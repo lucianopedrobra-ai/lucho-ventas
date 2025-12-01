@@ -5,12 +5,10 @@ import urllib.parse
 import re 
 
 # --- CONFIGURACIÓN ---
-# 🚨 CAMBIO 1: Ícono de Lucho (🧑‍💼) y layout para móvil (wide)
 st.set_page_config(page_title="Lucho | Pedro Bravin", page_icon="🧑‍💼", layout="wide")
 
 # 1. AUTENTICACIÓN
 try:
-# ... (Resto de la lógica de autenticación sin cambios) ...
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
 except KeyError:
@@ -25,7 +23,6 @@ SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkp
 
 @st.cache_data(ttl=600)
 def load_data():
-# ... (Resto de la lógica de carga de datos sin cambios) ...
     """Carga los datos desde la URL de la hoja de cálculo y los convierte a string."""
     try:
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip')
@@ -51,7 +48,6 @@ if csv_context == "ERROR_DATA_LOAD_FAILED":
 
 # 2.5. FUNCIÓN DE VALIDACIÓN DE DATOS LOCAL
 def validate_contact_data(text_input):
-# ... (Lógica de validación sin cambios) ...
     """
     Busca patrones de CUIT/DNI y Teléfono en el texto y valida su formato.
     Si la validación local falla, retorna un mensaje de error para el usuario.
@@ -82,8 +78,8 @@ def validate_contact_data(text_input):
 
     return None
 
-# 3. EL CEREBRO (PROMPT V74 - Corregido y Optimizado)
-# ... (Lógica del prompt sin cambios, ya se aplicó el escape {{}} y la regla de CHAPAS) ...
+# 3. EL CEREBRO (PROMPT V75 - Logística Optimizada)
+
 data_failure = "ERROR" in csv_context
 
 if data_failure:
@@ -102,7 +98,7 @@ else:
     reglas_cotizacion = """REGLAS DE INTERACCIÓN:
 1. Saludo: Inicia con "Hola, buenas tardes."
 2. Proactividad: Pregunta "¿Qué proyecto tenés? ¿Techado, rejas, pintura o construcción?"
-3. Captura Temprana: Antes de dar el precio final, pregunta: "Para confirmarte si tenés Envío Gratis, decime: ¿Tu Nombre y de qué Localidad sos?"
+3. Declaración de Servicio (OPTIMIZADA): Después de dar el precio de un producto, declara: "Te confirmo que tenemos Envío Sin Cargo en nuestra zona. Para verificar si aplica a tu proyecto o si prefieres retirar, necesito que me digas tu Localidad."
 4. LÍMITE ADMINISTRATIVO: Tú solo "reservas la orden".
 5. Proactividad ante Silencio (MEJORADA): Si en el turno anterior el cliente solo envió una respuesta corta o de confirmación (ej. "ok", "gracias", un emoji), o si su mensaje NO contiene una pregunta, ASUME que se detuvo y RETOMA la CONVERSACIÓN con la frase: "¿Pudiste revisar el presupuesto o necesitas que te cotice algo más?". Si el silencio persiste por TRES turnos consecutivos (incluyendo el de seguimiento), aplica el CIERRE CORTÉS.
 """ 
@@ -134,6 +130,10 @@ PROTOCOLO DE VENTA POR RUBRO:
 * REJA/CONSTRUCCIÓN: Cotiza material. Muestra diagrama ASCII si es reja.
 * NO LISTADOS: Si no está en BASE DE DATOS, fuerza handoff. La frase a usar es: "Disculpa, ese producto no figura en mi listado actual. Para una consulta inmediata de stock y precio en depósito, te pido que te contactes directamente con un vendedor al 3401-648118. ¡Ellos te ayudarán al instante!"
 
+PROTOCOLO LOGÍSTICO (POST-LOCALIDAD) - ¡NUEVO!
+* Si la Localidad del cliente está en la lista de ENVÍO SIN CARGO (ZONA), usa la frase: "¡Excelente! Estás dentro de nuestra zona de **Envío Sin Cargo**."
+* Si la Localidad NO está en la lista de ENVÍO SIN CARGO (ZONA), usa la frase: "Para esa Localidad no aplica el Envío Sin Cargo. Tienes dos opciones: 1. **Retiro** en El Trébol, Santa Fe, o 2. Lo derivo a un vendedor para que verifique si la entrega es posible y cuál sería su costo. ¿Qué prefieres?"
+
 PROTOCOLO DE VALIDACIÓN INTERNA:
 * CUIT: Debe tener exactamente 11 dígitos. Si no, pide el CUIT/DNI completo y correcto.
 * DNI: Debe tener 7 u 8 dígitos. Si no, pide el CUIT/DNI completo y correcto.
@@ -150,8 +150,8 @@ FORMATO Y CIERRE:
 * TICKET (DESGLOSE REAL): Usa bloques de código ```text. Lista cada producto por separado con su CÓDIGO y PRECIO UNITARIO real (del CSV). Nunca agrupes.
 * Usa la siguiente frase de Validación: "¿Cómo lo ves {{Nombre}}? ¿Cerramos así o ajustamos algo?"
 * PROTOCOLO DE CIERRE (El modelo debe generar el diálogo de cierre inmediatamente después de la validación):
-   1. PEDIDO FINAL (Contundente): El modelo debe decir: "Excelente. Para enviarle al depósito la reserva, solo me falta: CUIT/DNI y Teléfono." (Ya tenés Nombre y Loc).
-   2. GENERACIÓN DE TICKET FINAL (PASO CRÍTICO): Genera, después de la frase de Validación y la solicitud de CUIT/DNI y Teléfono, un bloque de código oculto (sin mostrar al cliente) que contenga el texto plano (sin formato Markdown) que será enviado por WhatsApp al vendedor. Usa la etiqueta [TEXTO_WHATSAPP]:.
+   1. PEDIDO FINAL (Contundente): El modelo debe decir: "Excelente. Para enviarle al depósito la reserva, solo me falta: Nombre, CUIT/DNI y Teléfono." (Ya tenés Localidad).
+   2. GENERACIÓN DE TICKET FINAL (PASO CRÍTICO): Genera, después de la frase de Validación y la solicitud de Nombre, CUIT/DNI y Teléfono, un bloque de código oculto (sin mostrar al cliente) que contenga el texto plano (sin formato Markdown) que será enviado por WhatsApp al vendedor. Usa la etiqueta [TEXTO_WHATSAPP]:.
    3. CIERRE POR RECHAZO (CRÍTICO): Si el cliente desestima el pedido, el modelo NO debe solicitar datos. Debe solo despedirse con la frase: "Perfecto. Lamento que no podamos avanzar hoy. Quedo a tu disposición para futuros proyectos. ¡Que tengas un excelente día!"
 """
 
@@ -185,10 +185,9 @@ if "chat_session" not in st.session_state:
         st.error(f"❌ Error al inicializar el modelo/chat: {e}")
         
 
-# --- MUESTRA EL HISTORIAL Y LAS SUGERENCIAS (Optimización UX y Avatares) ---
+# --- MUESTRA EL HISTORIAL Y LAS SUGERENCIAS ---
 
 for msg in st.session_state.messages:
-    # 🚨 CAMBIO 2: Avatares en el chat
     avatar = "🧑‍💼" if msg["role"] == "assistant" else "user" 
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
@@ -196,13 +195,13 @@ for msg in st.session_state.messages:
 if len(st.session_state.messages) == 1 and not st.session_state.suggestions_shown:
     
     suggestions = {
-        "Cotizar Chapa": "Quiero cotizar 10 chapas C25 de 4 metros.",
-        "Comparar Productos": "Comparame el precio del perfil C 100x40 vs 80x40.",
-        "Pedir Descuento": "¿Qué descuento me hacen por compra en efectivo mayor a $500.000?",
+        "Cotizar Techo": "Quiero cotizar un techo de 8x5 metros.",
+        "Materiales Cerco": "Necesito material para un cerco de 50 metros con tejido y postes.",
+        "Cotizar Reja": "Cotizame una reja de seguridad de 2x3 metros.",
+        "Recomendación Siderúrgica": "¿Qué tipo de perfil estructural me recomiendas para una viga de 6 metros?",
     }
     
     with st.chat_message("assistant"):
-        # Mensaje Discreto: Usa un subtítulo que da contexto sin ser redundante
         st.markdown(
             "***Ejemplos de preguntas que puedes hacer:***"
         )
@@ -236,7 +235,7 @@ if prompt_to_process:
     local_error = validate_contact_data(prompt_to_process)
     
     if local_error:
-        with st.chat_message("assistant", avatar="🧑‍💼"): # Usar avatar aquí
+        with st.chat_message("assistant", avatar="🧑‍💼"):
             st.markdown(local_error)
         st.session_state.messages.append({"role": "assistant", "content": local_error})
         st.rerun()
@@ -249,7 +248,7 @@ if prompt_to_process:
         chat = st.session_state.chat_session
         response = None
         
-        with st.chat_message("assistant", avatar="🧑‍💼"): # Usar avatar aquí
+        with st.chat_message("assistant", avatar="🧑‍💼"):
             with st.spinner("Lucho está cotizando..."):
                 response = chat.send_message(prompt_to_process)
             
