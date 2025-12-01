@@ -88,7 +88,6 @@ def search_product_data(prompt_text):
         col_search_str = df[col].astype(str).str.lower()
         
         for kw in keywords:
-            # Búsqueda de palabra completa (word boundary \b)
             mask = mask | col_search_str.str.contains(r'\b' + re.escape(kw) + r'\b', na=False)
 
     filtered_df = df[mask]
@@ -133,7 +132,7 @@ def validate_contact_data(text_input):
 
     return None
 
-# 3. EL CEREBRO (PROMPT V80)
+# 3. EL CEREBRO (PROMPT V81 - Flujo Conversacional Corregido)
 
 if data_failure:
     rol_persona = "ROL CRÍTICO: Eres Lucho, Ejecutivo Comercial Senior. Tu base de datos falló. NO DEBES COTIZAR NINGÚN PRECIO. Tu única función es disculparte por la 'falla temporal en el sistema de precios', tomar el Nombre, Localidad, CUIT/DNI y Teléfono del cliente, e informar que Martín Zimaro (3401 52-7780) le llamará de inmediato. IGNORA todas las reglas de cotización y enfócate en la derivación."
@@ -149,8 +148,8 @@ else:
     """
     
     reglas_cotizacion = """REGLAS DE INTERACCIÓN:
-1. Saludo: Inicia con "Hola, buenas tardes."
-2. Proactividad: Pregunta "¿Qué proyecto tenés? ¿Techado, rejas, pintura o construcción?"
+1. Saludo: **SOLO si el chat está vacío**, inicia con "Hola, buenas tardes."
+2. Proactividad: **Si el cliente hace una pregunta vaga o no da información de rubro**, pregunta "¿Qué proyecto tenés? ¿Techado, rejas, pintura o construcción?". **En caso de recibir una consulta clara (ej. "quiero chapa"), salta esta regla y ve a cotizar o al protocolo de NO LISTADOS.**
 3. Declaración de Servicio (OPTIMIZADA): Después de dar el precio de un producto, declara: "Te confirmo que tenemos Envío Sin Cargo en nuestra zona. Para verificar si aplica a tu proyecto o si prefieres retirar, necesito que me digas tu Localidad."
 4. LÍMITE ADMINISTRATIVO: Tú solo "reservas la orden".
 5. Proactividad ante Silencio (MEJORADA): Si en el turno anterior el cliente solo envió una respuesta corta o de confirmación (ej. "ok", "gracias", un emoji), o si su mensaje NO contiene una pregunta, ASUME que se detuvo y RETOMA la CONVERSACIÓN con la frase: "¿Pudiste revisar el presupuesto o necesitas que te cotice algo más?". Si el silencio persiste por TRES turnos consecutivos (incluyendo el de seguimiento), aplica el CIERRE CORTÉS.
@@ -217,11 +216,11 @@ if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "Hola, buenas. Soy Lucho. ¿Qué proyecto tenés hoy?"}]
 if "suggestions_shown" not in st.session_state:
     st.session_state.suggestions_shown = False
-if "debug_mode" not in st.session_state: # 🚨 DEBUG MODE INICIALIZACIÓN
+if "debug_mode" not in st.session_state:
     st.session_state.debug_mode = False
 
+
 # --- DEPURACIÓN (DEBUG MODE) ---
-# Usamos un expander para que sea discreto
 with st.expander("🛠️ Configuración y Depuración"):
     st.session_state.debug_mode = st.checkbox("Mostrar Datos de la Base de Precios", value=st.session_state.debug_mode)
 
@@ -300,7 +299,7 @@ if prompt_to_process:
         if "chat_session" not in st.session_state:
              st.error("No se pudo iniciar la sesión de chat. Revise la autenticación.")
              st.stop()
-             
+                 
         chat = st.session_state.chat_session
         response = None
         
@@ -309,12 +308,11 @@ if prompt_to_process:
         if not data_failure:
             relevant_data_string = search_product_data(prompt_to_process)
             
-            if st.session_state.debug_mode: # 🚨 DEBUG MODE LOGGING
+            if st.session_state.debug_mode:
                 st.info(f"DEBUG: Keywords usadas: {re.findall(r'\\b\\w{3,}\\b', prompt_to_process.lower())}")
                 st.info(f"DEBUG: Datos inyectados:\n{relevant_data_string if relevant_data_string else 'No se encontraron datos relevantes para inyectar.'}")
             
             if relevant_data_string:
-                # Inyectar el fragmento relevante al mensaje del usuario
                 dynamic_prompt = f"Consulta del Cliente: {prompt_to_process}\n\n[DATOS_RELEVANTES_BUSCADOS]:\n{relevant_data_string}"
             
         with st.chat_message("assistant", avatar="🧑‍💼"):
