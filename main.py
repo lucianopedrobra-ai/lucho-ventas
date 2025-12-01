@@ -2,135 +2,135 @@ import streamlit as st
 import pandas as pd
 from google import genai
 from google.genai import types
-import time
 
-# --- CONSTANTES DE CONFIGURACIÓN ---
-PAGE_TITLE = "Lucho | Asesor Comercial"
-PAGE_ICON = "🏗️"
-# URL pública del CSV publicado en Google Sheets
+# --- CONFIGURACIÓN DEL ENTORNO ---
+PAGE_CONFIG = {"page_title": "Lucho | Asesor Comercial", "page_icon": "🏗️", "layout": "centered"}
+MODEL_ID = "gemini-1.5-pro"
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
-st.set_page_config(page_title=PAGE_TITLE, page_icon=PAGE_ICON, layout="centered")
+st.set_page_config(**PAGE_CONFIG)
 
-def get_api_key():
-    """Recupera la API Key de los secretos de Streamlit de forma segura."""
+def get_credentials():
+    """Recupera credenciales de forma segura."""
     try:
         return st.secrets["GOOGLE_API_KEY"]
-    except (FileNotFoundError, KeyError):
-        st.error("Error de configuración: API Key no encontrada en secrets.")
+    except KeyError:
+        st.error("Error crítico: Credenciales no configuradas en el entorno.")
         st.stop()
 
-@st.cache_data(ttl=600)
-def load_data():
-    """Carga, limpia y optimiza la base de datos de precios."""
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_pricing_data():
+    """Obtiene y procesa la lista de precios en tiempo real."""
     try:
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip')
-        
-        # Optimización: Filtrar columnas irrelevantes para ahorrar tokens
-        # Se asume estructura: [Rubro, Subrubro, CÓDIGO, DESCRIPCIÓN, UNIDAD, P.BASE, P.ALT, Moneda]
-        # Índices clave: 2 (Código), 3 (Descripción), 4 (Unidad), 6 (Precio Alt/Venta)
-        if len(df.columns) > 6:
-            df_opt = df.iloc[:, [2, 3, 4, 6]].copy()
-            df_opt.columns = ['CODIGO', 'DESCRIPCION', 'UNIDAD', 'PRECIO_LISTA']
-            return df_opt.to_string(index=False)
         return df.to_string(index=False)
-        
     except Exception as e:
-        return f"Error al cargar datos: {str(e)}"
+        return f"Error de conexión con base de datos: {e}"
 
-def get_system_prompt(context):
-    """Genera las instrucciones del sistema con el contexto de datos actual."""
+def build_system_prompt(context_data):
+    """Genera la lógica de negocio del agente."""
     return f"""
-    ROL: Eres Lucho, Ejecutivo Comercial Senior. Tu perfil es técnico, experto y EXTREMADAMENTE CONCISO.
-    OBJETIVO: Cotizar rápido, realizar venta consultiva (Upsell) y cerrar la operación derivando a WhatsApp.
+    ROL: Asistente Comercial Senior "Lucho". Perfil técnico, conciso y orientado al cierre.
+    
+    BASE DE DATOS (PRECIOS ACTUALIZADOS):
+    {context_data}
 
-    BASE DE DATOS ACTUALIZADA:
-    {context}
+    DIRECTRICES OPERATIVAS:
+    1. PRECIOS: Los valores del CSV son NETOS. Calcular siempre precio final (x1.21 IVA).
+    2. SEGURIDAD: Validar CANTIDAD antes de cotizar.
+    3. DATOS: Solicitar Nombre y Localidad antes del precio final para validar logística.
+    4. ALCANCE: Reservar pedidos, no emitir facturas fiscales.
 
-    REGLAS OPERATIVAS:
-    1. IVA: Los precios de lista son NETOS. Debes MULTIPLICAR POR 1.21 para dar el precio final.
-    2. SEGURIDAD: Nunca des precios sin saber la CANTIDAD (evita errores de escala).
-    3. SALUDO: Corto y profesional ("Hola, buenas.").
-    4. DATOS DE CONTACTO: Antes del precio final, solicita Nombre y Localidad para validar envío.
-
-    LOGICA TÉCNICA (RAG):
-    - TUBOS: Conducción (Epoxi/Galva/Schedule) se venden por tira de 6.40m. Estructurales por tira de 6.00m.
-    - PLANCHUELAS: Precio por unidad (barra).
-    - AISLANTES: Si precio < $10k es x m2 (calcular por rollo). Si > $10k es x rollo cerrado.
+    REGLAS DE PRODUCTO (RAG):
+    - TUBOS: Cotizar tira completa (Conducción 6.40m / Estructural 6.00m).
+    - PLANCHUELAS: Unidad barra.
+    - AISLANTES: <$10k cotizar por m2 (calc. rollo) | >$10k cotizar por rollo.
 
     PROTOCOLOS DE VENTA:
-    - CHAPAS: Filtra uso (Techo vs Lisa). Si es techo, sugiere aislante (Doble Alu 10mm para semicubierto). Ofrece acopio si no hay medidas.
-    - TEJIDOS: Ofrece Kit Completo. Estrategia de menor (Eco) a mayor (Acindar).
-    - CONSTRUCCIÓN: Hierro ADN vs Liso. Alerta sobre hierro 4.2mm (fuera de norma).
-    - NO LISTADOS: Si el producto no figura en DB, deriva a consulta de stock física.
+    - CHAPAS: Filtrar uso (Techo/Lisa). Sugerir aislante Doble Alu 10mm en semicubiertos. Ofrecer acopio "Bolsa de Metros".
+    - TEJIDOS: Ofrecer Kit completo (Postes Tubo + Accesorios). Estrategia Eco -> Acindar.
+    - REJA: Diagrama ASCII visual. Cotizar Macizo vs Estructural.
+    - CONSTRUCCIÓN: Hierro ADN. Alertar si pide 4.2mm (no estructural). Upsell: Alambre/Clavos.
+    - NO CATALOGADO: Derivar a consulta de stock física.
 
     MATRIZ COMERCIAL:
-    - ENVÍO SIN CARGO: Zona El Trébol, San Jorge, Sastre, etc.
-    - DESCUENTOS: >$150k (7% Chapa/Hierro) | >$500k (7% Gral) | >$2M (14%).
-    - MEGA-CUENTAS (>10M): Muestra precio base y deriva a Gerencia (Martín Zimaro).
-    - FINANCIACIÓN: Promo FirstData (Mié/Sáb 3 cuotas s/int). Contado +3% extra.
+    - LOGÍSTICA: Envío bonificado en zona de influencia (El Trébol, San Jorge, etc.).
+    - BONIFICACIONES: >$150k (7% Chapa) | >$500k (7% Gral) | >$2M (14%).
+    - GRANDES CUENTAS (>10M): Presentar precio base y derivar a Gerencia (Martín Zimaro).
+    - PAGOS: Promo FirstData (Mié/Sáb). Contado +3% extra. Tarjetas solo presencial.
 
-    CIERRE Y FORMATO:
-    1. Pedir: Nombre, CUIT/DNI, Teléfono.
-    2. Link WhatsApp: Generar link con mensaje pre-cargado.
-       [✅ ENVIAR PEDIDO CONFIRMADO](LINK)
-       "📍 Retiro: [LINK_MAPS]"
+    FORMATO DE RESPUESTA:
+    - TICKET: Bloque de código ```text con desglose, códigos SKU y P.Unit.
+    - CIERRE: Solicitar Nombre, CUIT, Teléfono. Generar Link WhatsApp (Markdown).
     """
 
+def init_session():
+    if "messages" not in st.session_state:
+        st.session_state.messages = [
+            {"role": "model", "content": "Hola, buenas. Soy Lucho. ¿Qué proyecto tenés hoy? ¿Techado, rejas, pintura o construcción?"}
+        ]
+
+def render_chat():
+    for msg in st.session_state.messages:
+        avatar = "👷‍♂️" if msg["role"] == "model" else "👤"
+        with st.chat_message(msg["role"], avatar=avatar):
+            st.markdown(msg["content"])
+
 def main():
-    # Inicialización
     st.title("🏗️ Hablá con Lucho")
     st.markdown("**Atención Comercial | Acindar Pymes**")
     
-    api_key = get_api_key()
+    api_key = get_credentials()
     client = genai.Client(api_key=api_key)
-    csv_context = load_data()
+    pricing_data = fetch_pricing_data()
+    
+    init_session()
+    render_chat()
 
-    # Gestión de Sesión
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-        welcome_msg = "Hola, buenas. Soy Lucho. ¿Qué proyecto tenés hoy? ¿Techado, rejas, pintura o construcción?"
-        st.session_state.messages.append({"role": "model", "content": welcome_msg})
-
-    # Renderizar Chat
-    for message in st.session_state.messages:
-        avatar = "👷‍♂️" if message["role"] == "model" else "👤"
-        with st.chat_message(message["role"], avatar=avatar):
-            st.markdown(message["content"])
-
-    # Lógica de Interacción
-    if prompt := st.chat_input("Escribí acá..."):
+    if prompt := st.chat_input("Escribí tu consulta..."):
         with st.chat_message("user", avatar="👤"):
             st.markdown(prompt)
         st.session_state.messages.append({"role": "user", "content": prompt})
 
         try:
-            # Preparar historial
-            historial_gemini = [
+            sys_instruct = build_system_prompt(pricing_data)
+            
+            # Construcción del historial para la API
+            api_history = [
                 types.Content(role="user" if m["role"] == "user" else "model", parts=[types.Part.from_text(text=m["content"])])
                 for m in st.session_state.messages
             ]
 
-            # Configuración del Modelo (1.5 Flash para velocidad/costo)
-            sys_instruct = get_system_prompt(csv_context)
-            chat = client.chats.create(
-                model="gemini-1.5-flash",
+            # Inferencia
+            chat_session = client.chats.create(
+                model=MODEL_ID,
                 config=types.GenerateContentConfig(system_instruction=sys_instruct),
-                history=historial_gemini
+                history=api_history
             )
+            response = chat_session.send_message(prompt)
             
-            response = chat.send_message(prompt)
-            text_response = response.text
-
             with st.chat_message("model", avatar="👷‍♂️"):
-                st.markdown(text_response)
-            st.session_state.messages.append({"role": "model", "content": text_response})
+                st.markdown(response.text)
+            st.session_state.messages.append({"role": "model", "content": response.text})
 
         except Exception as e:
-            error_msg = f"⚠️ Hubo un error de conexión momentáneo. Por favor intentá de nuevo. ({str(e)})"
-            if "429" in str(e):
-                error_msg = "🚧 Estamos recibiendo muchas consultas. Por favor, aguardá unos segundos y volvé a preguntar."
-            st.error(error_msg)
+            # Fallback silencioso a modelo Flash si Pro falla o manejo de error genérico
+            if "404" in str(e) or "429" in str(e):
+                st.warning("Nota: Optimizando respuesta con modelo de alta velocidad...")
+                try:
+                    chat_session = client.chats.create(
+                        model="gemini-1.5-flash",
+                        config=types.GenerateContentConfig(system_instruction=sys_instruct),
+                        history=api_history
+                    )
+                    response = chat_session.send_message(prompt)
+                    with st.chat_message("model", avatar="👷‍♂️"):
+                        st.markdown(response.text)
+                    st.session_state.messages.append({"role": "model", "content": response.text})
+                except:
+                    st.error("Servicio momentáneamente no disponible. Por favor intente más tarde.")
+            else:
+                st.error(f"Error de conexión: {str(e)}")
 
 if __name__ == "__main__":
     main()
