@@ -20,7 +20,9 @@ except Exception as e:
     st.stop()
 
 # 2. CARGA DE DATOS
-SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtbBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
+# URL para la hoja de cálculo de Google Sheet en formato CSV
+# ¡CORREGIDA! Ahora usando el enlace más reciente proporcionado por el usuario.
+SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
 @st.cache_data(ttl=600)
 def load_data():
@@ -31,6 +33,7 @@ def load_data():
         # Convierte el DataFrame a una cadena de texto sin el índice para usar como contexto
         return df.to_string(index=False)
     except Exception as e:
+        # Manejo de errores de carga de datos
         error_msg = str(e)
         if "404" in error_msg or "Not Found" in error_msg:
             st.error(
@@ -80,9 +83,9 @@ FORMATO Y CIERRE:
 * TICKET (DESGLOSE REAL): Usa bloques de código ```text. Lista cada producto por separado con su CÓDIGO y PRECIO UNITARIO real (del CSV). Nunca agrupes.
 * FASE DE VALIDACIÓN: "¿Cómo lo ves [Nombre]? ¿Cerramos así o ajustamos algo?"
 * PROTOCOLO DE CIERRE (COMBO FINAL):
-    1. PEDIDO ÚNICO: "Excelente. Para reservar, solo me falta: CUIT/DNI y Teléfono." (Ya tenés Nombre y Loc).
-    2. LINK: Genera el link Markdown.
-    * Respuesta Final:
+   1. PEDIDO ÚNICO: "Excelente. Para reservar, solo me falta: CUIT/DNI y Teléfono." (Ya tenés Nombre y Loc).
+   2. LINK: Genera el link Markdown.
+   * Respuesta Final:
       "Listo. Hacé clic abajo para confirmar con el vendedor:"
       [✅ ENVIAR PEDIDO CONFIRMADO (WHATSAPP)](LINK)
       "O escribinos al: 3401-648118"
@@ -91,9 +94,7 @@ FORMATO Y CIERRE:
 
 # 4. INTERFAZ
 st.title("🏗️ Hablá con Lucho")
-# CORRECCIÓN 2: Sintaxis de URL de imagen corregida
-LUCHO_IMAGE_URL = "[https://placehold.co/120x120/4B0082/ffffff?text=Lucho+Exec](https://placehold.co/120x120/4B0082/ffffff?text=Lucho+Exec)" 
-st.image(LUCHO_IMAGE_URL, width=120) 
+# Se eliminó la sección de la imagen.
 st.markdown("**Atención Comercial | Pedro Bravin**")
 
 # Inicializa el historial de mensajes
@@ -102,6 +103,7 @@ if "messages" not in st.session_state:
 
 # Muestra los mensajes anteriores en el chat
 for msg in st.session_state.messages:
+    # Mapea el rol de la API a la función de mensaje de Streamlit
     role = "assistant" if msg["role"] == "model" else msg["role"]
     st.chat_message(role).write(msg["content"])
 
@@ -112,19 +114,19 @@ if prompt := st.chat_input():
     st.session_state.messages.append({"role": "user", "content": prompt})
 
     try:
-        model = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt) # Usamos el alias estable
-
-        # CORRECCIÓN 1: Filtra el último mensaje del usuario para evitar la dependencia circular
-        # El historial se construye con todos los mensajes MENOS el último (el 'prompt' actual)
-        history_for_api = [
+        # Usamos el identificador del modelo gemini-2.5-flash
+        model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025', system_instruction=sys_prompt)
+        
+        # Prepara el historial para la API
+        history = [
             {"role": "model" if m["role"] == "assistant" else m["role"], "parts": [{"text": m["content"]}]}
-            for m in st.session_state.messages[:-1] if m["role"] != "system"
+            for m in st.session_state.messages if m["role"] != "system"
         ]
         
-        # Inicia el chat con el historial que NO incluye el mensaje actual
-        chat = model.start_chat(history=history_for_api)
+        # Inicia el chat con el historial
+        chat = model.start_chat(history=history)
         
-        # Envía SOLO el mensaje actual (prompt)
+        # Envía el mensaje y espera la respuesta
         response = chat.send_message(prompt)
         
         # Muestra la respuesta y la guarda en el estado de sesión
@@ -135,4 +137,5 @@ if prompt := st.chat_input():
         # Manejo de errores
         st.error(f"❌ Error en la llamada a la API de Gemini: {e}")
         if "404" in str(e) or "not found" in str(e).lower():
+            # Consejo para el usuario en caso de error 404
             st.info("💡 Consejo: El nombre del modelo puede ser incorrecto o su clave API no tiene acceso. Intente usar un alias diferente o crear una nueva clave.")
