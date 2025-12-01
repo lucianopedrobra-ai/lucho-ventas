@@ -7,21 +7,33 @@ st.set_page_config(page_title="Lucho | Pedro Bravin", page_icon="🏗️", layou
 
 # 1. AUTENTICACIÓN
 try:
+    # Intenta obtener la API key de los secretos de Streamlit
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
-except:
-    st.error("🚨 Error: Falta la API Key en los Secrets.")
+except KeyError:
+    # Si la clave no se encuentra, muestra un error y detiene la ejecución
+    st.error("🚨 Error: Falta la API Key 'GOOGLE_API_KEY' en los Secrets de Streamlit.")
+    st.stop()
+except Exception as e:
+    # Maneja otros errores de configuración
+    st.error(f"🚨 Error de configuración de Gemini: {e}")
     st.stop()
 
 # 2. CARGA DE DATOS
-SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
+# URL para la hoja de cálculo de Google Sheet en formato CSV
+SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtcBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
 @st.cache_data(ttl=600)
 def load_data():
+    """Carga los datos desde la URL de la hoja de cálculo y los convierte a string."""
     try:
+        # Intenta leer el CSV
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip')
+        # Convierte el DataFrame a una cadena de texto sin el índice para usar como contexto
         return df.to_string(index=False)
-    except:
+    except Exception as e:
+        # Retorna un mensaje de error si la carga falla
+        st.error(f"Error cargando los datos de la hoja de cálculo: {e}")
         return "Error leyendo lista."
 
 csv_context = load_data()
@@ -61,30 +73,47 @@ CIERRE:
 st.title("🏗️ Hablá con Lucho")
 st.markdown("**Atención Comercial | Pedro Bravin**")
 
+# Inicializa el historial de mensajes
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "Hola, buenas. Soy Lucho. ¿Qué proyecto tenés hoy?"}]
 
+# Muestra los mensajes anteriores en el chat
 for msg in st.session_state.messages:
-    st.chat_message(msg["role"]).write(msg["content"])
+    # Mapea el rol de la API a la función de mensaje de Streamlit
+    role = "assistant" if msg["role"] == "model" else msg["role"]
+    st.chat_message(role).write(msg["content"])
 
+# Captura la entrada del usuario
 if prompt := st.chat_input():
+    # Muestra el mensaje del usuario
     st.chat_message("user").write(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
 
     try:
-        # MODELO FLASH (EL MÁS SEGURO)
-        model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=sys_prompt)
+        # CORRECCIÓN CLAVE: Usamos el identificador del modelo gemini-2.5-flash
+        # con el alias completo para mayor estabilidad.
+        model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025', system_instruction=sys_prompt)
         
-        # Historial simple
-        history = [{"role": m["role"], "parts": [m["content"]]} for m in st.session_state.messages if m["role"] != "system"]
+        # Prepara el historial para la API
+        # Nota: La API espera 'model' o 'user' como rol.
+        history = [
+            {"role": "model" if m["role"] == "assistant" else m["role"], "parts": [{"text": m["content"]}]}
+            for m in st.session_state.messages if m["role"] != "system"
+        ]
         
+        # Inicia el chat con el historial
         chat = model.start_chat(history=history)
+        
+        # Envía el mensaje y espera la respuesta
         response = chat.send_message(prompt)
         
+        # Muestra la respuesta y la guarda en el estado de sesión
         st.chat_message("assistant").write(response.text)
         st.session_state.messages.append({"role": "assistant", "content": response.text})
 
     except Exception as e:
-        st.error(f"❌ Error: {e}")
-        if "404" in str(e):
-            st.info("💡 Consejo: Creá una API Key nueva en un PROYECTO NUEVO en Google AI Studio.")
+        # Manejo de errores
+        st.error(f"❌ Error en la llamada a la API de Gemini: {e}")
+        if "404" in str(e) or "not found" in str(e).lower():
+            # Consejo para el usuario en caso de error 404
+            st.info("💡 Consejo: El nombre del modelo puede ser incorrecto o su clave API no tiene acceso. Intente usar un alias diferente o crear una nueva clave.")
