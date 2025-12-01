@@ -6,13 +6,15 @@ from google.genai import types
 # --- CONFIGURACIÓN ---
 PAGE_TITLE = "Lucho | Asesor Comercial"
 PAGE_ICON = "🏗️"
-MODEL_ID = "gemini-1.5-pro" # Modelo principal
+
+# CAMBIO CRÍTICO: Usamos el modelo 'flash' que es el estándar estable hoy
+MODEL_ID = "gemini-1.5-flash" 
+
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
 st.set_page_config(page_title=PAGE_TITLE, page_icon=PAGE_ICON, layout="centered")
 
 def get_credentials():
-    """Recupera la API Key de los secretos."""
     try:
         return st.secrets["GOOGLE_API_KEY"]
     except Exception:
@@ -56,7 +58,7 @@ def build_system_prompt(context_data):
     MATRIZ COMERCIAL:
     - LOGÍSTICA: Envío bonificado en zona de influencia (El Trébol, San Jorge, etc.).
     - BONIFICACIONES: >$150k (7% Chapa) | >$500k (7% Gral) | >$2M (14%).
-    - GRANDES CUENTAS (>10M): Precio base -> Derivar a Gerencia (Martín Zimaro).
+    - GRANDES CUENTAS (>10M): Presentar precio base y derivar a Gerencia (Martín Zimaro).
     - PAGOS: Promo FirstData (Mié/Sáb). Contado +3% extra.
 
     FORMATO:
@@ -95,13 +97,11 @@ def main():
         try:
             sys_instruct = build_system_prompt(pricing_data)
             
-            # Historial para la API
             api_history = [
                 types.Content(role="user" if m["role"] == "user" else "model", parts=[types.Part.from_text(text=m["content"])])
                 for m in st.session_state.messages
             ]
 
-            # LLAMADA DIRECTA (SIN FILTROS DE ERROR PARA VER EL PROBLEMA REAL)
             chat_session = client.chats.create(
                 model=MODEL_ID,
                 config=types.GenerateContentConfig(system_instruction=sys_instruct),
@@ -114,9 +114,7 @@ def main():
             st.session_state.messages.append({"role": "model", "content": response.text})
 
         except Exception as e:
-            # AQUÍ TE VA A DECIR LA VERDAD
             st.error(f"❌ Error Técnico: {str(e)}")
-            st.warning("Por favor revisa la API Key en Secrets o la cuota de Google AI Studio.")
 
 if __name__ == "__main__":
     main()
