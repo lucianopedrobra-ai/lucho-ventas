@@ -21,7 +21,8 @@ except Exception as e:
 
 # 2. CARGA DE DATOS
 # URL para la hoja de cálculo de Google Sheet en formato CSV
-SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtcBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
+# ¡CORREGIDA! Ahora usando el enlace más reciente proporcionado por el usuario.
+SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
 @st.cache_data(ttl=600)
 def load_data():
@@ -32,8 +33,15 @@ def load_data():
         # Convierte el DataFrame a una cadena de texto sin el índice para usar como contexto
         return df.to_string(index=False)
     except Exception as e:
-        # Retorna un mensaje de error si la carga falla
-        st.error(f"Error cargando los datos de la hoja de cálculo: {e}")
+        # Manejo de errores de carga de datos
+        error_msg = str(e)
+        if "404" in error_msg or "Not Found" in error_msg:
+            st.error(
+                f"🚨 Error 404 (Not Found) al cargar datos: El link en SHEET_URL es incorrecto o la hoja de cálculo NO está publicada 'al público' como archivo CSV. "
+                f"Vaya a 'Archivo > Compartir > Publicar en la web', seleccione el formato '.csv' y reemplace el link en la variable SHEET_URL."
+            )
+        else:
+            st.error(f"Error inesperado leyendo la lista de productos: {e}")
         return "Error leyendo lista."
 
 csv_context = load_data()
@@ -90,12 +98,10 @@ if prompt := st.chat_input():
     st.session_state.messages.append({"role": "user", "content": prompt})
 
     try:
-        # CORRECCIÓN CLAVE: Usamos el identificador del modelo gemini-2.5-flash
-        # con el alias completo para mayor estabilidad.
+        # Usamos el identificador del modelo gemini-2.5-flash
         model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025', system_instruction=sys_prompt)
         
         # Prepara el historial para la API
-        # Nota: La API espera 'model' o 'user' como rol.
         history = [
             {"role": "model" if m["role"] == "assistant" else m["role"], "parts": [{"text": m["content"]}]}
             for m in st.session_state.messages if m["role"] != "system"
