@@ -79,6 +79,12 @@ PROTOCOLO DE VENTA POR RUBRO:
 * REJA/CONSTRUCCIÓN: Cotiza material. Muestra diagrama ASCII si es reja.
 * NO LISTADOS: Si no está en BASE DE DATOS, fuerza handoff: "Consulto stock en depósito".
 
+PROTOCOLO DE VALIDACIÓN INTERNA:
+* CUIT: Debe tener exactamente 11 dígitos. Si no, pide el CUIT/DNI completo y correcto.
+* DNI: Debe tener 7 u 8 dígitos. Si no, pide el CUIT/DNI completo y correcto.
+* TELÉFONO: Debe tener al menos 7 dígitos y no más de 15 (incluyendo código de área, sin guiones). Si no, pide el teléfono correcto.
+* RESPUESTA DE ERROR: Si un dato es incorrecto, NO cierres. Di: "Disculpa, para asegurar la reserva, necesito que revises el [DATO INCORRECTO]. El formato correcto debe ser de [XX] dígitos. ¿Me lo confirmas, por favor?"
+
 MATRIZ DE NEGOCIACIÓN, FINANCIACIÓN Y LOGÍSTICA:
 * ENVÍO SIN CARGO (ZONA): El Trébol, María Susana, Piamonte, Landeta, San Jorge, Sastre, C. Pellegrini, Cañada Rosquín, Casas, Las Bandurrias, San Martín de las Escobas, Traill, Centeno, Classon, Los Cardos, Las Rosas, Bouquet, Montes de Oca.
 * DESCUENTOS: >$150k (7% Chapa/Hierro) | >$500k (7% General) | >$2M (14%).
@@ -102,15 +108,42 @@ FORMATO Y CIERRE:
 st.title("🏗️ Hablá con Lucho")
 st.markdown("**Atención Comercial | Pedro Bravin**")
 
+# --- NUEVA SECCIÓN DE SUGERENCIAS DE INTERACCIÓN (Botones) ---
+st.markdown("### 🗣️ ¿Cómo te puedo ayudar?")
+suggestion_col1, suggestion_col2, suggestion_col3 = st.columns(3)
+
+# Lista de comandos sugeridos
+suggestions = {
+    "Cotizar Chapa": "Quiero cotizar 10 chapas C25 de 4 metros.",
+    "Comparar Productos": "Comparame el precio del perfil C 100x40 vs 80x40.",
+    "Pedir Descuento": "¿Qué descuento me hacen por compra en efectivo mayor a $500.000?",
+}
+
+# Variable para almacenar la acción del botón
+triggered_prompt = None
+
+with suggestion_col1:
+    if st.button(list(suggestions.keys())[0], use_container_width=True):
+        triggered_prompt = suggestions[list(suggestions.keys())[0]]
+
+with suggestion_col2:
+    if st.button(list(suggestions.keys())[1], use_container_width=True):
+        triggered_prompt = suggestions[list(suggestions.keys())[1]]
+
+with suggestion_col3:
+    if st.button(list(suggestions.keys())[2], use_container_width=True):
+        triggered_prompt = suggestions[list(suggestions.keys())[2]]
+
 # Inicializa el historial de mensajes
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "Hola, buenas. Soy Lucho. ¿Qué proyecto tenés hoy?"}]
 
-# --- INICIALIZACIÓN DEL MODELO Y LA SESIÓN DE CHAT (Para mejorar la velocidad) ---
+# --- INICIALIZACIÓN DEL MODELO Y LA SESIÓN DE CHAT ---
 if "chat_session" not in st.session_state:
     try:
         model = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt)
         
+        # Mapeo de roles para la API
         initial_history = []
         for m in st.session_state.messages[1:]: 
             if m["role"] == "assistant":
@@ -131,14 +164,27 @@ if "chat_session" not in st.session_state:
 for msg in st.session_state.messages:
     st.chat_message(msg["role"]).write(msg["content"])
 
-# Captura la entrada del usuario
+
+# --- MANEJO DE INPUT (Botones o Campo de Texto) ---
+# Captura la entrada del usuario del campo de texto
 if prompt := st.chat_input():
-    st.chat_message("user").write(prompt)
+    # Si viene del chat_input, el prompt ya está definido
+
+# Si se presionó un botón, sobreescribimos el prompt para procesarlo
+if triggered_prompt:
+    prompt = triggered_prompt
+    
+# Si hay un prompt (del botón o del chat_input), lo procesamos
+if 'prompt' in locals() and prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
+    
+    # Se añade un mensaje de usuario visual para simular la interacción (si no lo hizo st.chat_input)
+    if not triggered_prompt: # st.chat_input ya lo hizo, solo necesitamos esto si vino de un botón
+        st.chat_message("user").write(prompt)
 
     try:
         if "chat_session" not in st.session_state:
-             st.error("No se pudo iniciar la sesión de chat. Revise la autenticación o el prompt inicial.")
+             st.error("No se pudo iniciar la sesión de chat. Revise la autenticación.")
              st.stop()
              
         chat = st.session_state.chat_session
@@ -153,6 +199,10 @@ if prompt := st.chat_input():
             
         # Guarda la respuesta en el estado de sesión
         st.session_state.messages.append({"role": "assistant", "content": response.text})
+        
+        # Si vino de un botón, forzamos el rerun para limpiar el estado de la aplicación
+        if triggered_prompt:
+            st.rerun()
 
     except Exception as e:
         error_message = str(e)
