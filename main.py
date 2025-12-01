@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
-import urllib.parse 
+import urllib.parse
+import re 
 
 # --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Lucho | Pedro Bravin", page_icon="🏗️", layout="centered")
@@ -46,7 +47,48 @@ if csv_context == "ERROR_DATA_LOAD_FAILED":
         "Lucho solo podrá tomar tus datos de contacto y derivarte a un vendedor humano."
     )
 
-# 3. EL CEREBRO (PROMPT V73 - Mejorado y Corregido)
+# 2.5. FUNCIÓN DE VALIDACIÓN DE DATOS LOCAL (Optimización de Costos)
+
+def validate_contact_data(text_input):
+    """
+    Busca patrones de CUIT/DNI y Teléfono en el texto y valida su formato.
+    Si la validación local falla, retorna un mensaje de error para el usuario.
+    """
+    
+    # 1. Definición de Patrones (Busca números puros para CUIT/DNI/Tel)
+    text_cleaned = re.sub(r'[^\d\s]', '', text_input) 
+
+    # Usamos re.findall para encontrar todos los números puros que podrían ser un identificador
+    numbers = re.findall(r'\b\d+\b', text_cleaned)
+    
+    # Solo intervenimos si el input parece ser una respuesta a la solicitud de datos
+    if len(text_input) < 50 and len(numbers) >= 2: 
+        
+        for num in numbers:
+            length = len(num)
+            
+            # Validación de CUIT (11 dígitos)
+            if length == 11: 
+                pass 
+            
+            # Validación de DNI (7 u 8 dígitos)
+            elif length in [7, 8]: 
+                pass
+            
+            # Validación de Teléfono (entre 7 y 15 dígitos)
+            elif length >= 7 and length <= 15:
+                pass
+            
+            # Si encontramos un número de longitud incorrecta para CUIT/DNI/Tel en este contexto
+            elif length > 1 and ('cuit' in text_input.lower() or 'dni' in text_input.lower() or 'tel' in text_input.lower()):
+                if length > 15:
+                    return "Disculpa, el **Teléfono** o **CUIT** que enviaste parece tener un formato incorrecto. Confírmame que el CUIT es de 11 dígitos y el teléfono (con código de área) está completo."
+                elif length < 7:
+                     return "Disculpa, para asegurar la reserva, necesito que revises el **DNI** (7 u 8 dígitos) o el **Teléfono** (al menos 7 dígitos). ¿Me lo confirmas, por favor?"
+
+    return None # Si todo está bien o no es un dato de contacto, retorna None
+
+# 3. EL CEREBRO (PROMPT V74 - Corregido y Optimizado)
 
 # --- Lógica Condicional del ROL (Mejora de Robustez) ---
 data_failure = "ERROR" in csv_context
@@ -75,8 +117,6 @@ else:
 5. Proactividad ante Silencio (MEJORADA): Si en el turno anterior el cliente solo envió una respuesta corta o de confirmación (ej. "ok", "gracias", un emoji), o si su mensaje NO contiene una pregunta, ASUME que se detuvo y RETOMA la CONVERSACIÓN con la frase: "¿Pudiste revisar el presupuesto o necesitas que te cotice algo más?". Si el silencio persiste por TRES turnos consecutivos (incluyendo el de seguimiento), aplica el CIERRE CORTÉS.
 """ 
 
-# 🚨 CORRECCIÓN CRÍTICA: Se usa una f-string para insertar variables Python, 
-# y doble llave {{}} para las variables que debe leer la IA (como {Nombre}).
 sys_prompt = f"""
 {rol_persona}
 UBICACIÓN DE RETIRO: El Trébol, Santa Fe. (Asume que el punto de retiro es central en esta localidad).
@@ -94,7 +134,13 @@ DICCIONARIO TÉCNICO Y MATEMÁTICA:
 
 PROTOCOLO DE VENTA POR RUBRO:
 * TEJIDOS: No uses "Kit". Cotiza item por item: 1. Tejido, 2. Alambre Tensión, 3. Planchuelas, 4. Accesorios.
-* CHAPAS: Filtro Techo vs Lisa. Aislación consultiva. Estructura. (Solo pide el largo exacto para cotizar cortes a medida).
+* CHAPAS (Optimizado):
+    * **REGLA DE COTIZACIÓN POR METRO:** Para chapas de techo, cotiza siempre por **Metro Lineal (ML)** utilizando los códigos base:
+        * **Código 4:** Chapa Acanalada Común (Sin color).
+        * **Código 6:** Chapa T-101 (Sin color).
+    * **LÓGICA DEL LARGO:** Si el cliente pregunta solo por el precio "por metro", usa el precio unitario del código base. Si pregunta por una cantidad total (ej. "30 metros de chapa"), cotiza el total multiplicando esa cantidad por el precio base.
+    * **COLORES/ACABADOS:** Asume que la venta es por metro y que el color no afecta la cotización, ya que no hay hojas precortadas predefinidas.
+    * FILTROS: Filtro Techo vs Lisa. Aislación consultiva. Estructura. (Solo pide el largo exacto **PARA PRESUPUESTO FINAL Y DETALLADO** después de haber dado el precio por metro).
 * REJA/CONSTRUCCIÓN: Cotiza material. Muestra diagrama ASCII si es reja.
 * NO LISTADOS: Si no está en BASE DE DATOS, fuerza handoff. La frase a usar es: "Disculpa, ese producto no figura en mi listado actual. Para una consulta inmediata de stock y precio en depósito, te pido que te contactes directamente con un vendedor al 3401-648118. ¡Ellos te ayudarán al instante!"
 
@@ -129,7 +175,7 @@ if "messages" not in st.session_state:
 if "suggestions_shown" not in st.session_state:
     st.session_state.suggestions_shown = False
 if "triggered_prompt" not in st.session_state:
-    st.session_state.triggered_prompt = None # Inicializa para la lógica de botones
+    st.session_state.triggered_prompt = None
 
 
 # --- INICIALIZACIÓN DEL MODELO Y LA SESIÓN DE CHAT ---
@@ -137,17 +183,11 @@ if "chat_session" not in st.session_state:
     try:
         model = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt)
         
-        # Mapeo de roles para la API
+        # Mapeo de roles para la API (Restauración de la conversación)
         initial_history = []
-        # Solo procesamos mensajes si hay más del mensaje inicial
         if len(st.session_state.messages) > 1:
             for m in st.session_state.messages[1:]: 
-                if m["role"] == "assistant":
-                    api_role = "model"
-                elif m["role"] == "user":
-                    api_role = "user"
-                else:
-                    continue
+                api_role = "model" if m["role"] == "assistant" else "user"
                 initial_history.append({"role": api_role, "parts": [{"text": m["content"]}]})
             
         st.session_state.chat_session = model.start_chat(history=initial_history)
@@ -156,29 +196,37 @@ if "chat_session" not in st.session_state:
         st.error(f"❌ Error al inicializar el modelo/chat: {e}")
         
 
-# --- MUESTRA EL HISTORIAL Y LA BURBUJA DE SUGERENCIAS ---
+# --- MUESTRA EL HISTORIAL Y LA BURBUJA DE SUGERENCIAS (CON POPOVER DISCRETO) ---
+
+# 1. Muestra el historial de mensajes
 for msg in st.session_state.messages:
-    # Usamos st.markdown para que el contenido del historial se renderice correctamente
     st.chat_message(msg["role"]).markdown(msg["content"])
 
-# Mostrar la burbuja de sugerencias solo si es el primer mensaje
+# 2. Lógica para mostrar el Popover de Sugerencias (Solo en el primer turno)
 if len(st.session_state.messages) == 1 and not st.session_state.suggestions_shown:
     
+    suggestions = {
+        "Cotizar Chapa": "Quiero cotizar 10 chapas C25 de 4 metros.",
+        "Comparar Productos": "Comparame el precio del perfil C 100x40 vs 80x40.",
+        "Pedir Descuento": "¿Qué descuento me hacen por compra en efectivo mayor a $500.000?",
+    }
+    
+    # Mensaje introductorio discreto
     with st.chat_message("assistant"):
-        st.markdown("💡 **Tip:** Puedes iniciar con preguntas directas como:")
+        st.markdown(
+            "💡 **Tip:** Haz clic en el botón de abajo si necesitas ideas para iniciar la conversación."
+        )
         
-        suggestions = {
-            "Cotizar Chapa": "Quiero cotizar 10 chapas C25 de 4 metros.",
-            "Comparar Productos": "Comparame el precio del perfil C 100x40 vs 80x40.",
-            "Pedir Descuento": "¿Qué descuento me hacen por compra en efectivo mayor a $500.000?",
-        }
+    # Colocamos el popover después del último mensaje
+    with st.popover("Ver Sugerencias para Lucho", use_container_width=True):
+        st.markdown("### ¿Cómo inicio la conversación?")
         
         cols = st.columns(len(suggestions))
         
         for i, (label, prompt_text) in enumerate(suggestions.items()):
             with cols[i]:
-                if st.button(label, key=f"sug_btn_{i}", use_container_width=True):
-                    # 💡 Manejo de Botones: Guardamos en session_state antes del rerun
+                # Usamos st.session_state.triggered_prompt para enviar el input
+                if st.button(label, key=f"sug_btn_pop_{i}", use_container_width=True):
                     st.session_state.triggered_prompt = prompt_text 
                     st.session_state.suggestions_shown = True 
                     st.rerun() 
@@ -187,11 +235,9 @@ if len(st.session_state.messages) == 1 and not st.session_state.suggestions_show
 
 # 1. Lógica unificada de input
 if st.session_state.triggered_prompt:
-    # Si se disparó por un botón, usamos el valor guardado
     prompt_to_process = st.session_state.triggered_prompt
     st.session_state.triggered_prompt = None # Lo limpiamos
 elif prompt := st.chat_input():
-    # Si viene del campo de texto
     prompt_to_process = prompt
 else:
     prompt_to_process = None
@@ -199,9 +245,17 @@ else:
 # 2. Procesamiento Centralizado
 if prompt_to_process:
     st.session_state.messages.append({"role": "user", "content": prompt_to_process})
+    st.chat_message("user").markdown(prompt_to_process)
+
+    # 🚨 Validación Local antes de llamar a Gemini
+    local_error = validate_contact_data(prompt_to_process)
     
-    # Se añade un mensaje de usuario visual
-    st.chat_message("user").markdown(prompt_to_process) # Usamos markdown para mayor flexibilidad
+    if local_error:
+        # Si la validación falla en Python, respondemos inmediatamente (Ahorra tokens)
+        with st.chat_message("assistant"):
+            st.markdown(local_error)
+        st.session_state.messages.append({"role": "assistant", "content": local_error})
+        st.rerun()
 
     try:
         if "chat_session" not in st.session_state:
@@ -214,13 +268,13 @@ if prompt_to_process:
         # Muestra el indicador de carga dinámico
         with st.chat_message("assistant"):
             with st.spinner("Lucho está cotizando..."):
+                # Llamada a la API de Gemini
                 response = chat.send_message(prompt_to_process)
             
-            # --- Procesamiento del Cierre y el Link (SUGERENCIA 2) ---
+            # --- Procesamiento del Cierre y el Link ---
             final_response_text = response.text
             whatsapp_link_section = ""
             
-            # Buscamos la etiqueta oculta del texto de WhatsApp
             WHATSAPP_TAG = "[TEXTO_WHATSAPP]:"
             if WHATSAPP_TAG in final_response_text:
                 # 1. Separamos la respuesta de Lucho y el texto oculto
@@ -231,7 +285,6 @@ if prompt_to_process:
                 
                 # 3. Codificamos el texto y generamos el link
                 whatsapp_text = whatsapp_part.strip()
-                # El texto se codifica para la URL de WhatsApp
                 encoded_text = urllib.parse.quote(whatsapp_text)
                 whatsapp_url = f"https://wa.me/5493401648118?text={encoded_text}"
                 
@@ -246,10 +299,8 @@ if prompt_to_process:
                 
                 📍 Retiro: [Ver Ubicación en Mapa](https://www.google.com/maps/search/?api=1&query=Pedro+Bravin+Materiales+El+Trebol)
                 """
-                # Muestra la sección de cierre en la interfaz
                 st.markdown(whatsapp_link_section)
                 
-                # Guardamos solo el diálogo + el cierre visual para el historial
                 final_response_for_history = dialogue_part.strip() + whatsapp_link_section
             else:
                 # Si no hay etiqueta de cierre, muestra la respuesta normal
@@ -259,11 +310,21 @@ if prompt_to_process:
         # Guarda la respuesta en el estado de sesión
         st.session_state.messages.append({"role": "assistant", "content": final_response_for_history})
         
-        # Forzar rerun para actualizar el historial
         st.rerun()
 
     except Exception as e:
         error_message = str(e)
         st.error(f"❌ Error en la llamada a la API de Gemini: {e}")
         
-        # ... (Lógica de manejo de errores de API) ...
+        if "429" in error_message or "Quota exceeded" in error_message:
+            st.info(
+                "🛑 **CUPO DE API EXCEDIDO (Error 429)**: Ha alcanzado el límite de tokens de entrada para el plan gratuito. "
+                "Espere unos minutos antes de intentar de nuevo o considere revisar y actualizar su plan de facturación en Google AI Studio. "
+                "[Más información sobre límites de cuota](https://ai.google.dev/gemini-api/docs/rate-limits)."
+            )
+        elif "400" in error_message and "valid role" in error_message:
+             st.info("💡 **Error de Rol (400)**: Hubo un problema con la estructura del historial de chat. Se ha corregido el mapeo de roles.")
+        elif "404" in error_message or "not found" in error_message.lower():
+            st.info("💡 Consejo: El nombre del modelo puede ser incorrecto o su clave API no tiene acceso. Intente usar un alias diferente o crear una nueva clave.")
+        else:
+            st.info("Revise los detalles del error en la consola o el administrador de su aplicación.")
