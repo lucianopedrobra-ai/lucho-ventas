@@ -101,7 +101,7 @@ def main():
             # --- INTENTO 1: GEMINI 1.5 PRO (EL MEJOR) ---
             try:
                 chat_session = client.chats.create(
-                    model="gemini-1.5-pro",
+                    model="models/gemini-2.5-pro",
                     config=types.GenerateContentConfig(system_instruction=sys_instruct),
                     history=api_history
                 )
