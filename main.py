@@ -74,8 +74,10 @@ def search_product_data(prompt_text):
     
     keywords = re.findall(r'\b\w{3,}\b', search_text) 
     
+    # Crea una máscara de búsqueda booleana (inicialmente False)
     mask = pd.Series([False] * len(df))
 
+    # 🚨 CORRECCIÓN DE FALLA DE BÚSQUEDA: Busca en todas las columnas de texto.
     for col in df.select_dtypes(include='object').columns:
         col_search_str = df[col].astype(str).str.lower()
         
@@ -124,7 +126,7 @@ def validate_contact_data(text_input):
 
     return None
 
-# 3. EL CEREBRO (PROMPT V77)
+# 3. EL CEREBRO (PROMPT V78 - Protocolo de Falla Corregido)
 
 if data_failure:
     rol_persona = "ROL CRÍTICO: Eres Lucho, Ejecutivo Comercial Senior. Tu base de datos falló. NO DEBES COTIZAR NINGÚN PRECIO. Tu única función es disculparte por la 'falla temporal en el sistema de precios', tomar el Nombre, Localidad, CUIT/DNI y Teléfono del cliente, e informar que Martín Zimaro (3401 52-7780) le llamará de inmediato. IGNORA todas las reglas de cotización y enfócate en la derivación."
@@ -172,7 +174,8 @@ PROTOCOLO DE VENTA POR RUBRO:
     * **COLORES/ACABADOS:** Asume que la venta es por metro y que el color no afecta la cotización, ya que no hay hojas precortadas predefinidas.
     * FILTROS: Filtro Techo vs Lisa. Aislación consultiva. Estructura. (Solo pide el largo exacto **PARA PRESUPUESTO FINAL Y DETALLADO** después de haber dado el precio por metro).
 * REJA/CONSTRUCCIÓN: Cotiza material. Muestra diagrama ASCII si es reja. Después de cotizar, pregunta si necesita pintura y consumibles de soldadura (electrodos, etc.) para la unión de las piezas.
-* NO LISTADOS: Si no está en BASE DE DATOS, fuerza handoff. La frase a usar es: "Disculpa, ese producto no figura en mi listado actual. Para una consulta inmediata de stock y precio en depósito, te pido que te contactes directamente con un vendedor al 3401-648118. ¡Ellos te ayudarán al instante!"
+* NO LISTADOS: Si no está en BASE DE DATOS, fuerza handoff. La frase a usar es: "Disculpa, ese producto no figura en mi listado actual. Para una consulta inmediata de stock y precio en depósito, te pido que te contactes directamente con un [vendedor al 3401-648118](tel:+543401648118). ¡Ellos te ayudarán al instante!"
+# 🚨 CORRECCIÓN: Se añadió el hipervínculo tipo tel: para que sea clickeable en móvil.
 
 PROTOCOLO LOGÍSTICO (POST-LOCALIDAD):
 * Si la Localidad del cliente está en la lista de ENVÍO SIN CARGO (ZONA), usa la frase: "¡Excelente! Estás dentro de nuestra zona de **Envío Sin Cargo**."
@@ -210,7 +213,8 @@ if "suggestions_shown" not in st.session_state:
     st.session_state.suggestions_shown = False
 if "triggered_prompt" not in st.session_state:
     st.session_state.triggered_prompt = None
-
+if "cart" not in st.session_state:
+    st.session_state.cart = [] # 🚨 Inicialización del carrito
 
 # --- INICIALIZACIÓN DEL MODELO Y LA SESIÓN DE CHAT ---
 if "chat_session" not in st.session_state:
@@ -227,90 +231,200 @@ if "chat_session" not in st.session_state:
         
     except Exception as e:
         st.error(f"❌ Error al inicializar el modelo/chat: {e}")
+
+
+# --- SECCIÓN DE FUNCIONES Y ESTRUCTURA DE COLUMNAS (Para Carro de Compras) ---
+
+def calculate_cart_total():
+    """Calcula el subtotal (NETO), IVA y total final del carrito."""
+    cart = st.session_state.cart
+    total_neto = 0
+    
+    # NOTA: Ajusta los nombres de columna aquí si tu CSV es diferente
+    for item in cart:
+        total_neto += item.get('Precio_Neto_Unitario', 0) * item.get('Cantidad', 0)
+    
+    total_iva = total_neto * 0.21
+    total_final = total_neto * 1.21
+    
+    return total_neto, total_iva, total_final
+
+def add_to_cart(product_code, quantity):
+    """Busca el producto por código en el DataFrame y lo añade al carrito."""
+    if 'df' not in st.session_state or st.session_state.df is None:
+        st.error("No se puede añadir al carrito: Base de datos no disponible.")
+        return False
+
+    try:
+        # Busca la fila del producto por código (Ajusta 'Código', 'Producto', 'Precio' si es necesario)
+        product_row = st.session_state.df[st.session_state.df.iloc[:, 0].astype(str) == str(product_code)].iloc[0]
         
+        item = {
+            'Código': product_code,
+            'Producto': product_row.iloc[1], # Asumiendo columna 1 es descripción
+            'Precio_Neto_Unitario': product_row.iloc[2], # Asumiendo columna 2 es precio neto
+            'Cantidad': quantity
+        }
+        
+        st.session_state.cart.append(item)
+        st.toast(f"Añadido: {quantity}x {item['Producto']}", icon="🛒")
+        return True
+        
+    except IndexError:
+        st.warning(f"No se encontró el producto con Código: {product_code}. Revise el código.")
+        return False
+    except Exception as e:
+        st.error(f"Error al añadir al carro: {e}. Revise los índices de columna en 'add_to_cart'.")
+        return False
 
-# --- MUESTRA EL HISTORIAL Y LAS SUGERENCIAS ---
 
-for msg in st.session_state.messages:
-    # 🚨 Aplicación de avatar en el chat
-    avatar = "🧑‍💼" if msg["role"] == "assistant" else "user" 
-    st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
+# 🚨 ESTRUCTURA PRINCIPAL DE COLUMNAS (Chat y Carro)
+col_chat, col_cart = st.columns([2, 1]) 
 
-# Muestra las sugerencias solo en el primer turno (Solo como texto/guía)
-if len(st.session_state.messages) == 1 and not st.session_state.suggestions_shown:
+
+# --- COLUMNA DEL CARRO DE COMPRAS Y BUSCADOR (col_cart) ---
+
+with col_cart:
+    st.subheader("🛒 Carro de Compras")
     
-    suggestions_text = [
-        "**Cotizar Techo** (ej. 'Quiero cotizar un techo de 8x5 metros.')",
-        "**Materiales Cerco** (ej. 'Necesito material para un cerco de 50 metros con tejido y postes.')",
-        "**Cotizar Reja** (ej. 'Cotizame una reja de seguridad de 2x3 metros.')",
-        "**Recomendación Siderúrgica** (ej. 'Qué tipo de perfil estructural me recomiendas para una viga de 6 metros?')"
-    ]
+    if st.session_state.cart:
+        cart_df = pd.DataFrame(st.session_state.cart)
+        
+        display_df = cart_df[['Producto', 'Cantidad']]
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
+        
+        total_neto, total_iva, total_final = calculate_cart_total()
+        
+        st.metric("Subtotal (NETO)", f"${total_neto:,.2f}")
+        st.metric("IVA (21%)", f"${total_iva:,.2f}")
+        st.metric("**Total Final**", f"**${total_final:,.2f}**")
+        
+        st.divider()
+        
+        if st.button("Finalizar y Cotizar (Usar Lucho)", use_container_width=True, key="btn_checkout"):
+            # Llenar triggered_prompt para transferir el control a Lucho
+            st.session_state.triggered_prompt = f"COTIZACIÓN FINAL DE CARRITO: El cliente ha añadido los siguientes ítems y desea finalizar el pedido. Por favor, revisa descuentos y aplica PROTOCOLO LOGÍSTICO y CIERRE:\n\n{cart_df.to_string(index=False)}"
+            st.rerun()
+            
+    else:
+        st.info("El carro está vacío. Use el buscador para añadir productos.")
+        
+    st.divider()
+    st.subheader("🔎 Búsqueda Rápida")
     
-    with st.chat_message("assistant"):
-        st.markdown(
+    search_term = st.text_input("Buscar producto por nombre o código:", key="search_term")
+    
+    # Lógica de búsqueda simplificada para la interfaz
+    if search_term and 'df' in st.session_state:
+        df_search = st.session_state.df[st.session_state.df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)].head(5)
+        
+        if not df_search.empty:
+            st.write("Resultados (Top 5):")
+            
+            # Asume que la primera columna es el código y la segunda es el producto
+            codes = df_search.iloc[:, 0].tolist()
+            products = df_search.iloc[:, 1].tolist()
+            
+            selected_product_code = st.selectbox(
+                "Seleccione para añadir:", 
+                options=codes, 
+                format_func=lambda code: f"{code} - {products[codes.index(code)]}"
+            )
+            quantity = st.number_input("Cantidad", min_value=1, value=1, key="qty_add")
+            
+            if st.button("Añadir", key="add_btn_quick"):
+                add_to_cart(selected_product_code, quantity)
+        else:
+            st.info("No se encontraron productos.")
+            
+    elif search_term and data_failure:
+        st.warning("La base de datos no está disponible. No se puede realizar la búsqueda.")
+
+
+# --- COLUMNA DEL CHAT (col_chat) ---
+
+with col_chat:
+    # --- MUESTRA EL HISTORIAL Y LAS SUGERENCIAS ---
+    for msg in st.session_state.messages:
+        avatar = "🧑‍💼" if msg["role"] == "assistant" else "user" 
+        st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
+
+    # Muestra las sugerencias solo en el primer turno (Solo como texto/guía)
+    if len(st.session_state.messages) == 1 and not st.session_state.suggestions_shown:
+        
+        suggestions_text = [
+            "**Cotizar Techo** (ej. 'Quiero cotizar un techo de 8x5 metros.')",
+            "**Materiales Cerco** (ej. 'Necesito material para un cerco de 50 metros con tejido y postes.')",
+            "**Cotizar Reja** (ej. 'Cotizame una reja de seguridad de 2x3 metros.')",
+            "**Recomendación Siderúrgica** (ej. 'Qué tipo de perfil estructural me recomiendas para una viga de 6 metros?')"
+        ]
+        
+        st.chat_message("assistant").markdown(
             "***Ejemplos de preguntas que puedes hacer:***"
         )
         for tip in suggestions_text:
-            st.markdown(f"* {tip}")
-            
-    st.session_state.suggestions_shown = True 
-                    
-# --- MANEJO DE INPUT (Campo de Texto) ---
+            st.chat_message("assistant").markdown(f"* {tip}")
+                
+        st.session_state.suggestions_shown = True 
+                        
+    # --- MANEJO DE INPUT (Campo de Texto) ---
 
-if prompt := st.chat_input():
-    prompt_to_process = prompt
-else:
-    prompt_to_process = None
+    if st.session_state.triggered_prompt:
+        prompt_to_process = st.session_state.triggered_prompt
+        st.session_state.triggered_prompt = None
+    elif prompt := st.chat_input("Escribe tu pregunta o consulta..."):
+        prompt_to_process = prompt
+    else:
+        prompt_to_process = None
 
-# 2. Procesamiento Centralizado
-if prompt_to_process:
-    st.session_state.messages.append({"role": "user", "content": prompt_to_process})
-    st.chat_message("user").markdown(prompt_to_process)
+    # 2. Procesamiento Centralizado del Chat
+    if prompt_to_process:
+        st.session_state.messages.append({"role": "user", "content": prompt_to_process})
+        st.chat_message("user").markdown(prompt_to_process)
 
-    # Validación Local antes de llamar a Gemini
-    local_error = validate_contact_data(prompt_to_process)
-    
-    if local_error:
-        with st.chat_message("assistant", avatar="🧑‍💼"):
-            st.markdown(local_error)
-        st.session_state.messages.append({"role": "assistant", "content": local_error})
-        st.rerun()
-
-    try:
-        if "chat_session" not in st.session_state:
-             st.error("No se pudo iniciar la sesión de chat. Revise la autenticación.")
-             st.stop()
-             
-        chat = st.session_state.chat_session
-        response = None
+        # Validación Local antes de llamar a Gemini
+        local_error = validate_contact_data(prompt_to_process)
         
-        # OPTIMIZACIÓN DE DATOS: Preparamos el prompt con datos filtrados
-        dynamic_prompt = prompt_to_process
-        if not data_failure:
-            relevant_data_string = search_product_data(prompt_to_process)
+        if local_error:
+            with st.chat_message("assistant", avatar="🧑‍💼"):
+                st.markdown(local_error)
+            st.session_state.messages.append({"role": "assistant", "content": local_error})
+            st.rerun()
+
+        try:
+            if "chat_session" not in st.session_state:
+                 st.error("No se pudo iniciar la sesión de chat. Revise la autenticación.")
+                 st.stop()
+                 
+            chat = st.session_state.chat_session
+            response = None
             
-            if relevant_data_string:
-                # Inyectar el fragmento relevante al mensaje del usuario
-                dynamic_prompt = f"Consulta del Cliente: {prompt_to_process}\n\n[DATOS_RELEVANTES_BUSCADOS]:\n{relevant_data_string}"
-            
-        with st.chat_message("assistant", avatar="🧑‍💼"):
-            with st.spinner("Lucho está cotizando..."):
-                response = chat.send_message(dynamic_prompt)
-            
-            final_response_text = response.text
-            whatsapp_link_section = ""
-            
-            WHATSAPP_TAG = "[TEXTO_WHATSAPP]:"
-            if WHATSAPP_TAG in final_response_text:
-                dialogue_part, whatsapp_part = final_response_text.split(WHATSAPP_TAG, 1)
-                st.markdown(dialogue_part.strip())
+            # OPTIMIZACIÓN DE DATOS: Preparamos el prompt con datos filtrados
+            dynamic_prompt = prompt_to_process
+            if not data_failure:
+                relevant_data_string = search_product_data(prompt_to_process)
                 
-                whatsapp_text = whatsapp_part.strip()
-                encoded_text = urllib.parse.quote(whatsapp_text)
-                whatsapp_url = f"https://wa.me/5493401648118?text={encoded_text}"
+                if relevant_data_string:
+                    # Inyectar el fragmento relevante al mensaje del usuario
+                    dynamic_prompt = f"Consulta del Cliente: {prompt_to_process}\n\n[DATOS_RELEVANTES_BUSCADOS]:\n{relevant_data_string}"
                 
-                # Estructura de cierre de Markdown robusta
-                whatsapp_link_section = f"""
+            with st.chat_message("assistant", avatar="🧑‍💼"):
+                with st.spinner("Lucho está cotizando..."):
+                    response = chat.send_message(dynamic_prompt)
+                
+                final_response_text = response.text
+                whatsapp_link_section = ""
+                
+                WHATSAPP_TAG = "[TEXTO_WHATSAPP]:"
+                if WHATSAPP_TAG in final_response_text:
+                    dialogue_part, whatsapp_part = final_response_text.split(WHATSAPP_TAG, 1)
+                    st.markdown(dialogue_part.strip())
+                    
+                    whatsapp_text = whatsapp_part.strip()
+                    encoded_text = urllib.parse.quote(whatsapp_text)
+                    whatsapp_url = f"https://wa.me/5493401648118?text={encoded_text}"
+                    
+                    whatsapp_link_section = f"""
 ---
 Listo. Hacé clic abajo para confirmar con el vendedor:
 
@@ -320,26 +434,25 @@ O escribinos al: 3401-648118
 
 📍 Retiro: [Ver Ubicación en Mapa](https://www.google.com/maps/search/?api=1&query=Pedro+Bravin+Materiales+El+Trebol)
 """
-                st.markdown(whatsapp_link_section)
-                
-                # Guardar con separador limpio para renderizado futuro
-                final_response_for_history = dialogue_part.strip() + "\n\n" + whatsapp_link_section.strip()
-            else:
-                st.markdown(response.text)
-                final_response_for_history = response.text
-                
-        st.session_state.messages.append({"role": "assistant", "content": final_response_for_history})
-        st.rerun()
+                    st.markdown(whatsapp_link_section)
+                    
+                    final_response_for_history = dialogue_part.strip() + "\n\n" + whatsapp_link_section.strip()
+                else:
+                    st.markdown(response.text)
+                    final_response_for_history = response.text
+                    
+            st.session_state.messages.append({"role": "assistant", "content": final_response_for_history})
+            st.rerun()
 
-    except Exception as e:
-        error_message = str(e)
-        st.error(f"❌ Error en la llamada a la API de Gemini: {e}")
-        
-        if "429" in error_message or "Quota exceeded" in error_message:
-            st.info("🛑 **CUPO DE API EXCEDIDO (Error 429)**...")
-        elif "400" in error_message and "valid role" in error_message:
-             st.info("💡 **Error de Rol (400)**:...")
-        elif "404" in error_message or "not found" in error_message.lower():
-            st.info("💡 Consejo: El nombre del modelo puede ser incorrecto o su clave API no tiene acceso...")
-        else:
-            st.info("Revise los detalles del error en la consola o el administrador de su aplicación.")
+        except Exception as e:
+            error_message = str(e)
+            st.error(f"❌ Error en la llamada a la API de Gemini: {e}")
+            
+            if "429" in error_message or "Quota exceeded" in error_message:
+                st.info("🛑 **CUPO DE API EXCEDIDO (Error 429)**...")
+            elif "400" in error_message and "valid role" in error_message:
+                 st.info("💡 **Error de Rol (400)**:...")
+            elif "404" in error_message or "not found" in error_message.lower():
+                st.info("💡 Consejo: El nombre del modelo puede ser incorrecto o su clave API no tiene acceso...")
+            else:
+                st.info("Revise los detalles del error en la consola o el administrador de su aplicación.")
