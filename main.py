@@ -108,7 +108,7 @@ FORMATO Y CIERRE:
 st.title("🏗️ Hablá con Lucho")
 st.markdown("**Atención Comercial | Pedro Bravin**")
 
-# --- NUEVA SECCIÓN DE SUGERENCIAS DE INTERACCIÓN (Botones) ---
+# --- SUGERENCIAS DE INTERACCIÓN (Botones) ---
 st.markdown("### 🗣️ ¿Cómo te puedo ayudar?")
 suggestion_col1, suggestion_col2, suggestion_col3 = st.columns(3)
 
@@ -169,6 +169,7 @@ for msg in st.session_state.messages:
 # Captura la entrada del usuario del campo de texto
 if prompt := st.chat_input():
     # Si viene del chat_input, el prompt ya está definido
+    pass
 
 # Si se presionó un botón, sobreescribimos el prompt para procesarlo
 if triggered_prompt:
@@ -179,7 +180,7 @@ if 'prompt' in locals() and prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
     
     # Se añade un mensaje de usuario visual para simular la interacción (si no lo hizo st.chat_input)
-    if not triggered_prompt: # st.chat_input ya lo hizo, solo necesitamos esto si vino de un botón
+    if not triggered_prompt:
         st.chat_message("user").write(prompt)
 
     try:
