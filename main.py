@@ -7,10 +7,14 @@ from google.genai import types
 st.set_page_config(page_title="Lucho - Ventas", page_icon="🏗️", layout="centered")
 
 # ==========================================
-# 1. SEGURIDAD: BUSCAMOS LA CLAVE EN LA CAJA FUERTE
+# 1. SEGURIDAD: CLAVE HÍBRIDA (FUNCIONA EN PC Y WEB)
 # ==========================================
 try:
+    # Intenta buscar en la caja fuerte de la Web (Streamlit Cloud)
     API_KEY = st.secrets["AIzaSyCpVXuNBECIdpBVHU3bwRSv50AX1GI8i2c"]
+except:
+    # Si falla (porque estoy en mi PC), usa esta clave directa:
+    API_KEY = "AIzaSyCpVXuNBECIdpBVHU3bwRSv50AX1GI8i2c"
 except:
     st.error("⚠️ ERROR: No encontré la Clave API. Asegurate de haberla puesto en los 'Secrets' de Streamlit.")
     st.stop()
