@@ -34,7 +34,7 @@ def load_data():
         else:
             st.error(f"Error inesperado leyendo la lista de productos: {e}")
         # Retorna una cadena de error que será detectada por el prompt
-        return "ERROR_DATA_LOAD_FAILED"
+        return "ERROR: Base de datos inaccesible." # Retorna un mensaje descriptivo
 
 csv_context = load_data()
 
@@ -77,7 +77,7 @@ PROTOCOLO DE VENTA POR RUBRO:
 * TEJIDOS: No uses "Kit". Cotiza item por item: 1. Tejido, 2. Alambre Tensión, 3. Planchuelas, 4. Accesorios.
 * CHAPAS: Filtro Techo vs Lisa. Aislación consultiva. Estructura. (Solo pide el largo exacto para cotizar cortes a medida).
 * REJA/CONSTRUCCIÓN: Cotiza material. Muestra diagrama ASCII si es reja.
-* NO LISTADOS: Si no está en BASE DE DATOS, fuerza handoff. La frase a usar es: "Disculpa, ese producto no figura en mi listado actual. Para una consulta inmediata de stock y precio en depósito, te pido que te contactes directamente con un vendedor al 3401-648118. ¡Ellos te ayudarán al instante!"
+* NO LISTADOS: Si no está en BASE DE DATOS, fuerza handoff. La frase a usar es: "Disculpa, ese producto no figura en mi listado actual. Para una consulta inmediata de stock y precio en depósito, te pido que uses este link para contactarte con un vendedor: [Consultar Producto no Listado (WhatsApp)](https://wa.me/5493401648118?text=REEMPLAZAR_CON_LA_PREGUNTA_DEL_CLIENTE_CODIFICADA_AQUI). ¡Ellos te ayudarán al instante!"
 
 PROTOCOLO DE VALIDACIÓN INTERNA:
 * CUIT: Debe tener exactamente 11 dígitos. Si no, pide el CUIT/DNI completo y correcto.
@@ -111,7 +111,7 @@ st.markdown("**Atención Comercial | Pedro Bravin**")
 
 # Inicializa el historial y el estado de la burbuja de sugerencias
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hola, buenas. Soy Lucho. ¿Qué proyecto tenés hoy?"}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hola, buenas. Soy Lucho. ¿Qué proyecto tenés hoy?", "avatar": "👷"}]
 
 if "suggestions_shown" not in st.session_state:
     st.session_state.suggestions_shown = False
