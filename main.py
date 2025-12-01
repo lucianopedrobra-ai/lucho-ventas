@@ -151,7 +151,8 @@ if prompt := st.chat_input():
         # Muestra el indicador de carga en la burbuja del asistente
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
-            message_placeholder.markdown("Lucho está cargando la cotización...")
+            # --- MODIFICACIÓN DEL MENSAJE DE CARGA AQUÍ ---
+            message_placeholder.markdown("estoy pensando aguardame que te puedo sorprender")
         
             response = chat.send_message(prompt)
         
