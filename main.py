@@ -51,7 +51,6 @@ def load_data():
         return "ERROR_DATA_LOAD_FAILED"
 
 df_data = load_data()
-# Verificación de carga y DataFrame vacío
 data_failure = (type(df_data) == str and df_data == "ERROR_DATA_LOAD_FAILED")
 
 if not data_failure:
@@ -89,6 +88,7 @@ def search_product_data(prompt_text):
         col_search_str = df[col].astype(str).str.lower()
         
         for kw in keywords:
+            # Búsqueda de palabra completa (word boundary \b)
             mask = mask | col_search_str.str.contains(r'\b' + re.escape(kw) + r'\b', na=False)
 
     filtered_df = df[mask]
@@ -133,7 +133,7 @@ def validate_contact_data(text_input):
 
     return None
 
-# 3. EL CEREBRO (PROMPT V79 - Chat Puro)
+# 3. EL CEREBRO (PROMPT V80)
 
 if data_failure:
     rol_persona = "ROL CRÍTICO: Eres Lucho, Ejecutivo Comercial Senior. Tu base de datos falló. NO DEBES COTIZAR NINGÚN PRECIO. Tu única función es disculparte por la 'falla temporal en el sistema de precios', tomar el Nombre, Localidad, CUIT/DNI y Teléfono del cliente, e informar que Martín Zimaro (3401 52-7780) le llamará de inmediato. IGNORA todas las reglas de cotización y enfócate en la derivación."
@@ -217,8 +217,20 @@ if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "Hola, buenas. Soy Lucho. ¿Qué proyecto tenés hoy?"}]
 if "suggestions_shown" not in st.session_state:
     st.session_state.suggestions_shown = False
-if "triggered_prompt" not in st.session_state:
-    st.session_state.triggered_prompt = None
+if "debug_mode" not in st.session_state: # 🚨 DEBUG MODE INICIALIZACIÓN
+    st.session_state.debug_mode = False
+
+# --- DEPURACIÓN (DEBUG MODE) ---
+# Usamos un expander para que sea discreto
+with st.expander("🛠️ Configuración y Depuración"):
+    st.session_state.debug_mode = st.checkbox("Mostrar Datos de la Base de Precios", value=st.session_state.debug_mode)
+
+    if st.session_state.debug_mode and not data_failure:
+        st.subheader("Contenido del DataFrame (st.session_state.df)")
+        st.dataframe(st.session_state.df, use_container_width=True)
+    elif st.session_state.debug_mode and data_failure:
+        st.error("No se puede mostrar el DataFrame porque la carga inicial falló.")
+# ----------------------------------
 
 
 # --- INICIALIZACIÓN DEL MODELO Y LA SESIÓN DE CHAT ---
@@ -240,7 +252,6 @@ if "chat_session" not in st.session_state:
 
 # --- FLUJO PRINCIPAL DE CHAT Y RENDERIZADO ---
 
-# Muestra el historial
 for msg in st.session_state.messages:
     avatar = "🧑‍💼" if msg["role"] == "assistant" else "user" 
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
@@ -297,6 +308,10 @@ if prompt_to_process:
         dynamic_prompt = prompt_to_process
         if not data_failure:
             relevant_data_string = search_product_data(prompt_to_process)
+            
+            if st.session_state.debug_mode: # 🚨 DEBUG MODE LOGGING
+                st.info(f"DEBUG: Keywords usadas: {re.findall(r'\\b\\w{3,}\\b', prompt_to_process.lower())}")
+                st.info(f"DEBUG: Datos inyectados:\n{relevant_data_string if relevant_data_string else 'No se encontraron datos relevantes para inyectar.'}")
             
             if relevant_data_string:
                 # Inyectar el fragmento relevante al mensaje del usuario
