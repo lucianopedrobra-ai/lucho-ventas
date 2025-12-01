@@ -55,7 +55,7 @@ else:
 2. Proactividad: Pregunta "¿Qué proyecto tenés? ¿Techado, rejas, pintura o construcción?"
 3. Antes de dar el precio final, pregunta: "Para confirmarte si tenés Envío Gratis, decime: ¿Tu Nombre y de qué Localidad sos?"
 4. LÍMITE ADMINISTRATIVO: Tú solo "reservas la orden".
-5. Si el cliente se detiene o no responde a tu último mensaje, debes ser proactivo. Después de un turno sin respuesta (conceptual 20 segundos), RETOMA LA CONVERSACIÓN con la frase: "¿Te ayudo con algún otro producto para optimizar el envío?". Si el silencio persiste (conceptual 60 segundos), CIERRA la conversación cortésmente con la frase: "Perfecto. Quedo atento a tu CUIT/DNI y Teléfono para avanzar con la reserva. ¡Que tengas un excelente día!"
+5. Si el cliente se detiene o no responde a tu último mensaje, debes ser proactivo. Después de un turno sin respuesta (conceptual 20 segundos), RETOMA LA CONVERSACIÓN con la frase: "¿Pudiste revisar el presupuesto o necesitas que te cotice algo más?". Si el silencio persiste (conceptual 60 segundos), CIERRA la conversación cortésmente con la frase: "Perfecto. Quedo atento a tu CUIT/DNI y Teléfono para avanzar con la reserva. ¡Que tengas un excelente día!"
 """ 
 
 sys_prompt = f"""
@@ -65,7 +65,7 @@ UBICACIÓN DE RETIRO: El Trébol, Santa Fe. (Asume que el punto de retiro es cen
 
 {reglas_cotizacion}
 
-**REGLA DE FORMATO: NUNCA uses etiquetas internas (como 'Follow-Up:', 'Cross-Sell:', 'Ticket:', 'Lógica:'). Usa solo diálogo natural y el formato TICKET.**
+**REGLA CRÍTICA DE FORMATO: ESTÁ TERMINANTEMENTE PROHIBIDO usar cualquier etiqueta interna (como 'Ticket:', 'Lógica:'). ELIMINA COMPLETAMENTE cualquier tipo de título interno en el diálogo. Usa SIEMPRE diálogo natural y el formato TICKET.**
 
 DICCIONARIO TÉCNICO Y MATEMÁTICA:
 * IVA: Precios en la BASE DE DATOS son NETOS. MULTIPLICA SIEMPRE POR 1.21.
@@ -145,7 +145,6 @@ if prompt := st.chat_input():
         
         # Muestra el indicador de carga dinámico
         with st.chat_message("assistant"):
-            # --- MODIFICACIÓN CLAVE: Usamos st.spinner para el efecto de "pensando" ---
             with st.spinner("..."):
                 response = chat.send_message(prompt)
             
