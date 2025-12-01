@@ -5,59 +5,69 @@ import google.generativeai as genai
 # --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Lucho | Pedro Bravin", page_icon="🏗️", layout="centered")
 
+# Función auxiliar para mapear roles entre la API y Streamlit
+def map_role(role):
+    """Mapea el rol de 'model' (Gemini API) a 'assistant' (Streamlit chat)."""
+    return "assistant" if role == "model" else role
+
 # 1. AUTENTICACIÓN
 try:
-    # Intenta obtener la API key de los secretos de Streamlit
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
 except KeyError:
-    # Si la clave no se encuentra, muestra un error y detiene la ejecución
     st.error("🚨 Error: Falta la API Key 'GOOGLE_API_KEY' en los Secrets de Streamlit.")
     st.stop()
 except Exception as e:
-    # Maneja otros errores de configuración
     st.error(f"🚨 Error de configuración de Gemini: {e}")
     st.stop()
 
 # 2. CARGA DE DATOS
-# URL para la hoja de cálculo de Google Sheet en formato CSV
-# ¡CORREGIDA! Ahora usando el enlace más reciente proporcionado por el usuario.
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
 @st.cache_data(ttl=600)
 def load_data():
     """Carga los datos desde la URL de la hoja de cálculo y los convierte a string."""
     try:
-        # Intenta leer el CSV
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip')
-        # Convierte el DataFrame a una cadena de texto sin el índice para usar como contexto
         return df.to_string(index=False)
     except Exception as e:
-        # Manejo de errores de carga de datos
         error_msg = str(e)
         if "404" in error_msg or "Not Found" in error_msg:
             st.error(
-                f"🚨 Error 404 (Not Found) al cargar datos: El link en SHEET_URL es incorrecto o la hoja de cálculo NO está publicada 'al público' como archivo CSV. "
-                f"Vaya a 'Archivo > Compartir > Publicar en la web', seleccione el formato '.csv' y reemplace el link en la variable SHEET_URL."
+                f"🚨 Error 404 (Not Found) al cargar datos: El link en SHEET_URL es incorrecto o la hoja no está publicada como CSV."
             )
         else:
             st.error(f"Error inesperado leyendo la lista de productos: {e}")
-        return "Error leyendo lista."
+        # Retorna una cadena de error que será detectada por el prompt
+        return "ERROR_DATA_LOAD_FAILED"
 
 csv_context = load_data()
 
-# 3. EL CEREBRO (PROMPT V72 - Actualizado con ROL detallado)
-sys_prompt = f"""
-ROL Y PERSONA: Eres Lucho, Ejecutivo Comercial Senior. Tu tono es profesional, cercano y EXTREMADAMENTE CONCISO. Tu objetivo es cotizar rápido y derivar al humano.
-UBICACIÓN DE RETIRO: El Trébol, Santa Fe. (Asume que el punto de retiro es central en esta localidad).
-BASE DE DATOS DE PRECIOS: {csv_context}
+# 3. EL CEREBRO (PROMPT V72 - Actualizado con Lógica Condicional)
 
-REGLAS DE INTERACCIÓN:
+# --- Lógica Condicional del ROL (Mejora de Robustez) ---
+data_failure = "ERROR" in csv_context
+
+if data_failure:
+    rol_persona = "ROL CRÍTICO: Eres Lucho, Ejecutivo Comercial Senior. Tu base de datos falló. NO DEBES COTIZAR NINGÚN PRECIO. Tu única función es disculparte por la 'falla temporal en el sistema de precios', tomar el Nombre, Localidad, CUIT/DNI y Teléfono del cliente, e informar que Martín Zimaro (3401 52-7780) le llamará de inmediato. IGNORA todas las reglas de cotización y enfócate en la derivación."
+    base_data = "BASE DE DATOS: [Datos no disponibles por falla crítica]"
+    reglas_cotizacion = "REGLAS DE INTERACCIÓN: 1. Saludo. 2. Disculpas y derivación. 3. CANDADO DE DATOS (captura total). 4. Cierre inmediato con datos de Martín Zimaro."
+else:
+    rol_persona = "ROL Y PERSONA: Eres Lucho, Ejecutivo Comercial Senior. Tu tono es profesional, cercano y EXTREMADAMENTE CONCISO. Tu objetivo es cotizar rápido y derivar al humano."
+    base_data = f"BASE DE DATOS DE PRECIOS: {csv_context}"
+    reglas_cotizacion = """REGLAS DE INTERACCIÓN:
 1. Saludo: Inicia con "Hola, buenas tardes."
 2. Proactividad: Pregunta "¿Qué proyecto tenés? ¿Techado, rejas, pintura o construcción?"
 3. CANDADO DE DATOS (PRE-COTIZACIÓN): Antes de dar el precio final, pregunta: "Para confirmarte si tenés Envío Gratis, decime: ¿Tu Nombre y de qué Localidad sos?"
 4. LÍMITE ADMINISTRATIVO: Tú solo "reservas la orden".
-5. **SEGUIMIENTO POR INACTIVIDAD (IMPORTANTE): Si el cliente se detiene o no responde a tu último mensaje, debes ser proactivo. Después de un turno sin respuesta (conceptual 20 segundos), realiza un FOLLOW-UP: "¿Te ayudo con algún otro producto para optimizar el envío?". Si el silencio persiste (conceptual 60 segundos), CIERRA la conversación cortésmente con la frase: "Perfecto. Quedo atento a tu CUIT/DNI y Teléfono para avanzar con la reserva. ¡Que tengas un excelente día!"**
+5. **SEGUIMIENTO POR INACTIVIDAD (IMPORTANTE): Si el cliente se detiene o no responde a tu último mensaje, debes ser proactivo. Después de un turno sin respuesta (conceptual 20 segundos), realiza un FOLLOW-UP: "¿Te ayudo con algún otro producto para optimizar el envío?". Si el silencio persiste (conceptual 60 segundos), CIERRA la conversación cortésmente con la frase: "Perfecto. Quedo atento a tu CUIT/DNI y Teléfono para avanzar con la reserva. ¡Que tengas un excelente día!"**"""
+
+sys_prompt = f"""
+{rol_persona}
+UBICACIÓN DE RETIRO: El Trébol, Santa Fe. (Asume que el punto de retiro es central en esta localidad).
+{base_data}
+
+{reglas_cotizacion}
 
 DICCIONARIO TÉCNICO Y MATEMÁTICA (RAG):
 * IVA: Precios en la BASE DE DATOS son NETOS. MULTIPLICA SIEMPRE POR 1.21.
@@ -102,51 +112,41 @@ if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "Hola, buenas. Soy Lucho. ¿Qué proyecto tenés hoy?"}]
 
 # --- INICIALIZACIÓN DEL MODELO Y LA SESIÓN DE CHAT (Para mejorar la velocidad) ---
-# Esto se hace una sola vez para evitar enviar el enorme sys_prompt/csv_context en cada turno.
 if "chat_session" not in st.session_state:
     try:
-        # 1. Inicializa el modelo solo una vez
         model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025', system_instruction=sys_prompt)
         
-        # 2. Prepara el historial inicial (sin el mensaje de bienvenida)
         initial_history = [
-            {"role": "model" if m["role"] == "assistant" else m["role"], "parts": [{"text": m["content"]}]}
+            {"role": map_role(m["role"]), "parts": [{"text": m["content"]}]}
             for m in st.session_state.messages if m["role"] != "system"
         ]
-        # 3. Inicia la sesión de chat y la guarda
         st.session_state.chat_session = model.start_chat(history=initial_history)
         
     except Exception as e:
         st.error(f"❌ Error al inicializar el modelo/chat: {e}")
-        # No paramos la ejecución aquí para que se puedan ver los mensajes anteriores
         
 # Muestra los mensajes anteriores en el chat
 for msg in st.session_state.messages:
-    # Mapea el rol de la API a la función de mensaje de Streamlit
-    role = "assistant" if msg["role"] == "model" else msg["role"]
-    st.chat_message(role).write(msg["content"])
+    # Usamos la función auxiliar para mapear el rol
+    st.chat_message(map_role(msg["role"])).write(msg["content"])
 
 # Captura la entrada del usuario
 if prompt := st.chat_input():
-    # Muestra el mensaje del usuario
     st.chat_message("user").write(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
 
     try:
-        # Verifica si la sesión de chat existe antes de usarla
         if "chat_session" not in st.session_state:
              st.error("No se pudo iniciar la sesión de chat. Revise la autenticación o el prompt inicial.")
              st.stop()
              
-        # Usa la sesión de chat ya inicializada
         chat = st.session_state.chat_session
         
         # Muestra el indicador de carga en la burbuja del asistente
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
-            message_placeholder.markdown("Lucho está cargando la cotización...") # Mostrar texto de carga
+            message_placeholder.markdown("Lucho está cargando la cotización...")
         
-            # Envía el mensaje usando la sesión de chat guardada (ahora mucho más rápido)
             response = chat.send_message(prompt)
         
             # Reemplaza el texto de carga con la respuesta final
