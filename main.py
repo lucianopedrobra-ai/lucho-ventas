@@ -19,15 +19,27 @@ except Exception as e:
     st.error(f"🚨 Error de configuración de Gemini: {e}")
     st.stop()
 
-# 2. CARGA DE DATOS (Optimizado para devolver DataFrame)
+# 2. CARGA DE DATOS (Optimizado y Limpiado)
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
 @st.cache_data(ttl=600)
 def load_data():
-    """Carga los datos desde la URL de la hoja de cálculo y devuelve el DataFrame."""
+    """Carga los datos, los limpia y estandariza para la búsqueda de Lucho."""
     try:
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip')
+        
+        # 🚨 OPTIMIZACIÓN CLAVE: Forzar a string y limpiar whitespace.
+        # 1. Convertir TODAS las columnas a string para asegurar que la búsqueda funcione.
+        df = df.astype(str)
+        
+        # 2. Eliminar espacios en blanco (whitespace) iniciales/finales en TODAS las celdas.
+        for col in df.columns:
+            if df[col].dtype == 'object': 
+                df[col] = df[col].str.strip() 
+
+        # 3. Rellenar valores nulos con cadena vacía.
         df = df.fillna('') 
+        
         return df
     except Exception as e:
         error_msg = str(e)
@@ -40,11 +52,10 @@ def load_data():
         return "ERROR_DATA_LOAD_FAILED"
 
 df_data = load_data()
-# 🚨 CORRECCIÓN DE ERROR: Usar type() para evitar el ValueError de Pandas.
+# 🚨 Verificación de carga y DataFrame vacío
 data_failure = (type(df_data) == str and df_data == "ERROR_DATA_LOAD_FAILED")
 
 if not data_failure:
-    # Chequear si el DataFrame está vacío, que también es un error de datos.
     if df_data.empty:
         data_failure = True
         st.warning("⚠️ Atención: La base de datos se cargó, pero está vacía. Lucho operará en modo de falla crítica.")
@@ -52,7 +63,6 @@ if not data_failure:
         st.session_state.df = df_data
         csv_context = "BASE DE DATOS CARGADA EN MEMORIA."
 else:
-    # Si falló la carga (es una cadena de error)
     st.warning(
         "⚠️ Atención: El sistema de precios no pudo cargar la base de datos. "
         "Lucho solo podrá tomar tus datos de contacto y derivarte a un vendedor humano."
@@ -60,10 +70,10 @@ else:
     st.session_state.df = None
     csv_context = "ERROR_DATA_LOAD_FAILED"
 
-# 2.5. FUNCIÓN DE BÚSQUEDA LOCAL DE DATOS (Optimización de Costos)
+# 2.5. FUNCIÓN DE BÚSQUEDA LOCAL DE DATOS
 def search_product_data(prompt_text):
     """
-    Busca palabras clave y números en el DataFrame cargado
+    Busca palabras clave en todas las columnas de texto del DataFrame cargado
     y devuelve una cadena de texto concisa con los resultados.
     """
     if 'df' not in st.session_state or st.session_state.df is None:
@@ -74,10 +84,9 @@ def search_product_data(prompt_text):
     
     keywords = re.findall(r'\b\w{3,}\b', search_text) 
     
-    # Crea una máscara de búsqueda booleana (inicialmente False)
     mask = pd.Series([False] * len(df))
 
-    # 🚨 CORRECCIÓN DE FALLA DE BÚSQUEDA: Busca en todas las columnas de texto.
+    # Búsqueda en todas las columnas de texto
     for col in df.select_dtypes(include='object').columns:
         col_search_str = df[col].astype(str).str.lower()
         
@@ -126,7 +135,7 @@ def validate_contact_data(text_input):
 
     return None
 
-# 3. EL CEREBRO (PROMPT V78 - Protocolo de Falla Corregido)
+# 3. EL CEREBRO (PROMPT V78)
 
 if data_failure:
     rol_persona = "ROL CRÍTICO: Eres Lucho, Ejecutivo Comercial Senior. Tu base de datos falló. NO DEBES COTIZAR NINGÚN PRECIO. Tu única función es disculparte por la 'falla temporal en el sistema de precios', tomar el Nombre, Localidad, CUIT/DNI y Teléfono del cliente, e informar que Martín Zimaro (3401 52-7780) le llamará de inmediato. IGNORA todas las reglas de cotización y enfócate en la derivación."
@@ -175,7 +184,6 @@ PROTOCOLO DE VENTA POR RUBRO:
     * FILTROS: Filtro Techo vs Lisa. Aislación consultiva. Estructura. (Solo pide el largo exacto **PARA PRESUPUESTO FINAL Y DETALLADO** después de haber dado el precio por metro).
 * REJA/CONSTRUCCIÓN: Cotiza material. Muestra diagrama ASCII si es reja. Después de cotizar, pregunta si necesita pintura y consumibles de soldadura (electrodos, etc.) para la unión de las piezas.
 * NO LISTADOS: Si no está en BASE DE DATOS, fuerza handoff. La frase a usar es: "Disculpa, ese producto no figura en mi listado actual. Para una consulta inmediata de stock y precio en depósito, te pido que te contactes directamente con un [vendedor al 3401-648118](tel:+543401648118). ¡Ellos te ayudarán al instante!"
-# 🚨 CORRECCIÓN: Se añadió el hipervínculo tipo tel: para que sea clickeable en móvil.
 
 PROTOCOLO LOGÍSTICO (POST-LOCALIDAD):
 * Si la Localidad del cliente está en la lista de ENVÍO SIN CARGO (ZONA), usa la frase: "¡Excelente! Estás dentro de nuestra zona de **Envío Sin Cargo**."
@@ -214,7 +222,8 @@ if "suggestions_shown" not in st.session_state:
 if "triggered_prompt" not in st.session_state:
     st.session_state.triggered_prompt = None
 if "cart" not in st.session_state:
-    st.session_state.cart = [] # 🚨 Inicialización del carrito
+    st.session_state.cart = [] 
+
 
 # --- INICIALIZACIÓN DEL MODELO Y LA SESIÓN DE CHAT ---
 if "chat_session" not in st.session_state:
@@ -233,16 +242,21 @@ if "chat_session" not in st.session_state:
         st.error(f"❌ Error al inicializar el modelo/chat: {e}")
 
 
-# --- SECCIÓN DE FUNCIONES Y ESTRUCTURA DE COLUMNAS (Para Carro de Compras) ---
+# --- SECCIÓN DE FUNCIONES DEL CARRO DE COMPRAS ---
 
 def calculate_cart_total():
     """Calcula el subtotal (NETO), IVA y total final del carrito."""
     cart = st.session_state.cart
     total_neto = 0
     
-    # NOTA: Ajusta los nombres de columna aquí si tu CSV es diferente
     for item in cart:
-        total_neto += item.get('Precio_Neto_Unitario', 0) * item.get('Cantidad', 0)
+        # Asegurarse de que el precio sea numérico para el cálculo
+        try:
+            price = float(item.get('Precio_Neto_Unitario', 0))
+        except ValueError:
+            price = 0
+            
+        total_neto += price * item.get('Cantidad', 0)
     
     total_iva = total_neto * 0.21
     total_final = total_neto * 1.21
@@ -256,13 +270,13 @@ def add_to_cart(product_code, quantity):
         return False
 
     try:
-        # Busca la fila del producto por código (Ajusta 'Código', 'Producto', 'Precio' si es necesario)
+        # Busca la fila usando la primera columna (código)
         product_row = st.session_state.df[st.session_state.df.iloc[:, 0].astype(str) == str(product_code)].iloc[0]
         
         item = {
             'Código': product_code,
-            'Producto': product_row.iloc[1], # Asumiendo columna 1 es descripción
-            'Precio_Neto_Unitario': product_row.iloc[2], # Asumiendo columna 2 es precio neto
+            'Producto': product_row.iloc[1], 
+            'Precio_Neto_Unitario': product_row.iloc[2], 
             'Cantidad': quantity
         }
         
@@ -271,7 +285,7 @@ def add_to_cart(product_code, quantity):
         return True
         
     except IndexError:
-        st.warning(f"No se encontró el producto con Código: {product_code}. Revise el código.")
+        st.warning(f"No se encontró el producto con Código: {product_code}.")
         return False
     except Exception as e:
         st.error(f"Error al añadir al carro: {e}. Revise los índices de columna en 'add_to_cart'.")
@@ -316,12 +330,13 @@ with col_cart:
     
     # Lógica de búsqueda simplificada para la interfaz
     if search_term and 'df' in st.session_state:
-        df_search = st.session_state.df[st.session_state.df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)].head(5)
+        # Búsqueda general en todas las columnas
+        df_search_mask = st.session_state.df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)
+        df_search = st.session_state.df[df_search_mask].head(5)
         
         if not df_search.empty:
             st.write("Resultados (Top 5):")
             
-            # Asume que la primera columna es el código y la segunda es el producto
             codes = df_search.iloc[:, 0].tolist()
             products = df_search.iloc[:, 1].tolist()
             
