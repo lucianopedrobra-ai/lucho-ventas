@@ -38,7 +38,7 @@ def load_data():
 
 csv_context = load_data()
 
-# 3. EL CEREBRO (PROMPT V72 - Actualizado con Lógica Condicional)
+# 3. EL CEREBRO (PROMPT V72 - Actualizado sin Cross-Sell)
 
 # --- Lógica Condicional del ROL (Mejora de Robustez) ---
 data_failure = "ERROR" in csv_context
@@ -78,12 +78,6 @@ PROTOCOLO DE VENTA POR RUBRO:
 * REJA/CONSTRUCCIÓN: Cotiza material. Muestra diagrama ASCII si es reja.
 * NO LISTADOS: Si no está en BASE DE DATOS, fuerza handoff: "Consulto stock en depósito".
 
-PROTOCOLO DE CROSS-SELL (SUGERENCIA DE ÍTEMS):
-* Después de cotizar el material principal, pregunta de forma RÁPIDA y natural:
-  - Para soldadura: "¿Necesitás electrodos o alambre para soldar?"
-  - Para corte: "¿Precisás discos de corte?"
-  - Para protección de postes (SI la cotización fue de Tejidos/Rejas): "¿Usarás postes de madera o perfiles metálicos? Si son de madera, ¿Necesitás algún fondo o aerosol para protegerlos?"
-
 MATRIZ DE NEGOCIACIÓN, FINANCIACIÓN Y LOGÍSTICA:
 * ENVÍO SIN CARGO (ZONA): El Trébol, María Susana, Piamonte, Landeta, San Jorge, Sastre, C. Pellegrini, Cañada Rosquín, Casas, Las Bandurrias, San Martín de las Escobas, Traill, Centeno, Classon, Los Cardos, Las Rosas, Bouquet, Montes de Oca.
 * DESCUENTOS: >$150k (7% Chapa/Hierro) | >$500k (7% General) | >$2M (14%).
@@ -94,13 +88,13 @@ FORMATO Y CIERRE:
 * TICKET (DESGLOSE REAL): Usa bloques de código ```text. Lista cada producto por separado con su CÓDIGO y PRECIO UNITARIO real (del CSV). Nunca agrupes.
 * FASE DE VALIDACIÓN: "¿Cómo lo ves [Nombre]? ¿Cerramos así o ajustamos algo?"
 * PROTOCOLO DE CIERRE (COMBO FINAL):
-   1. PEDIDO ÚNICO: "Excelente. Para reservar, solo me falta: CUIT/DNI y Teléfono." (Ya tenés Nombre y Loc).
-   2. LINK: Genera el link Markdown.
-   * Respuesta Final:
-      "Listo. Hacé clic abajo para confirmar con el vendedor:"
-      [✅ ENVIAR PEDIDO CONFIRMADO (WHATSAPP)](LINK)
-      "O escribinos al: 3401-648118"
-      "📍 Retiro: [Ver Ubicación en Mapa](https://www.google.com/maps/search/?api=1&query=Pedro+Bravin+Materiales+El+Trebol)"
+   1. PEDIDO ÚNICO: "Excelente. Para reservar, solo me falta: CUIT/DNI y Teléfono." (Ya tenés Nombre y Loc).
+   2. LINK: Genera el link Markdown.
+   * Respuesta Final:
+      "Listo. Hacé clic abajo para confirmar con el vendedor:"
+      [✅ ENVIAR PEDIDO CONFIRMADO (WHATSAPP)](LINK)
+      "O escribinos al: 3401-648118"
+      "📍 Retiro: [Ver Ubicación en Mapa](https://www.google.com/maps/search/?api=1&query=Pedro+Bravin+Materiales+El+Trebol)"
 """
 
 # 4. INTERFAZ
@@ -114,7 +108,8 @@ if "messages" not in st.session_state:
 # --- INICIALIZACIÓN DEL MODELO Y LA SESIÓN DE CHAT (Para mejorar la velocidad) ---
 if "chat_session" not in st.session_state:
     try:
-        model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025', system_instruction=sys_prompt)
+        # CORRECCIÓN #2: Se cambia el alias de vista previa por el modelo estable.
+        model = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt)
         
         # CORRECCIÓN CRÍTICA (Error 400):
         # Mapeamos 'assistant' a 'model' y EXCLUIMOS el primer mensaje (el saludo de bienvenida) 
