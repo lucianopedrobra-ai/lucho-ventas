@@ -89,11 +89,15 @@ FORMATO Y CIERRE:
       "Listo. Hacé clic abajo para confirmar con el vendedor:"
       [✅ ENVIAR PEDIDO CONFIRMADO (WHATSAPP)](LINK)
       "O escribinos al: 3401-648118"
-      "📍 Retiro: [https://www.google.com/maps/search/?api=1&query=Pedro+Bravin+Materiales+El+Trebol]"
+      "📍 Retiro: [[https://www.google.com/maps/search/?api=1&query=Pedro+Bravin+Materiales+El+Trebol](https://www.google.com/maps/search/?api=1&query=Pedro+Bravin+Materiales+El+Trebol)]"
 """
 
 # 4. INTERFAZ
 st.title("🏗️ Hablá con Lucho")
+# Agregamos una imagen representativa para Lucho
+# NOTA: Reemplace esta URL con la URL pública de la imagen de Lucho.
+LUCHO_IMAGE_URL = "[https://placehold.co/120x120/4B0082/ffffff?text=Lucho+Exec](https://placehold.co/120x120/4B0082/ffffff?text=Lucho+Exec)." 
+st.image(LUCHO_IMAGE_URL, width=120) 
 st.markdown("**Atención Comercial | Pedro Bravin**")
 
 # Inicializa el historial de mensajes
