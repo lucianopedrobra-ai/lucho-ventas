@@ -1,23 +1,29 @@
 import streamlit as st
 import pandas as pd
-from google import genai
-from google.genai import types
+import google.generativeai as genai
+import time
 
 # --- CONFIGURACIÓN ---
 PAGE_TITLE = "Lucho | Asesor Comercial"
 PAGE_ICON = "🏗️"
+MODEL_ID = "gemini-1.5-flash"  # El modelo más estable y rápido
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
 st.set_page_config(page_title=PAGE_TITLE, page_icon=PAGE_ICON, layout="centered")
 
-def get_credentials():
+def configure_genai():
+    """Configura la conexión con Google."""
     try:
-        return st.secrets["GOOGLE_API_KEY"]
+        api_key = st.secrets["GOOGLE_API_KEY"]
+        genai.configure(api_key=api_key)
+        return True
     except Exception:
-        return None
+        st.error("🚨 Error: Falta la API KEY en los Secrets.")
+        st.stop()
 
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=600)
 def fetch_pricing_data():
+    """Carga la lista de precios."""
     try:
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip')
         if len(df.columns) > 6:
@@ -28,51 +34,40 @@ def fetch_pricing_data():
     except Exception as e:
         return f"Error leyendo CSV: {e}"
 
-def build_system_prompt(context_data):
+def get_system_instruction(context_data):
     return f"""
-    ROL: Asistente Comercial Senior "Lucho". Perfil técnico y conciso.
+    ROL: Asistente Comercial Senior "Lucho".
     BASE DE DATOS: {context_data}
     
-    DIRECTRICES:
-    1. PRECIOS: Los valores CSV son NETOS. Calcular SIEMPRE precio final (x1.21 IVA).
-    2. SEGURIDAD: Validar CANTIDAD antes de cotizar.
-    3. DATOS: Solicitar Nombre y Localidad para validar envío.
-    4. ALCANCE: Reservar pedidos, no emitir facturas.
-
-    REGLAS TÉCNICAS:
-    - TUBOS: Conducción 6.40m / Estructural 6.00m.
-    - PLANCHUELAS: Unidad barra.
-    - AISLANTES: <$10k x m2 | >$10k x rollo.
+    REGLAS:
+    1. IVA: Precios CSV son NETOS. MULTIPLICA SIEMPRE POR 1.21.
+    2. SEGURIDAD: Valida CANTIDAD antes de cotizar.
+    3. DATOS: Pide Nombre y Localidad antes del precio.
+    4. LÍMITE: Solo reservas pedidos.
 
     PROTOCOLOS:
-    - CHAPAS: Filtro Techo/Lisa. Sugerir aislante Doble Alu 10mm (semicubierto). Acopio "Bolsa de Metros".
-    - TEJIDOS: Kit completo. Eco -> Acindar.
-    - REJA: Diagrama ASCII. Macizo vs Estructural.
-    - CONSTRUCCIÓN: Hierro ADN vs Liso. Alerta 4.2mm. Upsell Alambre/Clavos.
-    - NO CATALOGADO: Derivar a consulta de stock física.
+    - TUBOS: 6.40m (Conducción) / 6.00m (Estructura).
+    - CHAPAS: Techo/Lisa. Aislante consultivo. Acopio.
+    - TEJIDOS: Kit Completo. Eco -> Acindar.
+    - REJA: Macizo vs Estructural. ASCII.
+    - CONSTRUCCIÓN: Hierro ADN vs Liso. Upsell.
 
     MATRIZ COMERCIAL:
-    - LOGÍSTICA: Envío bonificado en zona de influencia (El Trébol, San Jorge, etc.).
-    - BONIFICACIONES: >$150k (7% Chapa) | >$500k (7% Gral) | >$2M (14%).
-    - GRANDES CUENTAS (>10M): Presentar precio base y derivar a Gerencia (Martín Zimaro).
-    - PAGOS: Promo FirstData (Mié/Sáb). Contado +3% extra.
+    - ENVÍO GRATIS: Zona El Trébol, San Jorge, Sastre, etc.
+    - DESCUENTOS: >150k (7% Chapa) | >500k (7% Gral) | >2M (14%).
+    - MEGA (>10M): Precio Base -> Derivar a Martín Zimaro (3401 52-7780).
+    - FINANCIACIÓN: Promo FirstData (Mié/Sáb). Contado +3%.
 
-    FORMATO:
-    - TICKET: Bloque ```text con desglose.
-    - CIERRE: Solicitar Nombre, CUIT, Teléfono. Generar Link WhatsApp.
+    CIERRE:
+    1. Pedir: Nombre, CUIT, Teléfono.
+    2. Link WhatsApp con resumen.
     """
 
 def main():
     st.title("🏗️ Hablá con Lucho")
     st.markdown("**Atención Comercial | Pedro Bravin**")
     
-    api_key = get_credentials()
-    
-    if not api_key:
-        st.error("🚨 ERROR: Falta la API Key en los Secrets de Streamlit.")
-        st.stop()
-
-    client = genai.Client(api_key=api_key)
+    configure_genai()
     pricing_data = fetch_pricing_data()
     
     if "messages" not in st.session_state:
@@ -91,39 +86,31 @@ def main():
         st.session_state.messages.append({"role": "user", "content": prompt})
 
         try:
-            sys_instruct = build_system_prompt(pricing_data)
+            # Configuración del Modelo
+            sys_prompt = get_system_instruction(pricing_data)
+            model = genai.GenerativeModel(
+                model_name=MODEL_ID,
+                system_instruction=sys_prompt
+            )
             
-            api_history = [
-                types.Content(role="user" if m["role"] == "user" else "model", parts=[types.Part.from_text(text=m["content"])])
-                for m in st.session_state.messages
-            ]
+            # Historial (formato compatible con librería clásica)
+            chat_history = []
+            for m in st.session_state.messages:
+                if m["role"] != "system": # Ignoramos mensajes de sistema previos si los hubiera
+                    role = "user" if m["role"] == "user" else "model"
+                    chat_history.append({"role": role, "parts": [m["content"]]})
 
-            # --- INTENTO 1: GEMINI 1.5 PRO (EL MEJOR) ---
-            try:
-                chat_session = client.chats.create(
-                    model="models/gemini-2.5-pro",
-                    config=types.GenerateContentConfig(system_instruction=sys_instruct),
-                    history=api_history
-                )
-                response = chat_session.send_message(prompt)
+            chat = model.start_chat(history=chat_history)
+            response = chat.send_message(prompt)
             
-            except Exception as e:
-                # SI FALLA EL PRO, INTENTAMOS CON FLASH AUTOMÁTICAMENTE
-                print(f"Fallo Pro: {e}. Intentando Flash.")
-                chat_session = client.chats.create(
-                    model="gemini-1.5-flash",
-                    config=types.GenerateContentConfig(system_instruction=sys_instruct),
-                    history=api_history
-                )
-                response = chat_session.send_message(prompt)
-
             with st.chat_message("model", avatar="👷‍♂️"):
                 st.markdown(response.text)
             st.session_state.messages.append({"role": "model", "content": response.text})
 
         except Exception as e:
             st.error(f"❌ Error Técnico: {str(e)}")
-            st.info("Verifica que tu API Key tenga habilitada la facturación en Google Cloud Console.")
+            if "429" in str(e):
+                st.warning("⏳ El sistema está saturado. Esperá 10 segundos y volvé a intentar.")
 
 if __name__ == "__main__":
     main()
