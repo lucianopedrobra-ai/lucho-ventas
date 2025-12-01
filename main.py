@@ -8,7 +8,7 @@ st.set_page_config(page_title="Lucho | Pedro Bravin", page_icon="🏗️", layou
 # 1. AUTENTICACIÓN
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
-    genai.configure(api_api_key=API_KEY)
+    genai.configure(api_key=API_KEY)
 except KeyError:
     st.error("🚨 Error: Falta la API Key 'GOOGLE_API_KEY' en los Secrets de Streamlit.")
     st.stop()
@@ -65,7 +65,7 @@ UBICACIÓN DE RETIRO: El Trébol, Santa Fe. (Asume que el punto de retiro es cen
 
 {reglas_cotizacion}
 
-**REGLA CRÍTICA DE FORMATO: ESTÁ TERMINANTEMENTE PROHIBIDO usar cualquier etiqueta interna (como 'Ticket:', 'Lógica:'). ELIMINA COMPLETAMENTE cualquier tipo de título interno en el diálogo. Usa SIEMPRE diálogo natural y el formato TICKET.**
+**REGLA CRÍTICA DE FORMATO: ESTÁ TERMINANTEMENTE PROHIBIDO usar cualquier etiqueta interna (como 'Ticket:', 'Lógica:', 'FOLLOW-UP:', 'Cross-Sell:'). ELIMINA COMPLETAMENTE cualquier tipo de título interno en el diálogo. Usa SIEMPRE diálogo natural y el formato TICKET.**
 
 DICCIONARIO TÉCNICO Y MATEMÁTICA:
 * IVA: Precios en la BASE DE DATOS son NETOS. MULTIPLICA SIEMPRE POR 1.21.
@@ -77,7 +77,7 @@ PROTOCOLO DE VENTA POR RUBRO:
 * TEJIDOS: No uses "Kit". Cotiza item por item: 1. Tejido, 2. Alambre Tensión, 3. Planchuelas, 4. Accesorios.
 * CHAPAS: Filtro Techo vs Lisa. Aislación consultiva. Estructura. (Solo pide el largo exacto para cotizar cortes a medida).
 * REJA/CONSTRUCCIÓN: Cotiza material. Muestra diagrama ASCII si es reja.
-* NO LISTADOS: Si no está en BASE DE DATOS, fuerza handoff: "Consulto stock en depósito".
+* NO LISTADOS: Si no está en BASE DE DATOS, fuerza handoff. La frase a usar es: "Disculpa, ese producto no figura en mi listado actual. Para una consulta inmediata de stock y precio en depósito, te pido que te contactes directamente con un vendedor al 3401-648118. ¡Ellos te ayudarán al instante!"
 
 PROTOCOLO DE VALIDACIÓN INTERNA:
 * CUIT: Debe tener exactamente 11 dígitos. Si no, pide el CUIT/DNI completo y correcto.
@@ -96,7 +96,8 @@ FORMATO Y CIERRE:
 * Usa la siguiente frase de Validación: "¿Cómo lo ves [Nombre]? ¿Cerramos así o ajustamos algo?"
 * **PROTOCOLO DE CIERRE (El modelo debe generar el diálogo de cierre inmediatamente después de la validación):**
    1. PEDIDO ÚNICO: El modelo debe decir: "Excelente. Para reservar, solo me falta: CUIT/DNI y Teléfono." (Ya tenés Nombre y Loc).
-   2. LINK: Genera el link Markdown.
+   2. **CIERRE POR RECHAZO (CRÍTICO):** Si el cliente desestima el pedido, el modelo NO debe solicitar datos. Debe solo despedirse con la frase: "Perfecto. Lamento que no podamos avanzar hoy. Quedo a tu disposición para futuros proyectos. ¡Que tengas un excelente día!"
+   3. LINK: Genera el link Markdown.
    * Respuesta Final:
       "Listo. Hacé clic abajo para confirmar con el vendedor:"
       [✅ ENVIAR PEDIDO CONFIRMADO (WHATSAPP)](LINK)
@@ -179,7 +180,7 @@ if 'prompt' in locals() and prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
     
     # Se añade un mensaje de usuario visual para simular la interacción
-    if 'prompt' in locals() and prompt: # Si vino del chat_input, ya está en el historial, si no, lo escribimos
+    if 'prompt' in locals() and prompt:
         if not triggered_prompt:
              st.chat_message("user").write(prompt)
 
@@ -201,7 +202,7 @@ if 'prompt' in locals() and prompt:
         # Guarda la respuesta en el estado de sesión
         st.session_state.messages.append({"role": "assistant", "content": response.text})
         
-        # Si vino de un botón o de un prompt normal, forzamos rerun para actualizar el historial
+        # Forzar rerun para actualizar el historial
         st.rerun()
 
     except Exception as e:
