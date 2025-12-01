@@ -111,11 +111,21 @@ if "chat_session" not in st.session_state:
     try:
         model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025', system_instruction=sys_prompt)
         
-        # Corrección CRÍTICA: Mapear 'assistant' (Streamlit) a 'model' (Gemini API)
-        initial_history = [
-            {"role": "model" if m["role"] == "assistant" else m["role"], "parts": [{"text": m["content"]}]}
-            for m in st.session_state.messages if m["role"] != "system"
-        ]
+        # CORRECCIÓN CRÍTICA (Error 400):
+        # Mapeamos 'assistant' a 'model' y EXCLUIMOS el primer mensaje (el saludo de bienvenida) 
+        # para que la secuencia de roles sea válida para la API.
+        initial_history = []
+        # Iteramos a partir del índice 1, ya que el índice 0 es el mensaje de bienvenida de Streamlit.
+        for m in st.session_state.messages[1:]: 
+            if m["role"] == "assistant":
+                api_role = "model"
+            elif m["role"] == "user":
+                api_role = "user"
+            else:
+                continue # Saltar roles inesperados
+            
+            initial_history.append({"role": api_role, "parts": [{"text": m["content"]}]})
+            
         st.session_state.chat_session = model.start_chat(history=initial_history)
         
     except Exception as e:
