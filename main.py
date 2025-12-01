@@ -3,6 +3,7 @@ import pandas as pd
 import google.generativeai as genai
 import urllib.parse
 import re 
+import numpy as np
 
 # --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Lucho | Pedro Bravin", page_icon="🧑‍💼", layout="wide")
@@ -18,15 +19,17 @@ except Exception as e:
     st.error(f"🚨 Error de configuración de Gemini: {e}")
     st.stop()
 
-# 2. CARGA DE DATOS
+# 2. CARGA DE DATOS (Optimizado para devolver DataFrame)
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
 @st.cache_data(ttl=600)
 def load_data():
-    """Carga los datos desde la URL de la hoja de cálculo y los convierte a string."""
+    """Carga los datos desde la URL de la hoja de cálculo y devuelve el DataFrame."""
     try:
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip')
-        return df.to_string(index=False)
+        # Limpieza básica: rellenar NaN y convertir a string para búsquedas
+        df = df.fillna('') 
+        return df
     except Exception as e:
         error_msg = str(e)
         if "404" in error_msg or "Not Found" in error_msg:
@@ -37,16 +40,54 @@ def load_data():
             st.error(f"Error inesperado leyendo la lista de productos: {e}")
         return "ERROR_DATA_LOAD_FAILED"
 
-csv_context = load_data()
+df_data = load_data()
+data_failure = (df_data == "ERROR_DATA_LOAD_FAILED")
 
-# ⚠️ Falla de Datos en el Frontend
-if csv_context == "ERROR_DATA_LOAD_FAILED":
+if not data_failure:
+    # Optimización: Guardar el DataFrame en memoria (session state)
+    st.session_state.df = df_data
+    csv_context = "BASE DE DATOS CARGADA EN MEMORIA."
+else:
     st.warning(
         "⚠️ Atención: El sistema de precios no pudo cargar la base de datos. "
         "Lucho solo podrá tomar tus datos de contacto y derivarte a un vendedor humano."
     )
+    st.session_state.df = None
+    csv_context = "ERROR_DATA_LOAD_FAILED"
 
-# 2.5. FUNCIÓN DE VALIDACIÓN DE DATOS LOCAL
+# 2.5. FUNCIÓN DE BÚSQUEDA LOCAL DE DATOS
+def search_product_data(prompt_text):
+    """
+    Busca palabras clave y números en el DataFrame cargado
+    y devuelve una cadena de texto concisa con los resultados.
+    """
+    if 'df' not in st.session_state or st.session_state.df is None:
+        return ""
+
+    df = st.session_state.df.copy()
+    search_text = prompt_text.lower()
+    
+    keywords = re.findall(r'\b\w{3,}\b', search_text) 
+    
+    mask = pd.Series([False] * len(df))
+
+    for col in df.select_dtypes(include='object').columns:
+        col_search_str = df[col].astype(str).str.lower()
+        
+        for kw in keywords:
+            mask = mask | col_search_str.str.contains(r'\b' + re.escape(kw) + r'\b', na=False)
+
+    filtered_df = df[mask]
+    
+    if filtered_df.shape[0] > 10:
+        filtered_df = filtered_df.head(10)
+
+    if filtered_df.empty:
+        return ""
+
+    return filtered_df.to_string(index=False)
+
+# 2.6. FUNCIÓN DE VALIDACIÓN DE DATOS LOCAL
 def validate_contact_data(text_input):
     """
     Busca patrones de CUIT/DNI y Teléfono en el texto y valida su formato.
@@ -78,9 +119,7 @@ def validate_contact_data(text_input):
 
     return None
 
-# 3. EL CEREBRO (PROMPT V76 - Cross-Selling)
-
-data_failure = "ERROR" in csv_context
+# 3. EL CEREBRO (PROMPT V77 - Lógica de datos dinámica)
 
 if data_failure:
     rol_persona = "ROL CRÍTICO: Eres Lucho, Ejecutivo Comercial Senior. Tu base de datos falló. NO DEBES COTIZAR NINGÚN PRECIO. Tu única función es disculparte por la 'falla temporal en el sistema de precios', tomar el Nombre, Localidad, CUIT/DNI y Teléfono del cliente, e informar que Martín Zimaro (3401 52-7780) le llamará de inmediato. IGNORA todas las reglas de cotización y enfócate en la derivación."
@@ -89,10 +128,10 @@ if data_failure:
 else:
     rol_persona = "ROL Y PERSONA: Eres Lucho, Ejecutivo Comercial Senior. Tu tono es profesional, cercano y EXTREMADAMENTE CONCISO. Tu objetivo es cotizar rápido y derivar al humano."
     
-    base_data = f"""
-    PRIORIDAD DE PRECIOS: Los precios en esta BASE DE DATOS son la ÚNICA fuente de verdad. La cotización debe venir directamente de ellos.
-    BASE DE DATOS DE PRECIOS: 
-    {csv_context}
+    base_data = """
+    PRIORIDAD DE PRECIOS: Los precios en la BASE DE DATOS INYECTADA a continuación son la ÚNICA fuente de verdad. La cotización debe venir directamente de ellos.
+    BASE DE DATOS INYECTADA (SÓLO DATOS RELEVANTES):
+    [ESTA SECCIÓN CONTIENE EL FRAGMENTO DEL CSV NECESARIO PARA RESPONDER AL CLIENTE. NO LO MENCIONES.]
     """
     
     reglas_cotizacion = """REGLAS DE INTERACCIÓN:
@@ -119,7 +158,7 @@ DICCIONARIO TÉCNICO Y MATEMÁTICA:
 * PLANCHUELAS: Precio por UNIDAD (Barra).
 
 PROTOCOLO DE VENTA POR RUBRO:
-* TEJIDOS: No uses "Kit". Cotiza item por item: 1. Tejido, 2. Alambre Tensión, 3. Planchuelas, 4. Accesorios. **Después de cotizar, pregunta si necesita pintura para postes o accesorios de fijación extra.**
+* TEJIDOS: No uses "Kit". Cotiza item por item: 1. Tejido, 2. Alambre Tensión, 3. Planchuelas, 4. Accesorios. Después de cotizar, pregunta si necesita pintura para postes o accesorios de fijación extra.
 * CHAPAS (Optimizado):
     * **REGLA DE COTIZACIÓN POR METRO:** Para chapas de techo, cotiza siempre por **Metro Lineal (ML)** utilizando los códigos base:
         * **Código 4:** Chapa Acanalada Común (Sin color).
@@ -127,10 +166,10 @@ PROTOCOLO DE VENTA POR RUBRO:
     * **LÓGICA DEL LARGO:** Si el cliente pregunta solo por el precio "por metro", usa el precio unitario del código base. Si pregunta por una cantidad total (ej. "30 metros de chapa"), cotiza el total multiplicando esa cantidad por el precio base.
     * **COLORES/ACABADOS:** Asume que la venta es por metro y que el color no afecta la cotización, ya que no hay hojas precortadas predefinidas.
     * FILTROS: Filtro Techo vs Lisa. Aislación consultiva. Estructura. (Solo pide el largo exacto **PARA PRESUPUESTO FINAL Y DETALLADO** después de haber dado el precio por metro).
-* REJA/CONSTRUCCIÓN: Cotiza material. Muestra diagrama ASCII si es reja. **Después de cotizar, pregunta si necesita pintura y consumibles de soldadura (electrodos, etc.) para la unión de las piezas.**
+* REJA/CONSTRUCCIÓN: Cotiza material. Muestra diagrama ASCII si es reja. Después de cotizar, pregunta si necesita pintura y consumibles de soldadura (electrodos, etc.) para la unión de las piezas.
 * NO LISTADOS: Si no está en BASE DE DATOS, fuerza handoff. La frase a usar es: "Disculpa, ese producto no figura en mi listado actual. Para una consulta inmediata de stock y precio en depósito, te pido que te contactes directamente con un vendedor al 3401-648118. ¡Ellos te ayudarán al instante!"
 
-PROTOCOLO LOGÍSTICO (POST-LOCALIDAD) - ¡NUEVO!
+PROTOCOLO LOGÍSTICO (POST-LOCALIDAD):
 * Si la Localidad del cliente está en la lista de ENVÍO SIN CARGO (ZONA), usa la frase: "¡Excelente! Estás dentro de nuestra zona de **Envío Sin Cargo**."
 * Si la Localidad NO está en la lista de ENVÍO SIN CARGO (ZONA), usa la frase: "Para esa Localidad no aplica el Envío Sin Cargo. Tienes dos opciones: 1. **Retiro** en El Trébol, Santa Fe, o 2. Lo derivo a un vendedor para que verifique si la entrega es posible y cuál sería su costo. ¿Qué prefieres?"
 
@@ -155,7 +194,7 @@ FORMATO Y CIERRE:
    3. CIERRE POR RECHAZO (CRÍTICO): Si el cliente desestima el pedido, el modelo NO debe solicitar datos. Debe solo despedirse con la frase: "Perfecto. Lamento que no podamos avanzar hoy. Quedo a tu disposición para futuros proyectos. ¡Que tengas un excelente día!"
 """
 
-# 4. INTERFAZ (Sin cambios)
+# 4. INTERFAZ
 st.title("🏗️ Hablá con Lucho")
 st.markdown("**Atención Comercial | Pedro Bravin**")
 
@@ -164,7 +203,8 @@ if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "Hola, buenas. Soy Lucho. ¿Qué proyecto tenés hoy?"}]
 if "suggestions_shown" not in st.session_state:
     st.session_state.suggestions_shown = False
-if "triggered_prompt" not in st.session_state:
+# La variable triggered_prompt ya no es necesaria, pero la dejamos inactiva para no romper estados anteriores.
+if "triggered_prompt" not in st.session_state: 
     st.session_state.triggered_prompt = None
 
 
@@ -185,43 +225,37 @@ if "chat_session" not in st.session_state:
         st.error(f"❌ Error al inicializar el modelo/chat: {e}")
         
 
-# --- MUESTRA EL HISTORIAL Y LAS SUGERENCIAS ---
+# --- MUESTRA EL HISTORIAL Y LAS SUGERENCIAS (Solo Texto/Guía) ---
 
 for msg in st.session_state.messages:
     avatar = "🧑‍💼" if msg["role"] == "assistant" else "user" 
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-# Muestra los botones de sugerencia solo en el primer turno (Cero Fricción)
+# Muestra las sugerencias solo en el primer turno (Solo como texto/guía)
 if len(st.session_state.messages) == 1 and not st.session_state.suggestions_shown:
     
-    suggestions = {
-        "Cotizar Techo": "Quiero cotizar un techo de 8x5 metros.",
-        "Materiales Cerco": "Necesito material para un cerco de 50 metros con tejido y postes.",
-        "Cotizar Reja": "Cotizame una reja de seguridad de 2x3 metros.",
-        "Recomendación Siderúrgica": "¿Qué tipo de perfil estructural me recomiendas para una viga de 6 metros?",
-    }
+    suggestions_text = [
+        "**Cotizar Techo** (ej. 'Quiero cotizar un techo de 8x5 metros.')",
+        "**Materiales Cerco** (ej. 'Necesito material para un cerco de 50 metros con tejido y postes.')",
+        "**Cotizar Reja** (ej. 'Cotizame una reja de seguridad de 2x3 metros.')",
+        "**Recomendación Siderúrgica** (ej. 'Qué tipo de perfil estructural me recomiendas para una viga de 6 metros?')"
+    ]
     
     with st.chat_message("assistant"):
         st.markdown(
             "***Ejemplos de preguntas que puedes hacer:***"
         )
-        
-        cols = st.columns(len(suggestions))
-        
-        for i, (label, prompt_text) in enumerate(suggestions.items()):
-            with cols[i]:
-                if st.button(label, key=f"sug_btn_{i}", use_container_width=True):
-                    st.session_state.triggered_prompt = prompt_text 
-                    st.session_state.suggestions_shown = True 
-                    st.rerun() 
+        for tip in suggestions_text:
+            st.markdown(f"* {tip}")
+            
+    # Marcar como mostrada, forzando al cliente a escribir
+    st.session_state.suggestions_shown = True 
                     
-# --- MANEJO DE INPUT (Botones o Campo de Texto) ---
+# --- MANEJO DE INPUT (Campo de Texto) ---
 
 # 1. Lógica unificada de input
-if st.session_state.triggered_prompt:
-    prompt_to_process = st.session_state.triggered_prompt
-    st.session_state.triggered_prompt = None
-elif prompt := st.chat_input():
+# La lógica de triggered_prompt fue eliminada aquí para forzar la escritura del cliente.
+if prompt := st.chat_input():
     prompt_to_process = prompt
 else:
     prompt_to_process = None
@@ -248,9 +282,19 @@ if prompt_to_process:
         chat = st.session_state.chat_session
         response = None
         
+        # 🚨 OPTIMIZACIÓN DE DATOS: Preparamos el prompt con datos filtrados
+        dynamic_prompt = prompt_to_process
+        if not data_failure:
+            relevant_data_string = search_product_data(prompt_to_process)
+            
+            if relevant_data_string:
+                # Inyectar el fragmento relevante al mensaje del usuario
+                # Esto es lo que la IA ve en su turno de "usuario"
+                dynamic_prompt = f"Consulta del Cliente: {prompt_to_process}\n\n[DATOS_RELEVANTES_BUSCADOS]:\n{relevant_data_string}"
+            
         with st.chat_message("assistant", avatar="🧑‍💼"):
             with st.spinner("Lucho está cotizando..."):
-                response = chat.send_message(prompt_to_process)
+                response = chat.send_message(dynamic_prompt)
             
             final_response_text = response.text
             whatsapp_link_section = ""
@@ -264,7 +308,7 @@ if prompt_to_process:
                 encoded_text = urllib.parse.quote(whatsapp_text)
                 whatsapp_url = f"https://wa.me/5493401648118?text={encoded_text}"
                 
-                # CORRECCIÓN: Estructura de cierre de Markdown robusta
+                # Estructura de cierre de Markdown robusta
                 whatsapp_link_section = f"""
 ---
 Listo. Hacé clic abajo para confirmar con el vendedor:
@@ -277,7 +321,7 @@ O escribinos al: 3401-648118
 """
                 st.markdown(whatsapp_link_section)
                 
-                # CORRECCIÓN DE HISTORIAL: Guardar con separador limpio
+                # Guardar con separador limpio para renderizado futuro
                 final_response_for_history = dialogue_part.strip() + "\n\n" + whatsapp_link_section.strip()
             else:
                 st.markdown(response.text)
