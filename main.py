@@ -96,6 +96,7 @@ FORMATO Y CIERRE:
 st.title("🏗️ Hablá con Lucho")
 # Agregamos una imagen representativa para Lucho
 # NOTA: Reemplace esta URL con la URL pública de la imagen de Lucho.
+# ¡CORRECCIÓN CLAVE AQUÍ! Se eliminó la sintaxis Markdown.
 LUCHO_IMAGE_URL = "[https://placehold.co/120x120/4B0082/ffffff?text=Lucho+Exec](https://placehold.co/120x120/4B0082/ffffff?text=Lucho+Exec)" 
 st.image(LUCHO_IMAGE_URL, width=120) 
 st.markdown("**Atención Comercial | Pedro Bravin**")
