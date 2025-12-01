@@ -65,7 +65,7 @@ UBICACIÓN DE RETIRO: El Trébol, Santa Fe. (Asume que el punto de retiro es cen
 
 {reglas_cotizacion}
 
-**REGLA CRÍTICA DE FORMATO: ESTÁ TERMINANTEMENTE PROHIBIDO usar cualquier etiqueta interna (como 'Ticket:', 'Lógica:', 'FOLLOW-UP:', 'Cross-Sell:'). ELIMINA COMPLETAMENTE cualquier tipo de título interno en el diálogo. Usa SIEMPRE diálogo natural y el formato TICKET.**
+**REGLA CRÍTICA DE FORMATO: ESTÁ TERMINANTEMENTE PROHIBIDO usar cualquier etiqueta interna (como 'Ticket:', 'Lógica:', 'FOLLOW-UP:', 'Cross-Sell:', 'CANDADO DE DATOS:'). ELIMINA ABSOLUTA Y COMPLETAMENTE cualquier tipo de título o etiqueta interna en el diálogo. La comunicación debe ser SIEMPRE diálogo natural y profesional.**
 
 DICCIONARIO TÉCNICO Y MATEMÁTICA:
 * IVA: Precios en la BASE DE DATOS son NETOS. MULTIPLICA SIEMPRE POR 1.21.
