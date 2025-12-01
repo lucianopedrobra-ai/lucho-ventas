@@ -5,7 +5,7 @@ from google.genai import types
 
 # --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Lucho - Ventas", page_icon="🏗️", layout="centered")
-API_KEY = "AIzaSyAM1rZ9u0mfBNaUbM9tFVhRZCSintTeawI"
+API_KEY = st.secrets["AIzaSyCpVXuNBECIdpBVHU3bwRSv50AX1GI8i2c"]
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
 @st.cache_data(ttl=600)
