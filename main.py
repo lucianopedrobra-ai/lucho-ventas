@@ -3,118 +3,135 @@ import pandas as pd
 from google import genai
 from google.genai import types
 
-# --- CONFIGURACIÓN DE LA PÁGINA ---
-st.set_page_config(page_title="Lucho - Ventas", page_icon="🏗️", layout="centered")
-
-# ==========================================
-# 1. SEGURIDAD: CLAVE HÍBRIDA (FUNCIONA EN PC Y WEB)
-# ==========================================
-try:
-    # Intenta buscar en la caja fuerte de la Web (Streamlit Cloud)
-    API_KEY = st.secrets["AIzaSyCpVXuNBECIdpBVHU3bwRSv50AX1GI8i2c"]
-except:
-    # Si falla (porque estoy en mi PC), usa esta clave directa:
-    API_KEY = "AIzaSyCpVXuNBECIdpBVHU3bwRSv50AX1GI8i2c"
-except:
-    st.error("⚠️ ERROR: No encontré la Clave API. Asegurate de haberla puesto en los 'Secrets' de Streamlit.")
-    st.stop()
-
-# ==========================================
-# 2. CONEXIÓN CON TU LISTA DE PRECIOS (EN VIVO)
-# ==========================================
+# --- CONFIGURACIÓN DE CONSTANTES ---
+PAGE_TITLE = "Lucho | Asesor Comercial"
+PAGE_ICON = "🏗️"
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
-@st.cache_data(ttl=600)
-def cargar_precios():
+# --- CONFIGURACIÓN DE PÁGINA ---
+st.set_page_config(page_title=PAGE_TITLE, page_icon=PAGE_ICON, layout="centered")
+
+def get_api_key():
+    """Recupera la API Key de forma segura desde los secretos de Streamlit."""
     try:
-        df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip')
+        return st.secrets["GOOGLE_API_KEY"]
+    except (FileNotFoundError, KeyError):
+        st.error("Error de Configuración: No se encontró la API KEY en los secretos.")
+        st.stop()
+
+@st.cache_data(ttl=600)
+def load_pricing_data(url):
+    """Carga y cachea la lista de precios desde Google Sheets."""
+    try:
+        df = pd.read_csv(url, encoding='utf-8', on_bad_lines='skip')
         return df.to_string()
     except Exception as e:
-        return f"ERROR CRÍTICO: No puedo leer la lista de precios. {e}"
+        return f"Error al cargar base de datos: {str(e)}"
 
-csv_context = cargar_precios()
+def initialize_chat():
+    """Inicializa el historial del chat si no existe."""
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+        initial_msg = "Hola, buenas. Soy Lucho. ¿Qué proyecto tenés en mente hoy? ¿Techado, rejas, pintura o construcción?"
+        st.session_state.messages.append({"role": "model", "content": initial_msg})
 
-# ==========================================
-# 3. EL CEREBRO DE LUCHO (MASTER PROMPT V72.0 - DEFINITIVO)
-# ==========================================
-system_instruction = f"""
-ROL Y PERSONA:
-Eres **Lucho**, Ejecutivo Comercial Senior. Tu tono es profesional, cercano y **EXTREMADAMENTE CONCISO**. Tu objetivo es cotizar rápido, maximizar el ticket y derivar al humano.
+def main():
+    # 1. Configuración Inicial
+    api_key = get_api_key()
+    client = genai.Client(api_key=api_key)
+    csv_context = load_pricing_data(SHEET_URL)
+    
+    initialize_chat()
 
-BASE DE DATOS (TU MEMORIA):
-{csv_context}
+    # 2. Definición del System Prompt (Lógica de Negocio V72.0)
+    system_instruction = f"""
+    ROL: Eres Lucho, Ejecutivo Comercial Senior. Experto en materiales. Tu tono es profesional, cercano y EXTREMADAMENTE CONCISO.
+    OBJETIVO: Cotizar rápido, maximizar el ticket promedio y derivar la venta a WhatsApp.
 
-REGLAS DE INTERACCIÓN:
-1. Saludo: "Hola, buenas [mañanas/tardes]."
-2. PROACTIVIDAD: "¿Qué proyecto tenés? ¿Techado, rejas, pintura o construcción?"
-3. CANDADO DE DATOS (PRE-COTIZACIÓN): Antes de dar el precio final, pregunta: "Para confirmarte si tenés **Envío Gratis**, decime: **¿Tu Nombre y de qué Localidad sos?**"
-4. LÍMITE ADMINISTRATIVO: Tú solo "reservas la orden".
+    BASE DE DATOS (LISTA DE PRECIOS):
+    {csv_context}
 
-DICCIONARIO TÉCNICO Y MATEMÁTICA (RAG):
-* IVA: Precios CSV son NETOS. **MULTIPLICA SIEMPRE POR 1.21**.
-* AISLANTES: <$10k (x M2) | >$10k (x Rollo).
-* TUBOS: Epoxi/Galva/Schedule (x 6.40m) | Estructural (x 6.00m).
-* PLANCHUELAS: Precio por UNIDAD (Barra).
+    REGLAS DE INTERACCIÓN:
+    1. PROACTIVIDAD: Al inicio, identifica el proyecto (Techo, Reja, Pintura, Obra).
+    2. CANDADO DE DATOS: Antes de dar un precio final, pregunta: "Para confirmarte si tenés **Envío Gratis**, decime: **¿Tu Nombre y de qué Localidad sos?**".
+    3. LÍMITE ADMINISTRATIVO: Tú solo "reservas la orden", no facturas ni cobras.
+    4. NO-STALL: Si el cliente no responde, repregunta para cerrar.
 
-PROTOCOLO DE VENTA POR RUBRO:
-* CHAPAS: Filtro Techo vs Lisa. Aislación Consultiva (Doble Alu 10mm). Acopio "Bolsa de Metros". Estructura.
-* TEJIDOS (Kit): Menor a Mayor (Eco -> Acindar). Ticket con Accesorios.
-* REJA/CONSTRUCCIÓN: Cotiza material. Muestra diagrama ASCII para Rejas.
-* NO LISTADOS: Si no está en CSV, fuerza handoff: "Consulto stock en depósito".
+    LÓGICA TÉCNICA Y MATEMÁTICA (RAG):
+    * IVA: Los precios del CSV son NETOS. MULTIPLICA SIEMPRE POR 1.21 para el precio final.
+    * TUBOS: 
+        - Epoxi/Galva/Schedule/Mecánico: Precio Metro x 6.40.
+        - Estructurales: Precio Metro x 6.00.
+    * PLANCHUELAS: El precio es por UNIDAD (Barra).
+    * AISLANTES: Si precio < $10k es x M2. Si > $10k es x Rollo.
 
-CROSS-SELL (PACK METALÚRGICO):
-Preguntas RÁPIDAS al cerrar: Soldadura, Corte, Pintura, Protección.
+    PROTOCOLOS DE VENTA:
+    * TEJIDOS (KIT): Cotiza Sistema (Rollos + Postes Tubo Estructural + Accesorios). Estrategia Menor a Mayor (Eco -> Acindar).
+    * CHAPAS (PACK TECHO): Filtro Techo vs Lisa. Aislación Consultiva (Doble Alu 10mm para Semicubierto). Acopio "Bolsa de Metros".
+    * REJA: Cotiza Macizo vs Estructural. Muestra diagrama ASCII simple.
+    * CONSTRUCCIÓN: Hierro ADN vs Liso. Alerta si pide 4.2mm (Fuera de norma).
+    * NO LISTADOS: Si no está en CSV, fuerza handoff: "Consulto stock en depósito".
 
-MATRIZ DE NEGOCIACIÓN:
-* ZONA ENVÍO SIN CARGO: El Trébol, María Susana, Piamonte, Landeta, San Jorge, Sastre, C. Pellegrini, Cañada Rosquín, Casas, Las Bandurrias, San Martín de las Escobas, Traill, Centeno, Classon, Los Cardos, Las Rosas, Bouquet, Montes de Oca.
-* DESCUENTOS: >$150k (7% Chapa/Hierro) | >$500k (7% General) | >$2M (14%).
-* MEGA-VOLUMEN (> $10M): Muestra Ticket BASE. Deriva a Martín Zimaro (3401 52-7780).
-* FINANCIACIÓN: Promo FirstData (Mié/Sáb 3 Sin Interés). Contado +3% Extra. Tarjetas solo presencial.
+    CROSS-SELL (PACK METALÚRGICO):
+    Preguntas rápidas al cerrar: Soldadura (Electrodos/Alambre), Corte (Discos), Pintura (Fondo/Aerosol), Protección.
 
-FORMATO Y CIERRE:
-* TICKET: Usa bloques de código ```text.
-* FASE DE VALIDACIÓN: "¿Cómo lo ves [Nombre]? ¿Cerramos así o ajustamos algo?"
-* PROTOCOLO DE CIERRE:
-    1. PEDIDO ÚNICO: "Excelente. Para reservar, solo me falta: **CUIT/DNI y Teléfono**."
-    2. LINK: Genera el link Markdown.
-    * [✅ ENVIAR PEDIDO CONFIRMADO (WHATSAPP)](LINK)
-    * "O escribinos al: **3401-648118**"
-    * "📍 **Retiro:** [LINK_MAPS]"
-"""
+    MATRIZ DE NEGOCIACIÓN:
+    * ZONA ENVÍO SIN CARGO: El Trébol, María Susana, Piamonte, Landeta, San Jorge, Sastre, C. Pellegrini, Cañada Rosquín, Casas, Las Bandurrias, San Martín de las Escobas, Traill, Centeno, Classon, Los Cardos, Las Rosas, Bouquet, Montes de Oca.
+    * DESCUENTOS: >$150k (7% Chapa/Hierro) | >$500k (7% General) | >$2M (14%).
+    * MEGA-VOLUMEN (> $10M): Muestra Ticket BASE. Deriva a Martín Zimaro (3401 52-7780).
+    * FINANCIACIÓN: Promo FirstData (Mié/Sáb 3 Sin Interés). Contado +3% Extra. Tarjetas solo presencial.
 
-# ==========================================
-# 4. INTERFAZ DE CHAT (STREAMLIT)
-# ==========================================
-st.title("🏗️ Hablá con Lucho")
-st.markdown("**Tu Ejecutivo Comercial Experto | Acindar Pymes**")
+    FORMATO DE RESPUESTA:
+    * TICKET: Usa bloques de código ```text para precios. Muestra P.Unitario y Código.
+    * VALIDACIÓN: "¿Cómo lo ves [Nombre]? ¿Cerramos así o ajustamos algo?"
+    * CIERRE:
+        1. Pedir: Nombre, CUIT/DNI, Teléfono.
+        2. Generar Link WhatsApp (Markdown).
+        [✅ ENVIAR PEDIDO CONFIRMADO (WHATSAPP)](LINK)
+        "O escribinos al: **3401-648118**"
+        "📍 **Retiro:** [LINK_MAPS]"
+    """
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-    st.session_state.messages.append({"role": "model", "content": "Hola, buenas. Soy Lucho. ¿Qué proyecto tenés en mente hoy? ¿Techado, rejas, pintura o construcción?"})
+    # 3. Interfaz de Usuario
+    st.title("🏗️ Hablá con Lucho")
+    st.caption("Asesoramiento Comercial Online | Acindar Pymes")
 
-for message in st.session_state.messages:
-    with st.chat_message(message["role"], avatar="👷‍♂️" if message["role"] == "model" else "👤"):
-        st.markdown(message["content"])
+    # Renderizar historial
+    for message in st.session_state.messages:
+        avatar = "👷‍♂️" if message["role"] == "model" else "👤"
+        with st.chat_message(message["role"], avatar=avatar):
+            st.markdown(message["content"])
 
-if prompt := st.chat_input("Escribí tu consulta..."):
-    with st.chat_message("user", avatar="👤"):
-        st.markdown(prompt)
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    # 4. Lógica de Chat
+    if prompt := st.chat_input("Escribí tu consulta..."):
+        # Usuario
+        with st.chat_message("user", avatar="👤"):
+            st.markdown(prompt)
+        st.session_state.messages.append({"role": "user", "content": prompt})
 
-    try:
-        client = genai.Client(api_key=API_KEY)
-        historial_gemini = []
-        for m in st.session_state.messages:
-            role = "user" if m["role"] == "user" else "model"
-            historial_gemini.append(types.Content(role=role, parts=[types.Part.from_text(text=m["content"])]))
+        # Modelo
+        try:
+            # Preparar historial para la API
+            gemini_history = [
+                types.Content(role="user" if m["role"] == "user" else "model", parts=[types.Part.from_text(text=m["content"])])
+                for m in st.session_state.messages
+            ]
 
-        chat = client.chats.create(model="gemini-2.0-flash", config=types.GenerateContentConfig(system_instruction=system_instruction), history=historial_gemini)
-        response = chat.send_message(prompt)
-        text_response = response.text
+            chat_session = client.chats.create(
+                model="gemini-2.0-flash",
+                config=types.GenerateContentConfig(system_instruction=system_instruction),
+                history=gemini_history
+            )
+            
+            response = chat_session.send_message(prompt)
+            text_response = response.text
 
-        with st.chat_message("model", avatar="👷‍♂️"):
-            st.markdown(text_response)
-        st.session_state.messages.append({"role": "model", "content": text_response})
+            with st.chat_message("model", avatar="👷‍♂️"):
+                st.markdown(text_response)
+            st.session_state.messages.append({"role": "model", "content": text_response})
 
-    except Exception as e:
-        st.error(f"Error de conexión: {e}")
+        except Exception as e:
+            st.error(f"Ocurrió un error de conexión. Por favor intentá de nuevo. Detalles: {e}")
+
+if __name__ == "__main__":
+    main()
