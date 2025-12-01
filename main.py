@@ -6,10 +6,6 @@ from google.genai import types
 # --- CONFIGURACIÓN ---
 PAGE_TITLE = "Lucho | Asesor Comercial"
 PAGE_ICON = "🏗️"
-
-# CAMBIO CRÍTICO: Usamos el modelo 'flash' que es el estándar estable hoy
-MODEL_ID = "gemini-1.5-flash" 
-
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
 st.set_page_config(page_title=PAGE_TITLE, page_icon=PAGE_ICON, layout="centered")
@@ -102,19 +98,32 @@ def main():
                 for m in st.session_state.messages
             ]
 
-            chat_session = client.chats.create(
-                model=MODEL_ID,
-                config=types.GenerateContentConfig(system_instruction=sys_instruct),
-                history=api_history
-            )
-            response = chat_session.send_message(prompt)
+            # --- INTENTO 1: GEMINI 1.5 PRO (EL MEJOR) ---
+            try:
+                chat_session = client.chats.create(
+                    model="gemini-1.5-pro",
+                    config=types.GenerateContentConfig(system_instruction=sys_instruct),
+                    history=api_history
+                )
+                response = chat_session.send_message(prompt)
             
+            except Exception as e:
+                # SI FALLA EL PRO, INTENTAMOS CON FLASH AUTOMÁTICAMENTE
+                print(f"Fallo Pro: {e}. Intentando Flash.")
+                chat_session = client.chats.create(
+                    model="gemini-1.5-flash",
+                    config=types.GenerateContentConfig(system_instruction=sys_instruct),
+                    history=api_history
+                )
+                response = chat_session.send_message(prompt)
+
             with st.chat_message("model", avatar="👷‍♂️"):
                 st.markdown(response.text)
             st.session_state.messages.append({"role": "model", "content": response.text})
 
         except Exception as e:
             st.error(f"❌ Error Técnico: {str(e)}")
+            st.info("Verifica que tu API Key tenga habilitada la facturación en Google Cloud Console.")
 
 if __name__ == "__main__":
     main()
