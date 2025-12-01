@@ -38,7 +38,7 @@ def load_data():
 
 csv_context = load_data()
 
-# 3. EL CEREBRO (PROMPT V72 - Final)
+# 3. EL CEREBRO (PROMPT V72 - FINAL Y LIMPIO)
 
 # --- Lógica Condicional del ROL (Mejora de Robustez) ---
 data_failure = "ERROR" in csv_context
@@ -46,19 +46,17 @@ data_failure = "ERROR" in csv_context
 if data_failure:
     rol_persona = "ROL CRÍTICO: Eres Lucho, Ejecutivo Comercial Senior. Tu base de datos falló. NO DEBES COTIZAR NINGÚN PRECIO. Tu única función es disculparte por la 'falla temporal en el sistema de precios', tomar el Nombre, Localidad, CUIT/DNI y Teléfono del cliente, e informar que Martín Zimaro (3401 52-7780) le llamará de inmediato. IGNORA todas las reglas de cotización y enfócate en la derivación."
     base_data = "BASE DE DATOS: [Datos no disponibles por falla crítica]"
-    # ESTRATEGIA INTERNA LIMPIA: Solo la acción de captura
     reglas_cotizacion = "REGLAS DE INTERACCIÓN: 1. Saludo. 2. Disculpas y derivación. 3. Captura el Nombre, Localidad, CUIT/DNI y Teléfono del cliente. 4. Cierre inmediato con datos de Martín Zimaro."
 else:
     rol_persona = "ROL Y PERSONA: Eres Lucho, Ejecutivo Comercial Senior. Tu tono es profesional, cercano y EXTREMADAMENTE CONCISO. Tu objetivo es cotizar rápido y derivar al humano."
     base_data = f"BASE DE DATOS DE PRECIOS: {csv_context}"
-    # ERROR CORREGIDO: Eliminación de la comilla doble extra al final de la Regla 5.
     reglas_cotizacion = """REGLAS DE INTERACCIÓN:
 1. Saludo: Inicia con "Hola, buenas tardes."
 2. Proactividad: Pregunta "¿Qué proyecto tenés? ¿Techado, rejas, pintura o construcción?"
 3. Antes de dar el precio final, pregunta: "Para confirmarte si tenés Envío Gratis, decime: ¿Tu Nombre y de qué Localidad sos?"
 4. LÍMITE ADMINISTRATIVO: Tú solo "reservas la orden".
-5. Si el cliente se detiene o no responde a tu último mensaje, debes ser proactivo. Después de un turno sin respuesta (conceptual 20 segundos), realiza un FOLLOW-UP: "¿Te ayudo con algún otro producto para optimizar el envío?". Si el silencio persiste (conceptual 60 segundos), CIERRA la conversación cortésmente con la frase: "Perfecto. Quedo atento a tu CUIT/DNI y Teléfono para avanzar con la reserva. ¡Que tengas un excelente día!"
-""" # <-- Aquí terminan las 3 comillas dobles que cierran la cadena.
+5. Si el cliente se detiene o no responde a tu último mensaje, debes ser proactivo. Después de un turno sin respuesta (conceptual 20 segundos), RETOMA LA CONVERSACIÓN con la frase: "¿Te ayudo con algún otro producto para optimizar el envío?". Si el silencio persiste (conceptual 60 segundos), CIERRA la conversación cortésmente con la frase: "Perfecto. Quedo atento a tu CUIT/DNI y Teléfono para avanzar con la reserva. ¡Que tengas un excelente día!"
+""" 
 
 sys_prompt = f"""
 {rol_persona}
@@ -111,21 +109,16 @@ if "messages" not in st.session_state:
 # --- INICIALIZACIÓN DEL MODELO Y LA SESIÓN DE CHAT (Para mejorar la velocidad) ---
 if "chat_session" not in st.session_state:
     try:
-        # **CORRECCIÓN DE MODELO: Se usa el alias del modelo estable 'gemini-2.5-flash'**
         model = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt)
         
-        # CORRECCIÓN CRÍTICA (Error 400):
-        # Mapeamos 'assistant' a 'model' y EXCLUIMOS el primer mensaje (el saludo de bienvenida) 
-        # para que la secuencia de roles sea válida para la API.
         initial_history = []
-        # Iteramos a partir del índice 1, ya que el índice 0 es el mensaje de bienvenida de Streamlit.
         for m in st.session_state.messages[1:]: 
             if m["role"] == "assistant":
                 api_role = "model"
             elif m["role"] == "user":
                 api_role = "user"
             else:
-                continue # Saltar roles inesperados
+                continue
             
             initial_history.append({"role": api_role, "parts": [{"text": m["content"]}]})
             
@@ -136,7 +129,6 @@ if "chat_session" not in st.session_state:
         
 # Muestra los mensajes anteriores en el chat
 for msg in st.session_state.messages:
-    # El rol en st.session_state ya es 'user' o 'assistant'
     st.chat_message(msg["role"]).write(msg["content"])
 
 # Captura la entrada del usuario
@@ -151,16 +143,14 @@ if prompt := st.chat_input():
              
         chat = st.session_state.chat_session
         
-        # Muestra el indicador de carga en la burbuja del asistente
+        # Muestra el indicador de carga dinámico
         with st.chat_message("assistant"):
-            message_placeholder = st.empty()
-            # --- MODIFICACIÓN DEL MENSAJE DE CARGA AQUÍ ---
-            message_placeholder.markdown("estoy pensando aguardame que te puedo sorprender")
-        
-            response = chat.send_message(prompt)
-        
-            # Reemplaza el texto de carga con la respuesta final
-            message_placeholder.markdown(response.text)
+            # --- MODIFICACIÓN CLAVE: Usamos st.spinner para el efecto de "pensando" ---
+            with st.spinner("..."):
+                response = chat.send_message(prompt)
+            
+            # Escribimos la respuesta final
+            st.markdown(response.text)
             
         # Guarda la respuesta en el estado de sesión
         st.session_state.messages.append({"role": "assistant", "content": response.text})
