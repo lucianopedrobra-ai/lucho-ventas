@@ -5,11 +5,6 @@ import google.generativeai as genai
 # --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Lucho | Pedro Bravin", page_icon="🏗️", layout="centered")
 
-# Función auxiliar para mapear roles entre la API y Streamlit
-def map_role(role):
-    """Mapea el rol de 'model' (Gemini API) a 'assistant' (Streamlit chat)."""
-    return "assistant" if role == "model" else role
-
 # 1. AUTENTICACIÓN
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
@@ -116,8 +111,9 @@ if "chat_session" not in st.session_state:
     try:
         model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025', system_instruction=sys_prompt)
         
+        # Corrección CRÍTICA: Mapear 'assistant' (Streamlit) a 'model' (Gemini API)
         initial_history = [
-            {"role": map_role(m["role"]), "parts": [{"text": m["content"]}]}
+            {"role": "model" if m["role"] == "assistant" else m["role"], "parts": [{"text": m["content"]}]}
             for m in st.session_state.messages if m["role"] != "system"
         ]
         st.session_state.chat_session = model.start_chat(history=initial_history)
@@ -127,8 +123,8 @@ if "chat_session" not in st.session_state:
         
 # Muestra los mensajes anteriores en el chat
 for msg in st.session_state.messages:
-    # Usamos la función auxiliar para mapear el rol
-    st.chat_message(map_role(msg["role"])).write(msg["content"])
+    # El rol en st.session_state ya es 'user' o 'assistant'
+    st.chat_message(msg["role"]).write(msg["content"])
 
 # Captura la entrada del usuario
 if prompt := st.chat_input():
@@ -165,6 +161,8 @@ if prompt := st.chat_input():
                 "Espere unos minutos antes de intentar de nuevo o considere revisar y actualizar su plan de facturación en Google AI Studio. "
                 "[Más información sobre límites de cuota](https://ai.google.dev/gemini-api/docs/rate-limits)."
             )
+        elif "400" in error_message and "valid role" in error_message:
+             st.info("💡 **Error de Rol (400)**: Hubo un problema con la estructura del historial de chat. Se ha corregido el mapeo de roles.")
         elif "404" in error_message or "not found" in error_message.lower():
             st.info("💡 Consejo: El nombre del modelo puede ser incorrecto o su clave API no tiene acceso. Intente usar un alias diferente o crear una nueva clave.")
         else:
