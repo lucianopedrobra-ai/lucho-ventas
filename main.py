@@ -5,6 +5,7 @@ from google.genai import types
 
 # --- CONFIGURACIÓN DEL ENTORNO ---
 PAGE_CONFIG = {"page_title": "Lucho | Asesor Comercial", "page_icon": "🏗️", "layout": "centered"}
+# Usamos el modelo PRO (Requiere API Key paga o con billing habilitado)
 MODEL_ID = "gemini-1.5-pro"
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
@@ -14,21 +15,26 @@ def get_credentials():
     """Recupera credenciales de forma segura."""
     try:
         return st.secrets["GOOGLE_API_KEY"]
-    except KeyError:
-        st.error("Error crítico: Credenciales no configuradas en el entorno.")
-        st.stop()
+    except Exception:
+        return None
 
 @st.cache_data(ttl=600, show_spinner=False)
 def fetch_pricing_data():
     """Obtiene y procesa la lista de precios en tiempo real."""
     try:
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip')
+        # Optimización: Solo columnas clave para ahorrar tokens
+        if len(df.columns) > 6:
+             # Asumiendo estructura: Rubro, Sub, CODIGO, DESCRIPCION, UNIDAD, Base, PRECIO, Moneda
+             df_opt = df.iloc[:, [2, 3, 4, 6]].copy()
+             df_opt.columns = ['CODIGO', 'DESCRIPCION', 'UNIDAD', 'PRECIO_LISTA']
+             return df_opt.to_string(index=False)
         return df.to_string(index=False)
     except Exception as e:
-        return f"Error de conexión con base de datos: {e}"
+        return f"Error leyendo CSV: {e}"
 
 def build_system_prompt(context_data):
-    """Genera la lógica de negocio del agente."""
+    """Genera la lógica de negocio del agente (Lucho V72)."""
     return f"""
     ROL: Asistente Comercial Senior "Lucho". Perfil técnico, conciso y orientado al cierre.
     
@@ -42,7 +48,7 @@ def build_system_prompt(context_data):
     4. ALCANCE: Reservar pedidos, no emitir facturas fiscales.
 
     REGLAS DE PRODUCTO (RAG):
-    - TUBOS: Cotizar tira completa (Conducción 6.40m / Estructural 6.00m).
+    - TUBOS: Epoxi/Galva/Schedule (x 6.40m) | Estructural (x 6.00m).
     - PLANCHUELAS: Unidad barra.
     - AISLANTES: <$10k cotizar por m2 (calc. rollo) | >$10k cotizar por rollo.
 
@@ -81,6 +87,13 @@ def main():
     st.markdown("**Atención Comercial | Acindar Pymes**")
     
     api_key = get_credentials()
+    
+    # Verificación temprana de clave
+    if not api_key:
+        st.error("🚨 ERROR CRÍTICO: No se encontró la API Key en los Secrets de Streamlit.")
+        st.info("Por favor, ve a Settings > Secrets y agrega GOOGLE_API_KEY = '...'")
+        st.stop()
+
     client = genai.Client(api_key=api_key)
     pricing_data = fetch_pricing_data()
     
@@ -92,16 +105,16 @@ def main():
             st.markdown(prompt)
         st.session_state.messages.append({"role": "user", "content": prompt})
 
+        # --- BLOQUE DE EJECUCIÓN CON DIAGNÓSTICO ---
         try:
             sys_instruct = build_system_prompt(pricing_data)
             
-            # Construcción del historial para la API
             api_history = [
                 types.Content(role="user" if m["role"] == "user" else "model", parts=[types.Part.from_text(text=m["content"])])
                 for m in st.session_state.messages
             ]
 
-            # Inferencia
+            # Intentamos conectar con el modelo PRO
             chat_session = client.chats.create(
                 model=MODEL_ID,
                 config=types.GenerateContentConfig(system_instruction=sys_instruct),
@@ -114,23 +127,17 @@ def main():
             st.session_state.messages.append({"role": "model", "content": response.text})
 
         except Exception as e:
-            # Fallback silencioso a modelo Flash si Pro falla o manejo de error genérico
-            if "404" in str(e) or "429" in str(e):
-                st.warning("Nota: Optimizando respuesta con modelo de alta velocidad...")
-                try:
-                    chat_session = client.chats.create(
-                        model="gemini-1.5-flash",
-                        config=types.GenerateContentConfig(system_instruction=sys_instruct),
-                        history=api_history
-                    )
-                    response = chat_session.send_message(prompt)
-                    with st.chat_message("model", avatar="👷‍♂️"):
-                        st.markdown(response.text)
-                    st.session_state.messages.append({"role": "model", "content": response.text})
-                except:
-                    st.error("Servicio momentáneamente no disponible. Por favor intente más tarde.")
-            else:
-                st.error(f"Error de conexión: {str(e)}")
+            # AQUÍ CAPTURAMOS EL ERROR REAL
+            error_text = str(e)
+            st.error(f"❌ ERROR TÉCNICO: {error_text}")
+            
+            # Ayudas automáticas según el error
+            if "404" in error_text:
+                st.warning(f"El modelo '{MODEL_ID}' no se encontró. Verifica si tu API Key tiene acceso a la versión Pro.")
+            elif "429" in error_text:
+                st.warning("Cuota excedida (Resource Exhausted). Revisa el Billing en Google Cloud.")
+            elif "403" in error_text:
+                st.warning("Permiso denegado. La API Key puede ser inválida o estar restringida.")
 
 if __name__ == "__main__":
     main()
