@@ -57,6 +57,7 @@ REGLAS DE INTERACCIÓN:
 2. Proactividad: Pregunta "¿Qué proyecto tenés? ¿Techado, rejas, pintura o construcción?"
 3. CANDADO DE DATOS (PRE-COTIZACIÓN): Antes de dar el precio final, pregunta: "Para confirmarte si tenés Envío Gratis, decime: ¿Tu Nombre y de qué Localidad sos?"
 4. LÍMITE ADMINISTRATIVO: Tú solo "reservas la orden".
+5. **SEGUIMIENTO POR INACTIVIDAD (IMPORTANTE): Si el cliente se detiene o no responde a tu último mensaje, debes ser proactivo. Después de un turno sin respuesta (conceptual 20 segundos), realiza un FOLLOW-UP: "¿Te ayudo con algún otro producto para optimizar el envío?". Si el silencio persiste (conceptual 60 segundos), CIERRA la conversación cortésmente con la frase: "Perfecto. Quedo atento a tu CUIT/DNI y Teléfono para avanzar con la reserva. ¡Que tengas un excelente día!"**
 
 DICCIONARIO TÉCNICO Y MATEMÁTICA (RAG):
 * IVA: Precios en la BASE DE DATOS son NETOS. MULTIPLICA SIEMPRE POR 1.21.
@@ -94,13 +95,31 @@ FORMATO Y CIERRE:
 
 # 4. INTERFAZ
 st.title("🏗️ Hablá con Lucho")
-# Se eliminó la sección de la imagen.
 st.markdown("**Atención Comercial | Pedro Bravin**")
 
 # Inicializa el historial de mensajes
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "Hola, buenas. Soy Lucho. ¿Qué proyecto tenés hoy?"}]
 
+# --- INICIALIZACIÓN DEL MODELO Y LA SESIÓN DE CHAT (Para mejorar la velocidad) ---
+# Esto se hace una sola vez para evitar enviar el enorme sys_prompt/csv_context en cada turno.
+if "chat_session" not in st.session_state:
+    try:
+        # 1. Inicializa el modelo solo una vez
+        model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025', system_instruction=sys_prompt)
+        
+        # 2. Prepara el historial inicial (sin el mensaje de bienvenida)
+        initial_history = [
+            {"role": "model" if m["role"] == "assistant" else m["role"], "parts": [{"text": m["content"]}]}
+            for m in st.session_state.messages if m["role"] != "system"
+        ]
+        # 3. Inicia la sesión de chat y la guarda
+        st.session_state.chat_session = model.start_chat(history=initial_history)
+        
+    except Exception as e:
+        st.error(f"❌ Error al inicializar el modelo/chat: {e}")
+        # No paramos la ejecución aquí para que se puedan ver los mensajes anteriores
+        
 # Muestra los mensajes anteriores en el chat
 for msg in st.session_state.messages:
     # Mapea el rol de la API a la función de mensaje de Streamlit
@@ -114,23 +133,26 @@ if prompt := st.chat_input():
     st.session_state.messages.append({"role": "user", "content": prompt})
 
     try:
-        # Usamos el identificador del modelo gemini-2.5-flash
-        model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025', system_instruction=sys_prompt)
+        # Verifica si la sesión de chat existe antes de usarla
+        if "chat_session" not in st.session_state:
+             st.error("No se pudo iniciar la sesión de chat. Revise la autenticación o el prompt inicial.")
+             st.stop()
+             
+        # Usa la sesión de chat ya inicializada
+        chat = st.session_state.chat_session
         
-        # Prepara el historial para la API
-        history = [
-            {"role": "model" if m["role"] == "assistant" else m["role"], "parts": [{"text": m["content"]}]}
-            for m in st.session_state.messages if m["role"] != "system"
-        ]
+        # Muestra el indicador de carga en la burbuja del asistente
+        with st.chat_message("assistant"):
+            message_placeholder = st.empty()
+            message_placeholder.markdown("Lucho está cargando la cotización...") # Mostrar texto de carga
         
-        # Inicia el chat con el historial
-        chat = model.start_chat(history=history)
+            # Envía el mensaje usando la sesión de chat guardada (ahora mucho más rápido)
+            response = chat.send_message(prompt)
         
-        # Envía el mensaje y espera la respuesta
-        response = chat.send_message(prompt)
-        
-        # Muestra la respuesta y la guarda en el estado de sesión
-        st.chat_message("assistant").write(response.text)
+            # Reemplaza el texto de carga con la respuesta final
+            message_placeholder.markdown(response.text)
+            
+        # Guarda la respuesta en el estado de sesión
         st.session_state.messages.append({"role": "assistant", "content": response.text})
 
     except Exception as e:
