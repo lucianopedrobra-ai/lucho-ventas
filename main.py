@@ -27,7 +27,6 @@ def load_data():
     """Carga los datos desde la URL de la hoja de cálculo y devuelve el DataFrame."""
     try:
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip')
-        # Limpieza básica: rellenar NaN y convertir a string para búsquedas
         df = df.fillna('') 
         return df
     except Exception as e:
@@ -41,13 +40,19 @@ def load_data():
         return "ERROR_DATA_LOAD_FAILED"
 
 df_data = load_data()
-data_failure = (df_data == "ERROR_DATA_LOAD_FAILED")
+# 🚨 CORRECCIÓN DE ERROR: Usar type() para evitar el ValueError de Pandas.
+data_failure = (type(df_data) == str and df_data == "ERROR_DATA_LOAD_FAILED")
 
 if not data_failure:
-    # Optimización: Guardar el DataFrame en memoria (session state)
-    st.session_state.df = df_data
-    csv_context = "BASE DE DATOS CARGADA EN MEMORIA."
+    # Chequear si el DataFrame está vacío, que también es un error de datos.
+    if df_data.empty:
+        data_failure = True
+        st.warning("⚠️ Atención: La base de datos se cargó, pero está vacía. Lucho operará en modo de falla crítica.")
+    else:
+        st.session_state.df = df_data
+        csv_context = "BASE DE DATOS CARGADA EN MEMORIA."
 else:
+    # Si falló la carga (es una cadena de error)
     st.warning(
         "⚠️ Atención: El sistema de precios no pudo cargar la base de datos. "
         "Lucho solo podrá tomar tus datos de contacto y derivarte a un vendedor humano."
@@ -55,7 +60,7 @@ else:
     st.session_state.df = None
     csv_context = "ERROR_DATA_LOAD_FAILED"
 
-# 2.5. FUNCIÓN DE BÚSQUEDA LOCAL DE DATOS
+# 2.5. FUNCIÓN DE BÚSQUEDA LOCAL DE DATOS (Optimización de Costos)
 def search_product_data(prompt_text):
     """
     Busca palabras clave y números en el DataFrame cargado
@@ -119,7 +124,7 @@ def validate_contact_data(text_input):
 
     return None
 
-# 3. EL CEREBRO (PROMPT V77 - Lógica de datos dinámica)
+# 3. EL CEREBRO (PROMPT V77)
 
 if data_failure:
     rol_persona = "ROL CRÍTICO: Eres Lucho, Ejecutivo Comercial Senior. Tu base de datos falló. NO DEBES COTIZAR NINGÚN PRECIO. Tu única función es disculparte por la 'falla temporal en el sistema de precios', tomar el Nombre, Localidad, CUIT/DNI y Teléfono del cliente, e informar que Martín Zimaro (3401 52-7780) le llamará de inmediato. IGNORA todas las reglas de cotización y enfócate en la derivación."
@@ -128,7 +133,7 @@ if data_failure:
 else:
     rol_persona = "ROL Y PERSONA: Eres Lucho, Ejecutivo Comercial Senior. Tu tono es profesional, cercano y EXTREMADAMENTE CONCISO. Tu objetivo es cotizar rápido y derivar al humano."
     
-    base_data = """
+    base_data = f"""
     PRIORIDAD DE PRECIOS: Los precios en la BASE DE DATOS INYECTADA a continuación son la ÚNICA fuente de verdad. La cotización debe venir directamente de ellos.
     BASE DE DATOS INYECTADA (SÓLO DATOS RELEVANTES):
     [ESTA SECCIÓN CONTIENE EL FRAGMENTO DEL CSV NECESARIO PARA RESPONDER AL CLIENTE. NO LO MENCIONES.]
@@ -203,8 +208,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "Hola, buenas. Soy Lucho. ¿Qué proyecto tenés hoy?"}]
 if "suggestions_shown" not in st.session_state:
     st.session_state.suggestions_shown = False
-# La variable triggered_prompt ya no es necesaria, pero la dejamos inactiva para no romper estados anteriores.
-if "triggered_prompt" not in st.session_state: 
+if "triggered_prompt" not in st.session_state:
     st.session_state.triggered_prompt = None
 
 
@@ -225,9 +229,10 @@ if "chat_session" not in st.session_state:
         st.error(f"❌ Error al inicializar el modelo/chat: {e}")
         
 
-# --- MUESTRA EL HISTORIAL Y LAS SUGERENCIAS (Solo Texto/Guía) ---
+# --- MUESTRA EL HISTORIAL Y LAS SUGERENCIAS ---
 
 for msg in st.session_state.messages:
+    # 🚨 Aplicación de avatar en el chat
     avatar = "🧑‍💼" if msg["role"] == "assistant" else "user" 
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
@@ -248,13 +253,10 @@ if len(st.session_state.messages) == 1 and not st.session_state.suggestions_show
         for tip in suggestions_text:
             st.markdown(f"* {tip}")
             
-    # Marcar como mostrada, forzando al cliente a escribir
     st.session_state.suggestions_shown = True 
                     
 # --- MANEJO DE INPUT (Campo de Texto) ---
 
-# 1. Lógica unificada de input
-# La lógica de triggered_prompt fue eliminada aquí para forzar la escritura del cliente.
 if prompt := st.chat_input():
     prompt_to_process = prompt
 else:
@@ -282,14 +284,13 @@ if prompt_to_process:
         chat = st.session_state.chat_session
         response = None
         
-        # 🚨 OPTIMIZACIÓN DE DATOS: Preparamos el prompt con datos filtrados
+        # OPTIMIZACIÓN DE DATOS: Preparamos el prompt con datos filtrados
         dynamic_prompt = prompt_to_process
         if not data_failure:
             relevant_data_string = search_product_data(prompt_to_process)
             
             if relevant_data_string:
                 # Inyectar el fragmento relevante al mensaje del usuario
-                # Esto es lo que la IA ve en su turno de "usuario"
                 dynamic_prompt = f"Consulta del Cliente: {prompt_to_process}\n\n[DATOS_RELEVANTES_BUSCADOS]:\n{relevant_data_string}"
             
         with st.chat_message("assistant", avatar="🧑‍💼"):
