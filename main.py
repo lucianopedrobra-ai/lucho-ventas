@@ -134,8 +134,16 @@ if prompt := st.chat_input():
         st.session_state.messages.append({"role": "assistant", "content": response.text})
 
     except Exception as e:
-        # Manejo de errores
+        error_message = str(e)
         st.error(f"❌ Error en la llamada a la API de Gemini: {e}")
-        if "404" in str(e) or "not found" in str(e).lower():
-            # Consejo para el usuario en caso de error 404
+        
+        if "429" in error_message or "Quota exceeded" in error_message:
+            st.info(
+                "🛑 **CUPO DE API EXCEDIDO (Error 429)**: Ha alcanzado el límite de tokens de entrada para el plan gratuito. "
+                "Espere unos minutos antes de intentar de nuevo o considere revisar y actualizar su plan de facturación en Google AI Studio. "
+                "[Más información sobre límites de cuota](https://ai.google.dev/gemini-api/docs/rate-limits)."
+            )
+        elif "404" in error_message or "not found" in error_message.lower():
             st.info("💡 Consejo: El nombre del modelo puede ser incorrecto o su clave API no tiene acceso. Intente usar un alias diferente o crear una nueva clave.")
+        else:
+            st.info("Revise los detalles del error en la consola o el administrador de su aplicación.")
