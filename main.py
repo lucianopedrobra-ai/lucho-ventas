@@ -19,24 +19,16 @@ except Exception as e:
     st.error(f"🚨 Error de configuración de Gemini: {e}")
     st.stop()
 
-# 2. CARGA DE DATOS (Optimizado y Limpiado)
+# 2. CARGA DE DATOS (Reversión: Devuelve String Completo)
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
 @st.cache_data(ttl=600)
 def load_data():
-    """Carga los datos, los limpia y estandariza para la búsqueda de Lucho."""
+    """Carga los datos desde la URL de la hoja de cálculo y los convierte a string completo."""
     try:
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip')
-        
-        df = df.astype(str)
-        
-        for col in df.columns:
-            if df[col].dtype == 'object': 
-                df[col] = df[col].str.strip() 
-
-        df = df.fillna('') 
-        
-        return df
+        # 🚨 REVERSIÓN: Devuelve el DataFrame como una cadena de texto (el método que funcionaba)
+        return df.to_string(index=False)
     except Exception as e:
         error_msg = str(e)
         if "404" in error_msg or "Not Found" in error_msg:
@@ -47,57 +39,23 @@ def load_data():
             st.error(f"Error inesperado leyendo la lista de productos: {e}")
         return "ERROR_DATA_LOAD_FAILED"
 
-df_data = load_data()
-data_failure = (type(df_data) == str and df_data == "ERROR_DATA_LOAD_FAILED")
+# 🚨 REVERSIÓN: Carga de datos directa a csv_context como string
+csv_context = load_data() 
+data_failure = (csv_context == "ERROR_DATA_LOAD_FAILED")
 
 if not data_failure:
-    if df_data.empty:
-        data_failure = True
-        st.warning("⚠️ Atención: La base de datos se cargó, pero está vacía. Lucho operará en modo de falla crítica.")
-    else:
-        st.session_state.df = df_data
-        csv_context = "BASE DE DATOS CARGADA EN MEMORIA."
+    # Si la carga fue exitosa, el contexto es la cadena completa.
+    pass
 else:
     st.warning(
         "⚠️ Atención: El sistema de precios no pudo cargar la base de datos. "
         "Lucho solo podrá tomar tus datos de contacto y derivarte a un vendedor humano."
     )
-    st.session_state.df = None
-    csv_context = "ERROR_DATA_LOAD_FAILED"
+    # csv_context ya tiene el valor de error
 
-# 2.5. FUNCIÓN DE BÚSQUEDA LOCAL DE DATOS
-def search_product_data(prompt_text):
-    """
-    Busca palabras clave en todas las columnas de texto del DataFrame cargado
-    y devuelve una cadena de texto concisa con los resultados.
-    """
-    if 'df' not in st.session_state or st.session_state.df is None:
-        return ""
+# 2.5. FUNCIÓN DE BÚSQUEDA LOCAL DE DATOS (ELIMINADA) - Reemplazada por contexto estático.
 
-    df = st.session_state.df.copy()
-    search_text = prompt_text.lower()
-    
-    keywords = re.findall(r'\b\w{3,}\b', search_text) 
-    
-    mask = pd.Series([False] * len(df))
-
-    for col in df.select_dtypes(include='object').columns:
-        col_search_str = df[col].astype(str).str.lower()
-        
-        for kw in keywords:
-            mask = mask | col_search_str.str.contains(r'\b' + re.escape(kw) + r'\b', na=False)
-
-    filtered_df = df[mask]
-    
-    if filtered_df.shape[0] > 10:
-        filtered_df = filtered_df.head(10)
-
-    if filtered_df.empty:
-        return ""
-
-    return filtered_df.to_string(index=False)
-
-# 2.6. FUNCIÓN DE VALIDACIÓN DE DATOS LOCAL
+# 2.6. FUNCIÓN DE VALIDACIÓN DE DATOS LOCAL (Se mantiene por ser local)
 def validate_contact_data(text_input):
     """
     Busca patrones de CUIT/DNI y Teléfono en el texto y valida su formato.
@@ -105,7 +63,7 @@ def validate_contact_data(text_input):
     """
     
     text_cleaned = re.sub(r'[^\d\s]', '', text_input) 
-    numbers = re.findall(r'\b\d+\b', text_cleaned)
+    numbers = re.findall(r'\b\d+\b', text_input)
     
     if len(text_input) < 50 and len(numbers) >= 2: 
         
@@ -129,7 +87,7 @@ def validate_contact_data(text_input):
 
     return None
 
-# 3. EL CEREBRO (PROMPT V86 - Limpieza Total)
+# 3. EL CEREBRO (PROMPT V87 - Contexto Estático)
 
 if data_failure:
     rol_persona = "ROL CRÍTICO: Eres Lucho, Ejecutivo Comercial Senior. Tu base de datos falló. NO DEBES COTIZAR NINGÚN PRECIO. Tu única función es disculparte por la 'falla temporal en el sistema de precios', tomar el Nombre, Localidad, CUIT/DNI y Teléfono del cliente, e informar que Martín Zimaro (3401 52-7780) le llamará de inmediato. IGNORA todas las reglas de cotización y enfócate en la derivación."
@@ -138,10 +96,11 @@ if data_failure:
 else:
     rol_persona = "ROL Y PERSONA: Eres Lucho, Ejecutivo Comercial Senior. Tu tono es profesional, cercano y EXTREMADAMENTE CONCISO. Tu objetivo es cotizar rápido y derivar al humano. En tus sugerencias y cotizaciones consultivas, prioriza discretamente las opciones de mayor valor (ticket) para el cliente, sin usar adjetivos de valor como 'más económico' o 'mejor diseño'."
     
+    # 🚨 REVERSIÓN: Inyección completa del CSV en la BASE DE DATOS
     base_data = f"""
-    PRIORIDAD DE PRECIOS: Los precios en la BASE DE DATOS INYECTADA a continuación son la ÚNICA fuente de verdad. La cotización debe venir directamente de ellos.
-    BASE DE DATOS INYECTADA (SÓLO DATOS RELEVANTES):
-    [ESTA SECCIÓN CONTIENE EL FRAGMENTO DEL CSV NECESARIO PARA RESPONDER AL CLIENTE. NO LO MENCIONES.]
+    PRIORIDAD DE PRECIOS: Los precios en la BASE DE DATOS a continuación son la ÚNICA fuente de verdad. La cotización debe venir directamente de ellos.
+    BASE DE DATOS:
+    {csv_context}
     """
     
     reglas_cotizacion = """REGLAS DE INTERACCIÓN:
@@ -214,20 +173,12 @@ if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "Hola, buenas. Soy Lucho. ¿Qué proyecto tenés hoy?"}]
 if "suggestions_shown" not in st.session_state:
     st.session_state.suggestions_shown = False
+
+# 🚨 REVERSIÓN: La depuración local ya no es necesaria con el contexto estático.
+# Si quieres activar la depuración en la consola, puedes poner st.session_state.debug_mode = True aquí.
+# Mantenemos el flag en False por defecto.
 if "debug_mode" not in st.session_state:
     st.session_state.debug_mode = False
-
-
-# --- DEPURACIÓN (DEBUG MODE) ---
-with st.expander("🛠️ Configuración y Depuración"):
-    st.session_state.debug_mode = st.checkbox("Mostrar Datos de la Base de Precios", value=st.session_state.debug_mode)
-
-    if st.session_state.debug_mode and not data_failure:
-        st.subheader("Contenido del DataFrame (st.session_state.df)")
-        st.dataframe(st.session_state.df, use_container_width=True)
-    elif st.session_state.debug_mode and data_failure:
-        st.error("No se puede mostrar el DataFrame porque la carga inicial falló.")
-# ----------------------------------
 
 
 # --- INICIALIZACIÓN DEL MODELO Y LA SESIÓN DE CHAT ---
@@ -301,18 +252,9 @@ if prompt_to_process:
         chat = st.session_state.chat_session
         response = None
         
-        # OPTIMIZACIÓN DE DATOS: Preparamos el prompt con datos filtrados
-        dynamic_prompt = prompt_to_process
-        if not data_failure:
-            relevant_data_string = search_product_data(prompt_to_process)
-            
-            if st.session_state.debug_mode:
-                st.info(f"DEBUG: Keywords usadas: {re.findall(r'\\b\\w{3,}\\b', prompt_to_process.lower())}")
-                st.info(f"DEBUG: Datos inyectados:\n{relevant_data_string if relevant_data_string else 'No se encontraron datos relevantes para inyectar.'}")
-            
-            if relevant_data_string:
-                dynamic_prompt = f"Consulta del Cliente: {prompt_to_process}\n\n[DATOS_RELEVANTES_BUSCADOS]:\n{relevant_data_string}"
-            
+        # 🚨 REVERSIÓN: Ya no usamos el filtro dinámico, el prompt es el original del cliente.
+        dynamic_prompt = prompt_to_process 
+        
         with st.chat_message("assistant", avatar="🧑‍💼"):
             with st.spinner("Lucho está cotizando..."):
                 response = chat.send_message(dynamic_prompt)
