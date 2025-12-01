@@ -78,7 +78,7 @@ def validate_contact_data(text_input):
 
     return None
 
-# 3. EL CEREBRO (PROMPT V75 - Logística Optimizada)
+# 3. EL CEREBRO (PROMPT V76 - Cross-Selling)
 
 data_failure = "ERROR" in csv_context
 
@@ -119,7 +119,7 @@ DICCIONARIO TÉCNICO Y MATEMÁTICA:
 * PLANCHUELAS: Precio por UNIDAD (Barra).
 
 PROTOCOLO DE VENTA POR RUBRO:
-* TEJIDOS: No uses "Kit". Cotiza item por item: 1. Tejido, 2. Alambre Tensión, 3. Planchuelas, 4. Accesorios.
+* TEJIDOS: No uses "Kit". Cotiza item por item: 1. Tejido, 2. Alambre Tensión, 3. Planchuelas, 4. Accesorios. **Después de cotizar, pregunta si necesita pintura para postes o accesorios de fijación extra.**
 * CHAPAS (Optimizado):
     * **REGLA DE COTIZACIÓN POR METRO:** Para chapas de techo, cotiza siempre por **Metro Lineal (ML)** utilizando los códigos base:
         * **Código 4:** Chapa Acanalada Común (Sin color).
@@ -127,7 +127,7 @@ PROTOCOLO DE VENTA POR RUBRO:
     * **LÓGICA DEL LARGO:** Si el cliente pregunta solo por el precio "por metro", usa el precio unitario del código base. Si pregunta por una cantidad total (ej. "30 metros de chapa"), cotiza el total multiplicando esa cantidad por el precio base.
     * **COLORES/ACABADOS:** Asume que la venta es por metro y que el color no afecta la cotización, ya que no hay hojas precortadas predefinidas.
     * FILTROS: Filtro Techo vs Lisa. Aislación consultiva. Estructura. (Solo pide el largo exacto **PARA PRESUPUESTO FINAL Y DETALLADO** después de haber dado el precio por metro).
-* REJA/CONSTRUCCIÓN: Cotiza material. Muestra diagrama ASCII si es reja.
+* REJA/CONSTRUCCIÓN: Cotiza material. Muestra diagrama ASCII si es reja. **Después de cotizar, pregunta si necesita pintura y consumibles de soldadura (electrodos, etc.) para la unión de las piezas.**
 * NO LISTADOS: Si no está en BASE DE DATOS, fuerza handoff. La frase a usar es: "Disculpa, ese producto no figura en mi listado actual. Para una consulta inmediata de stock y precio en depósito, te pido que te contactes directamente con un vendedor al 3401-648118. ¡Ellos te ayudarán al instante!"
 
 PROTOCOLO LOGÍSTICO (POST-LOCALIDAD) - ¡NUEVO!
@@ -155,7 +155,7 @@ FORMATO Y CIERRE:
    3. CIERRE POR RECHAZO (CRÍTICO): Si el cliente desestima el pedido, el modelo NO debe solicitar datos. Debe solo despedirse con la frase: "Perfecto. Lamento que no podamos avanzar hoy. Quedo a tu disposición para futuros proyectos. ¡Que tengas un excelente día!"
 """
 
-# 4. INTERFAZ
+# 4. INTERFAZ (Sin cambios)
 st.title("🏗️ Hablá con Lucho")
 st.markdown("**Atención Comercial | Pedro Bravin**")
 
@@ -264,19 +264,21 @@ if prompt_to_process:
                 encoded_text = urllib.parse.quote(whatsapp_text)
                 whatsapp_url = f"https://wa.me/5493401648118?text={encoded_text}"
                 
+                # CORRECCIÓN: Estructura de cierre de Markdown robusta
                 whatsapp_link_section = f"""
-                ---
-                Listo. Hacé clic abajo para confirmar con el vendedor:
-                
-                [✅ ENVIAR PEDIDO CONFIRMADO (WHATSAPP)]({whatsapp_url})
-                
-                O escribinos al: 3401-648118
-                
-                📍 Retiro: [Ver Ubicación en Mapa](https://www.google.com/maps/search/?api=1&query=Pedro+Bravin+Materiales+El+Trebol)
-                """
+---
+Listo. Hacé clic abajo para confirmar con el vendedor:
+
+[✅ ENVIAR PEDIDO CONFIRMADO (WHATSAPP)]({whatsapp_url})
+
+O escribinos al: 3401-648118
+
+📍 Retiro: [Ver Ubicación en Mapa](https://www.google.com/maps/search/?api=1&query=Pedro+Bravin+Materiales+El+Trebol)
+"""
                 st.markdown(whatsapp_link_section)
                 
-                final_response_for_history = dialogue_part.strip() + whatsapp_link_section
+                # CORRECCIÓN DE HISTORIAL: Guardar con separador limpio
+                final_response_for_history = dialogue_part.strip() + "\n\n" + whatsapp_link_section.strip()
             else:
                 st.markdown(response.text)
                 final_response_for_history = response.text
