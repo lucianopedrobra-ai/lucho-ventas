@@ -8,7 +8,7 @@ st.set_page_config(page_title="Lucho | Pedro Bravin", page_icon="🏗️", layou
 # 1. AUTENTICACIÓN
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
-    genai.configure(api_key=API_KEY)
+    genai.configure(api_api_key=API_KEY)
 except KeyError:
     st.error("🚨 Error: Falta la API Key 'GOOGLE_API_KEY' en los Secrets de Streamlit.")
     st.stop()
@@ -108,35 +108,13 @@ FORMATO Y CIERRE:
 st.title("🏗️ Hablá con Lucho")
 st.markdown("**Atención Comercial | Pedro Bravin**")
 
-# --- SUGERENCIAS DE INTERACCIÓN (Botones) ---
-st.markdown("### 🗣️ ¿Cómo te puedo ayudar?")
-suggestion_col1, suggestion_col2, suggestion_col3 = st.columns(3)
-
-# Lista de comandos sugeridos
-suggestions = {
-    "Cotizar Chapa": "Quiero cotizar 10 chapas C25 de 4 metros.",
-    "Comparar Productos": "Comparame el precio del perfil C 100x40 vs 80x40.",
-    "Pedir Descuento": "¿Qué descuento me hacen por compra en efectivo mayor a $500.000?",
-}
-
-# Variable para almacenar la acción del botón
-triggered_prompt = None
-
-with suggestion_col1:
-    if st.button(list(suggestions.keys())[0], use_container_width=True):
-        triggered_prompt = suggestions[list(suggestions.keys())[0]]
-
-with suggestion_col2:
-    if st.button(list(suggestions.keys())[1], use_container_width=True):
-        triggered_prompt = suggestions[list(suggestions.keys())[1]]
-
-with suggestion_col3:
-    if st.button(list(suggestions.keys())[2], use_container_width=True):
-        triggered_prompt = suggestions[list(suggestions.keys())[2]]
-
-# Inicializa el historial de mensajes
+# Inicializa el historial y el estado de la burbuja de sugerencias
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "Hola, buenas. Soy Lucho. ¿Qué proyecto tenés hoy?"}]
+
+if "suggestions_shown" not in st.session_state:
+    st.session_state.suggestions_shown = False
+
 
 # --- INICIALIZACIÓN DEL MODELO Y LA SESIÓN DE CHAT ---
 if "chat_session" not in st.session_state:
@@ -160,28 +138,50 @@ if "chat_session" not in st.session_state:
     except Exception as e:
         st.error(f"❌ Error al inicializar el modelo/chat: {e}")
         
-# Muestra los mensajes anteriores en el chat
+# --- MUESTRA EL HISTORIAL Y LA BURBUJA DE SUGERENCIAS ---
+triggered_prompt = None
+
 for msg in st.session_state.messages:
     st.chat_message(msg["role"]).write(msg["content"])
 
-
+# Mostrar la burbuja de sugerencias solo si es el primer mensaje
+if len(st.session_state.messages) == 1 and not st.session_state.suggestions_shown:
+    
+    with st.chat_message("assistant"):
+        st.markdown("💡 **Tip:** Puedes iniciar con preguntas directas como:")
+        
+        # Lista de comandos sugeridos
+        suggestions = {
+            "Cotizar Chapa": "Quiero cotizar 10 chapas C25 de 4 metros.",
+            "Comparar Productos": "Comparame el precio del perfil C 100x40 vs 80x40.",
+            "Pedir Descuento": "¿Qué descuento me hacen por compra en efectivo mayor a $500.000?",
+        }
+        
+        # Uso de columnas internas para los botones
+        cols = st.columns(len(suggestions))
+        
+        for i, (label, prompt) in enumerate(suggestions.items()):
+            with cols[i]:
+                if st.button(label, key=f"sug_btn_{i}", use_container_width=True):
+                    triggered_prompt = prompt
+                    st.session_state.suggestions_shown = True # Marcar como usada para que desaparezca
+                    st.rerun() # Forzar el re-renderizado
+                    
 # --- MANEJO DE INPUT (Botones o Campo de Texto) ---
 # Captura la entrada del usuario del campo de texto
 if prompt := st.chat_input():
-    # Si viene del chat_input, el prompt ya está definido
     pass
 
-# Si se presionó un botón, sobreescribimos el prompt para procesarlo
-if triggered_prompt:
-    prompt = triggered_prompt
+# Si se presionó un botón, el prompt ya está definido arriba y se procesa
     
 # Si hay un prompt (del botón o del chat_input), lo procesamos
 if 'prompt' in locals() and prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
     
-    # Se añade un mensaje de usuario visual para simular la interacción (si no lo hizo st.chat_input)
-    if not triggered_prompt:
-        st.chat_message("user").write(prompt)
+    # Se añade un mensaje de usuario visual para simular la interacción
+    if 'prompt' in locals() and prompt: # Si vino del chat_input, ya está en el historial, si no, lo escribimos
+        if not triggered_prompt:
+             st.chat_message("user").write(prompt)
 
     try:
         if "chat_session" not in st.session_state:
@@ -201,9 +201,8 @@ if 'prompt' in locals() and prompt:
         # Guarda la respuesta en el estado de sesión
         st.session_state.messages.append({"role": "assistant", "content": response.text})
         
-        # Si vino de un botón, forzamos el rerun para limpiar el estado de la aplicación
-        if triggered_prompt:
-            st.rerun()
+        # Si vino de un botón o de un prompt normal, forzamos rerun para actualizar el historial
+        st.rerun()
 
     except Exception as e:
         error_message = str(e)
