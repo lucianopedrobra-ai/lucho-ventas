@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import google.generativeai as genai
 import urllib.parse
-import re 
+import re
 import numpy as np
 
 # --- CONFIGURACIÓN ---
@@ -24,10 +24,10 @@ SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkp
 
 @st.cache_data(ttl=600)
 def load_data():
-    """Carga los datos desde la URL de la hoja de cálculo y retorna el DataFrame. (MODIFICADO)"""
+    """Carga los datos desde la URL de la hoja de cálculo y retorna el DataFrame."""
     try:
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip')
-        return df # <-- Retorna el DataFrame
+        return df 
     except Exception as e:
         error_msg = str(e)
         if "404" in error_msg or "Not Found" in error_msg:
@@ -43,7 +43,7 @@ raw_data = load_data()
 data_failure = (raw_data == "ERROR_DATA_LOAD_FAILED")
 
 if not data_failure:
-    st.session_state.df_data = raw_data # <-- Guarda el DF en session_state para filtrado dinámico
+    st.session_state.df_data = raw_data # <-- Guarda el DF para filtrado dinámico
     csv_context = raw_data.to_string(index=False) # <-- String completo para el System Prompt inicial
 else:
     csv_context = "ERROR_DATA_LOAD_FAILED"
@@ -84,7 +84,7 @@ def validate_contact_data(text_input):
 
     return None
 
-# 2.7. FUNCIÓN DE FILTRADO DINÁMICO DE CONTEXTO (NUEVO)
+# 2.7. FUNCIÓN DE FILTRADO DINÁMICO DE CONTEXTO (OPTIMIZADA)
 def filter_data_by_prompt(prompt, df_data):
     """Filtra el DataFrame por rubro para reducir el contexto enviado a Gemini."""
     prompt_lower = prompt.lower()
@@ -111,7 +111,6 @@ def filter_data_by_prompt(prompt, df_data):
             if not df_filtered.empty:
                 return df_filtered.to_string(index=False)
         except KeyError:
-            # Fallback si no encuentra la columna 'Rubro'
             pass
             
     # Fallback: si no se pudo filtrar, envía todo el contexto estático
@@ -222,7 +221,7 @@ st.markdown("**Atención Comercial | Pedro Bravin**")
 
 # Inicializa el historial y el estado de la burbuja de sugerencias
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hola, buenas tardes. Soy Lucho. ¿Qué proyecto tenés hoy?"}] # Saludo optimizado V93
+    st.session_state.messages = [{"role": "assistant", "content": "Hola, buenas tardes. Soy Lucho. ¿Qué proyecto tenés hoy?"}]
 if "suggestions_shown" not in st.session_state:
     st.session_state.suggestions_shown = False
 if "debug_mode" not in st.session_state:
@@ -303,13 +302,12 @@ if prompt_to_process:
         chat = st.session_state.chat_session
         response = None
         
-        # --- LÓGICA DE INYECCIÓN DE CONTEXTO DINÁMICO (MODIFICADO) ---
+        # --- LÓGICA DE INYECCIÓN DE CONTEXTO DINÁMICO ---
         if not data_failure:
             # 1. Filtra el DF con el prompt del usuario
             filtered_context = filter_data_by_prompt(prompt_to_process, st.session_state.df_data)
             
             # 2. Genera el prompt final inyectando el contexto relevante
-            # Se le informa a Gemini que este es el contexto relevante.
             full_gemini_prompt = f"Consulta del cliente: {prompt_to_process}\n\n[CONTEXTO_RELEVANTE_PARA_COTIZAR]:\n{filtered_context}"
         else:
             # Si hubo falla en la carga de datos, el prompt es solo la consulta del cliente
