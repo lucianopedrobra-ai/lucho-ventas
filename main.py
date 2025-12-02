@@ -12,6 +12,7 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
     .block-container {padding-top: 1rem;}
+    /* Avatar Corporativo */
     .stChatMessage .stChatMessageAvatar {background-color: #003366; color: white;}
     </style>
     """, unsafe_allow_html=True)
@@ -21,11 +22,12 @@ try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
 except Exception:
-    st.error("⚠️ Error de conexión.")
+    st.error("⚠️ Error de conexión. Verifique la API Key.")
     st.stop()
 
-# --- 3. CARGA DE DATOS ---
-SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
+# --- 3. CARGA DE DATOS (URL ACTIVA) ---
+# Se mantiene la última URL proporcionada por el usuario
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1gBxIaV7-P7wP4aRNYQIGKaTHxBdOg7iV6cyndtLvKds/export?format=csv"
 
 @st.cache_data(ttl=600)
 def load_data():
@@ -39,6 +41,7 @@ def load_data():
 
 raw_data = load_data()
 
+# Contexto para la IA
 if raw_data is not None and not raw_data.empty:
     try:
         csv_context = raw_data.to_markdown(index=False)
@@ -47,30 +50,36 @@ if raw_data is not None and not raw_data.empty:
 else:
     csv_context = "ERROR: LISTA VACÍA."
 
-# --- 4. CEREBRO DE VENTAS (PROTOCOLO 001: INVENTARIO) ---
+# --- 4. CEREBRO DE VENTAS (PROTOCOLO V5: BLINDAJE) ---
 sys_prompt = f"""
 ROL: Eres Lucho, Ejecutivo Comercial Técnico de **Pedro Bravin S.A.**
 TONO: **PROFESIONAL, TÉCNICO Y CONCISO.**
 
 🚨 **PROTOCOLO 001: VERIFICACIÓN DE INVENTARIO (PRIORIDAD ABSOLUTA):**
-1.  **LECTURA:** Antes de responder, verifica el producto en la "LISTA DE STOCK" de abajo.
-2.  **LIMITE:** Tu conocimiento está ANCLADO a esta lista. Si el producto/medida NO está aquí, **NO EXISTE** para la venta. (No sugieras "Postes de Hormigón" o medidas que no ves).
-3.  **RESPUESTA:** Si el producto no figura, informa con cortesía que no hay stock y ofrece la alternativa más cercana que SÍ veas en la lista.
+1.  **LECTURA ESTRICTA:** Tu inventario es esta lista. No cotices nada que no veas aquí.
+2.  **PRIORIDAD DE BÚSQUEDA:** Si el cliente nombra una marca (ej: MALLA JOB), **prioriza la búsqueda por texto de la marca** en la columna de descripción sobre la búsqueda por código.
+3.  **LÍMITE:** Si no puedes encontrar el código o la marca exacta en el CSV, informa con cortesía que no hay stock y ofrece la alternativa más cercana que SÍ veas en la lista.
 
 LISTA DE STOCK Y PRECIOS NETOS:
 ------------------------------------------------------------
 {csv_context}
 ------------------------------------------------------------
 
-🛠️ **REGLAS DE COTIZACIÓN:**
-1.  **TEJIDOS:** Vende por **ROLLO CERRADO**. Optimiza entre 10m (Eco) y 15m (Acindar) para menos desperdicio.
-2.  **MEDIDAS EXACTAS:** Si pide 1.50m, busca códigos con "150". **No ofrezcas medidas menores sin advertir.**
-3.  **LARGOS:** Caños (Epoxi/Galv): 6.40m. Perfiles/Hierros: 6.00m (o 12m si es Perfil C/IPN grande).
+🧠 **TRADUCTOR TÉCNICO:**
+* "Cerrar terreno/lote" -> Busca: **TEJIDO ROMBOIDAL / POSTES**.
+* "Mallas de Construcción" / "Mallas" -> Busca: **SIMA / PLACAS / JOB** (si aparece).
 
-💰 **POLÍTICA DE PRECIOS ($$$):**
+**REGLAS CLAVE:**
+1.  **TEJIDOS:** Vende por **ROLLO CERRADO**. Optimiza entre 10m (Eco) y 15m (Acindar) para menos desperdicio.
+2.  **MEDIDAS:** Respeta la altura exacta. Si no hay la medida exacta (ej: 1.50m), avisa antes de ofrecer otra.
+3.  **LARGOS:** Caños: 6.40m. Perfiles/Hierros: 6.00m (o 12m si es Perfil C/IPN grande).
+
+💰 **POLÍTICA DE DESCUENTOS:**
 **BASE:** (Precio CSV x 1.21).
-**DESCUENTO COMPETITIVO:** Chapa/Hierro > $300k = **15% OFF**.
-**ESCALA GENERAL:** 0% a 18% según volumen total.
+
+**A. REGLA COMPETITIVA (CHAPA Y HIERRO):** >$300.000 = **15% OFF**.
+
+**B. ESCALA GENERAL:** Progresiva de **0% a 18%** según volumen total.
 
 💳 **FINANCIACIÓN:**
 * Precios Contado/Transferencia.
@@ -93,7 +102,6 @@ if "messages" not in st.session_state:
 
 if "chat_session" not in st.session_state:
     try:
-        # Usamos el modelo más inteligente para manejar las conversiones complejas
         model = genai.GenerativeModel('gemini-2.0-flash', system_instruction=sys_prompt)
         
         initial_history = []
@@ -104,21 +112,25 @@ if "chat_session" not in st.session_state:
         
         st.session_state.chat_session = model.start_chat(history=initial_history)
     except Exception as e:
-        st.error(f"Error de sistema: {e}")
+        try:
+            model = genai.GenerativeModel('gemini-1.5-pro', system_instruction=sys_prompt)
+            st.session_state.chat_session = model.start_chat(history=initial_history)
+        except Exception as e2:
+             st.error(f"Error crítico de conexión: {e2}")
 
 # --- 6. INTERFAZ ---
 for msg in st.session_state.messages:
     avatar = "🧑‍💼" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-if prompt := st.chat_input("Ej: Necesito 40 metros de tejido 1.50..."):
+if prompt := st.chat_input("Ej: Necesito malla JOB..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").markdown(prompt)
 
     try:
         chat = st.session_state.chat_session
         with st.chat_message("assistant", avatar="🧑‍💼"):
-            with st.spinner("Verificando stock..."):
+            with st.spinner("Verificando stock por texto..."):
                 response = chat.send_message(prompt)
                 full_text = response.text
                 
