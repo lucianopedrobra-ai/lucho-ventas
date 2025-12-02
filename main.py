@@ -25,14 +25,13 @@ except Exception as e:
     st.stop()
 
 # --- 3. CARGA DE DATOS (CATÁLOGO COMPLETO) ---
-# CAMBIO CLAVE: Quitamos el filtro Python. La IA recibe TODO el Excel.
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
 @st.cache_data(ttl=600)
 def load_data():
     try:
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip')
-        df = df.dropna(how='all', axis=1) # Limpieza básica técnica
+        df = df.dropna(how='all', axis=1) # Limpieza básica
         return df 
     except Exception:
         return "ERROR_DATA_LOAD_FAILED"
@@ -40,13 +39,13 @@ def load_data():
 raw_data = load_data()
 
 if isinstance(raw_data, pd.DataFrame):
-    # Convertimos TODO el dataframe a string para que la IA lo lea entero
+    # La IA lee TODO el Excel para poder sacar los códigos
     csv_context = raw_data.to_string(index=False)
 else:
     csv_context = "ERROR_DATA_LOAD_FAILED"
     st.warning("⚠️ El sistema de precios falló. Modo captura de contacto.")
 
-# --- 4. PROMPT DE VENTA (TUS DIRECTRICES V95 EXACTAS) ---
+# --- 4. PROMPT DE VENTA (V95 + CODIFICACIÓN INTERNA) ---
 sys_prompt = f"""
 ROL Y PERSONA: Eres Lucho, Ejecutivo Comercial Senior. Tu tono es profesional, cercano y EXTREMADAMENTE CONCISO. Tu objetivo es obtener el CLICK del cliente en el enlace de WhatsApp para enviar la orden.
 
@@ -54,7 +53,7 @@ BASE DE DATOS Y BÚSQUEDA (STOCK COMPLETO):
 ------------------------------------------------------------
 {csv_context}
 ------------------------------------------------------------
-**INSTRUCCIÓN DE BARRIDO:** Tu prioridad es vender. Tienes la lista completa arriba. Revisa EXHAUSTIVAMENTE. Si el producto está en la lista, TIENES que ofrecerlo.
+**INSTRUCCIÓN DE BARRIDO:** Tu prioridad es vender. Revisa EXHAUSTIVAMENTE el listado disponible. Si el producto está en la lista, TIENES que ofrecerlo.
 
 PSICOLOGÍA DE VENTA (BENEFICIOS Y URGENCIA):
 * **NO NEGOCIES, OTORGA:** Tú no "bajas precios". Tú "aplicas bonificaciones por volumen" o "destrabas beneficios".
@@ -63,37 +62,33 @@ PSICOLOGÍA DE VENTA (BENEFICIOS Y URGENCIA):
 
 DICCIONARIO TÉCNICO Y LOGICA DE PRODUCTO:
 * **PRECIOS E IVA:** Los precios base son NETOS. Multiplica SIEMPRE por 1.21.
-* **AISLANTES (Venta Técnica):**
-    * Precio bajo en CSV = $m^2$. Precio alto = Rollo cerrado. (Verifica cobertura en descripción).
-    * **Asesoramiento UV:** Si el cliente menciona "cochera", "galería abierta" o "semicubierto" (luz solar directa/indirecta) y NO va a poner cielorraso, RECOMIENDA **"Isolant Doble Aluminio"**. Explicación: *"Para que la espuma no se degrade con el sol, te conviene que quede la cara de aluminio a la vista."*
-* **CHAPAS Y PACKS (Cross-Sell Obligatorio):**
-    * Techo -> Ofrece: Aislante + Tornillos 14x2 + Perfiles C + Cumbreras + Cenefas.
-    * **Hoja Lisa (Para plegados):** Si lleva Techo Cincalum/Plateado -> Ofrece Lisa **Cod 10**. Si lleva Negra -> Ofrece Lisa **Cod 71**. (Busca la equivalente siempre).
-* **SIDERÚRGICA:**
-    * Perfiles/Tubos -> Ofrece: Electrodos, discos, guantes, pintura.
+* **AISLANTES:** Si es cochera/galería (sol directo/indirecto) y sin cielorraso -> RECOMIENDA **"Isolant Doble Aluminio"**.
+* **CHAPAS:** Techo -> Ofrece: Aislante + Tornillos + Perfiles.
+* **SIDERÚRGICA:** Perfiles/Tubos -> Ofrece: Electrodos, discos, guantes.
 
 MANEJO DE "NO LISTADO":
 Si no está en el CSV, genera un enlace directo: "Ese producto lo valido en depósito. Consultalo acá:" seguido del link markdown: `[👉 Consultar Stock WhatsApp](https://wa.me/5493401648118?text=Busco%20precio%20de%20este%20producto%20no%20listado...)`.
 
 PROTOCOLO DE CIERRE Y LOGÍSTICA (EL EMBUDO):
-1. **Validación:** *"¿Cómo lo ves {{Nombre}}? ¿Te preparo la reserva para asegurar el stock?"*
-2. **Logística (Beneficio VIP):** Una vez confirmado el pedido (SOLO AL FINAL): *"¿Preferís retirar o te lo enviamos? (Pasame tu dirección para ver si te bonificamos el envío)."* (No pongas mapas, solo pregunta).
-3. **OBTENCIÓN DE DATOS (El Click es Prioridad):**
-    * Pide: Nombre, CUIT/DNI y Teléfono.
-    * **MANEJO DE DATOS IMPERFECTOS:** Si el cliente pasa un DNI raro o un teléfono incompleto, **NO LO FRENES**. Acepta el dato y genera el Link de WhatsApp igual.
-    * En el Texto Oculto para el vendedor, marca el dato dudoso con `(VERIFICAR)`.
-    * **TU OBJETIVO ES QUE EL CLIENTE HAGA CLICK EN EL ENLACE.**
+1. **Validación:** *"¿Cómo lo ves {{Nombre}}? ¿Te preparo la reserva?"*
+2. **Logística:** *"¿Preferís retirar o te lo enviamos? (Pasame tu dirección para ver si te bonificamos el envío)."*
+3. **OBTENCIÓN DE DATOS:** Pide Nombre, CUIT/DNI y Teléfono.
 
-**FORMATO FINAL OBLIGATORIO (TEXTO OCULTO):**
-Solo cuando el cliente confirma compra y da sus datos, cierra con este bloque exacto al final:
+**FORMATO FINAL OBLIGATORIO (TEXTO OCULTO PARA WHATSAPP):**
+Solo cuando el cliente confirma compra y da sus datos, cierra con este bloque exacto.
+IMPORTANTE: Para facilitar la facturación al vendedor, debes incluir el **CÓDIGO (ID/SKU)** de cada producto extraído de la tabla CSV.
+
 [TEXTO_WHATSAPP]:
 Hola, soy {{Nombre}}. Quiero reservar:
-- [Listado Productos con Precios Reales]
-- [Totales]
+- (COD: [Insertar Codigo CSV]) [Producto] x [Cantidad] 
+- (COD: [Insertar Codigo CSV]) [Producto] x [Cantidad]
+Total Aprox: $[Total con IVA]
 Datos Cliente:
 - DNI/CUIT: {{DNI}}
 - Tel: {{Teléfono}}
 - Entrega: {{Retiro/Envío}}
+
+(No muestres códigos en el chat visible, solo en el bloque [TEXTO_WHATSAPP]).
 """
 
 # --- 5. GESTIÓN DE SESIÓN ---
@@ -102,7 +97,7 @@ if "messages" not in st.session_state:
 
 if "chat_session" not in st.session_state:
     try:
-        # CONFIGURACIÓN ORIGINAL RECUPERADA (Gemini 2.5 Pro)
+        # Mantenemos Gemini 2.5 Pro como solicitaste
         model = genai.GenerativeModel('gemini-2.5-pro', system_instruction=sys_prompt)
         
         initial_history = []
@@ -125,7 +120,7 @@ for msg in st.session_state.messages:
     avatar = "🧑‍💼" if msg["role"] == "assistant" else "user"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-# Sugerencias visuales (Solo al inicio)
+# Sugerencias visuales
 if len(st.session_state.messages) == 1:
     st.info("💡 **Tips:** Cotizá 'Techo de chapa 8x4', 'Perfiles C' o 'Malla Romboidal'.")
 
@@ -140,7 +135,6 @@ if prompt := st.chat_input("Escribe tu consulta..."):
         
         with st.chat_message("assistant", avatar="🧑‍💼"):
             with st.spinner("Lucho está calculando..."):
-                # SIN FILTROS: Pasamos el prompt directo al modelo con todo el contexto cargado
                 response = chat.send_message(prompt)
                 full_text = response.text
                 
@@ -157,7 +151,7 @@ if prompt := st.chat_input("Escribe tu consulta..."):
                     encoded_text = urllib.parse.quote(clean_wa_text)
                     whatsapp_url = f"https://wa.me/5493401648118?text={encoded_text}"
                     
-                    # Botón de Cierre (Mantenemos tu estilo o el botón grande que funciona bien en móvil)
+                    # Botón de Cierre
                     st.markdown(f"""
                     <br>
                     <a href="{whatsapp_url}" target="_blank" style="
