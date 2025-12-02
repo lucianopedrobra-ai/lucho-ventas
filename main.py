@@ -43,7 +43,7 @@ if raw_data is not None:
 else:
     csv_context = "ERROR: No se pudo cargar la lista de precios. Cotizar manual."
 
-# --- 4. CEREBRO DE VENTAS (BLINDADO) ---
+# --- 4. CEREBRO DE VENTAS (MODO ESTABLE 1.5 FLASH) ---
 sys_prompt = f"""
 ROL: Eres Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**
 TONO: **PROFESIONAL, TÉCNICO Y CONCISO.** (CERO vulgaridad).
@@ -61,7 +61,6 @@ BASE DE DATOS (STOCK Y PRECIOS NETOS):
 🚫 **REGLA DE ORO (CONFIDENCIALIDAD):**
 * **JAMÁS** menciones al cliente "Niveles", "Escalas" o "Reglas Internas".
 * Solo diles: *"Te conseguí una bonificación especial"* o *"Te apliqué el descuento mayorista"*.
-* Nunca digas: *"Como tu compra es de $100.000 entrás en el nivel 1"*.
 
 💰 **POLÍTICA FINANCIERA (AL CLIENTE):**
 1.  **PRECIOS:** Aclara siempre que son **CONTADO / TRANSFERENCIA**.
@@ -98,9 +97,8 @@ if "messages" not in st.session_state:
 
 if "chat_session" not in st.session_state:
     try:
-        # MODELO: gemini-2.0-flash-exp (Rápido y moderno)
-        # Alternativa estable: 'gemini-1.5-pro'
-        model = genai.GenerativeModel('gemini-2.0-flash-exp', system_instruction=sys_prompt)
+        # CORRECCIÓN: Usamos 'gemini-1.5-flash'. Es el modelo MÁS ESTABLE y con MAYOR CUOTA para webs.
+        model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=sys_prompt)
         
         initial_history = []
         if len(st.session_state.messages) > 1:
@@ -135,7 +133,7 @@ if prompt := st.chat_input("Ej: 5 caños de gas 1 pulgada..."):
                     
                     wa_encoded = urllib.parse.quote(wa_part.strip())
                     
-                    # DESTINO: MARTÍN (3401 52-7780)
+                    # DESTINO: MARTÍN
                     wa_url = f"https://wa.me/5493401527780?text={wa_encoded}"
                     
                     st.markdown(f"""
