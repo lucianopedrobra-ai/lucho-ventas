@@ -12,7 +12,6 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
     .block-container {padding-top: 1rem;}
-    /* Avatar Corporativo */
     .stChatMessage .stChatMessageAvatar {background-color: #003366; color: white;}
     </style>
     """, unsafe_allow_html=True)
@@ -22,7 +21,7 @@ try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
 except Exception:
-    st.error("⚠️ Error de conexión. Verifique la API Key.")
+    st.error("⚠️ Error de conexión.")
     st.stop()
 
 # --- 3. CARGA DE DATOS ---
@@ -31,7 +30,7 @@ SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkp
 @st.cache_data(ttl=600)
 def load_data():
     try:
-        # Leemos todo como texto para evitar errores de formato
+        # Leemos todo como string para proteger códigos y evitar formateo automático
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip', dtype=str)
         df = df.dropna(how='all', axis=1)
         df = df.fillna("")
@@ -41,53 +40,65 @@ def load_data():
 
 raw_data = load_data()
 
-# Preparación del contexto
+# Contexto de Precios
 if raw_data is not None and not raw_data.empty:
     try:
         csv_context = raw_data.to_markdown(index=False)
     except ImportError:
         csv_context = raw_data.to_string(index=False)
 else:
-    csv_context = "ADVERTENCIA: LISTA VACÍA."
+    csv_context = "ERROR: LISTA VACÍA."
 
-# --- 4. CEREBRO DE VENTAS (GEMINI 2.5 FLASH LITE) ---
+# --- 4. CEREBRO DE VENTAS (CON REGLA DE M2 PARA TECHOS) ---
 sys_prompt = f"""
-ROL: Eres Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**
-OBJETIVO: Vender productos EXCLUSIVAMENTE de nuestro stock.
+ROL: Eres Lucho, Ejecutivo Comercial Técnico de **Pedro Bravin S.A.**
+TONO: **PROFESIONAL, TÉCNICO Y CONCISO.**
 
-LISTA DE STOCK Y PRECIOS BASE (TU ÚNICA VERDAD):
+BASE DE DATOS (STOCK Y PRECIOS NETOS):
 ------------------------------------------------------------
 {csv_context}
 ------------------------------------------------------------
 
-🧠 **TRADUCTOR TÉCNICO (USA TU LÓGICA):**
-* "Cerrar terreno/lote" -> Ofrece: **TEJIDO ROMBOIDAL + POSTES**.
-* "Techo" -> Ofrece: **CHAPA (Cincalum/T101) + PERFIL C + AISLANTE**.
-* "Gas" -> Ofrece: **CAÑO EPOXI**.
-* "Agua" -> Ofrece: **CAÑO GALVANIZADO**.
+🏠 **REGLA TÉCNICA: CHAPAS DE TECHO (POR M2 vs LINEAL):**
+El precio de lista suele ser por METRO LINEAL.
+Si el cliente pide **METROS CUADRADOS (m2)** y no da medidas de corte:
+1.  **Conversión:** Asume que **1 m2 = 1 Metro Lineal** (Ancho útil estandar 1m).
+2.  **SELECCIÓN DE CÓDIGO (IMPORTANTE):**
+    * Si pide **CINCALUM ACANALADA** (Común): Usa el precio del **CÓDIGO 4**.
+    * Si pide **CINCALUM T-101** (Trapezoidal): Usa el precio del **CÓDIGO 6**.
+    * Si pide **COLOR**: Busca el precio por metro del color en lista.
 
-🔥 **POLÍTICA DE PRECIOS ($$$):**
-Cálculo: (Precio CSV x 1.21). Aplica descuento sobre total:
-1.  **< $100.000:** 0% OFF (Precio de Lista).
-2.  **$100k - $500k:** 5% OFF.
-3.  **$500k - $1M:** 8% OFF.
-4.  **$1M - $2M:** 12% OFF.
-5.  **$2M - $3M:** 15% OFF.
-6.  **> $3M:** 18% OFF.
+📏 **REGLA DE LARGOS (PERFILES):**
+1.  **6.40m:** Epoxi, Galvanizado, Schedule, Mecánico.
+2.  **6.00m:** Ángulos, Planchuelas, Hierros, Estructurales.
+*(Cálculo de precio hierros: Precio Kg x Peso x Largo x 1.21)*.
 
-⚠️ **REGLAS:**
-1.  **STOCK:** Si piden algo vago, ofrece la solución de la lista.
-2.  **PRECIO:** Aclara siempre que es **CONTADO / TRANSFERENCIA**.
-3.  **TARJETAS:** "Con tarjeta aplica recargo. ¡Promo Miércoles y Sábados!".
-4.  **LOGÍSTICA:** Pregunta siempre: "¿Para qué localidad es?".
+💰 **POLÍTICA DE PRECIOS ($$$):**
+**BASE:** (Precio CSV x 1.21).
+
+**A. REGLA COMPETITIVA (CHAPA Y HIERRO):**
+* > $300.000: **15% OFF DIRECTO**.
+* > $3.000.000: **18% OFF**.
+
+**B. ESCALA GENERAL (RESTO):**
+1. < $100k: **0%**.
+2. $100k - $500k: **5%**.
+3. $500k - $1M: **8%**.
+4. $1M - $2M: **12%**.
+5. $2M - $3M: **15%**.
+6. > $3M: **18%**.
+
+💳 **FINANCIACIÓN:**
+* Precios con descuento son **CONTADO/TRANSFERENCIA**.
+* **Tarjeta:** Tiene recargo. *"¡Promo BOMBA Miércoles y Sábados disponible!"*.
 
 **FORMATO FINAL (SOLO AL CONFIRMAR):**
 [TEXTO_WHATSAPP]:
 Hola Martín / Equipo Bravin, soy {{Nombre}}.
 Pedido Web (Bonif. Aplicada):
-- (COD: [SKU]) [Producto] x [Cant]
-Total Contado/Transf: $[Monto]
-*Consulta Financiación: [SI/NO]*
+- (COD: [SKU]) [Producto] x [Cant/Metros]
+Total Contado/Transf: $[Monto Final]
+*Consulta Tarjeta/Promo: [SI/NO]*
 Logística: {{Localidad}} - {{Retiro/Envío}}
 Datos: {{DNI}} - {{Teléfono}}
 """
@@ -98,9 +109,9 @@ if "messages" not in st.session_state:
 
 if "chat_session" not in st.session_state:
     try:
-        # MODELO NUEVO: gemini-2.5-flash-lite
-        # Es la versión más eficiente y actual que reemplaza a la 1.5
-        model = genai.GenerativeModel('gemini-2.5-flash-lite', system_instruction=sys_prompt)
+        # MODELO: gemini-2.0-flash (Inteligente y Rápido)
+        # Si da error, volver a gemini-1.5-pro
+        model = genai.GenerativeModel('gemini-2.0-flash', system_instruction=sys_prompt)
         
         initial_history = []
         if len(st.session_state.messages) > 1:
@@ -110,26 +121,21 @@ if "chat_session" not in st.session_state:
         
         st.session_state.chat_session = model.start_chat(history=initial_history)
     except Exception as e:
-        # Fallback de seguridad por si la API requiere la version '001' o similar
-        try:
-            model = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt)
-            st.session_state.chat_session = model.start_chat(history=initial_history)
-        except Exception as e2:
-             st.error(f"Error crítico de conexión con Gemini 2.5: {e2}")
+        st.error(f"Error de sistema: {e}")
 
 # --- 6. INTERFAZ ---
 for msg in st.session_state.messages:
     avatar = "🧑‍💼" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-if prompt := st.chat_input("Ej: Necesito cerrar un terreno..."):
+if prompt := st.chat_input("Ej: 100 m2 de chapa acanalada cincalum..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").markdown(prompt)
 
     try:
         chat = st.session_state.chat_session
         with st.chat_message("assistant", avatar="🧑‍💼"):
-            with st.spinner("Analizando requerimiento..."):
+            with st.spinner("Calculando m2 y descuentos..."):
                 response = chat.send_message(prompt)
                 full_text = response.text
                 
@@ -139,6 +145,8 @@ if prompt := st.chat_input("Ej: Necesito cerrar un terreno..."):
                     st.markdown(dialogue.strip())
                     
                     wa_encoded = urllib.parse.quote(wa_part.strip())
+                    
+                    # DESTINO: MARTÍN
                     wa_url = f"https://wa.me/5493401527780?text={wa_encoded}"
                     
                     st.markdown(f"""
