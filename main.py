@@ -29,23 +29,19 @@ def load_data():
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip')
         return df 
     except Exception as e:
-        error_msg = str(e)
-        if "404" in error_msg or "Not Found" in error_msg:
-            st.error(
-                f"🚨 Error 404 (Not Found) al cargar datos: El link en SHEET_URL es incorrecto o la hoja no está publicada como CSV."
-            )
-        else:
-            st.error(f"Error inesperado leyendo la lista de productos: {e}")
+        # Solo en caso de error retornamos un string
         return "ERROR_DATA_LOAD_FAILED"
 
-# --- MANEJO DE DATOS Y ESTADO ---
+# --- MANEJO DE DATOS Y ESTADO (CORREGIDO PARA EVITAR VALUEERROR) ---
 raw_data = load_data()
-data_failure = (raw_data == "ERROR_DATA_LOAD_FAILED")
 
-if not data_failure:
-    st.session_state.df_data = raw_data # <-- Guarda el DF para filtrado dinámico
-    csv_context = raw_data.to_string(index=False) # <-- String completo para el System Prompt inicial
+# LÓGICA SEGURA: Verificamos si es un DataFrame válido
+if isinstance(raw_data, pd.DataFrame):
+    data_failure = False
+    st.session_state.df_data = raw_data # Guardamos DF para filtrado
+    csv_context = raw_data.to_string(index=False) # Contexto completo inicial
 else:
+    data_failure = True
     csv_context = "ERROR_DATA_LOAD_FAILED"
     st.warning(
         "⚠️ Atención: El sistema de precios no pudo cargar la base de datos. "
@@ -56,35 +52,27 @@ else:
 def validate_contact_data(text_input):
     """
     Busca patrones de CUIT/DNI y Teléfono en el texto y valida su formato.
-    Si la validación local falla, retorna un mensaje de error para el usuario.
     """
-    
     text_cleaned = re.sub(r'[^\d\s]', '', text_input) 
     numbers = re.findall(r'\b\d+\b', text_input)
     
     if len(text_input) < 50 and len(numbers) >= 2: 
-        
         for num in numbers:
             length = len(num)
-            
             if length == 11: 
                 pass 
-            
             elif length in [7, 8]: 
                 pass
-            
             elif length >= 7 and length <= 15:
                 pass
-            
             elif length > 1 and ('cuit' in text_input.lower() or 'dni' in text_input.lower() or 'tel' in text_input.lower()):
                 if length > 15:
                     return "Disculpa, el **Teléfono** o **CUIT** que enviaste parece tener un formato incorrecto. Confírmame que el CUIT es de 11 dígitos y el teléfono (con código de área) está completo."
                 elif length < 7:
-                    return "Disculpa, para asegurar la reserva, necesito que revises el **DNI** (7 u 8 dígitos) o el **Teléfono** (al menos 7 dígitos). ¿Me lo confirmas, por favor?"
-
+                    return "Disculpa, para asegurar la reserva, necesito que revises el **DNI** (7 u 8 dígitos) o el **Teléfono** (al menos 7 dígitos)."
     return None
 
-# 2.7. FUNCIÓN DE FILTRADO DINÁMICO DE CONTEXTO (OPTIMIZADA)
+# 2.7. FUNCIÓN DE FILTRADO DINÁMICO DE CONTEXTO
 def filter_data_by_prompt(prompt, df_data):
     """Filtra el DataFrame por rubro para reducir el contexto enviado a Gemini."""
     prompt_lower = prompt.lower()
@@ -104,16 +92,16 @@ def filter_data_by_prompt(prompt, df_data):
 
     if selected_rubros:
         try:
-            # Asume la columna 'Rubro'
-            mask = df_data['Rubro'].astype(str).str.lower().apply(lambda x: any(r in x for r in selected_rubros))
-            df_filtered = df_data[mask]
+            # Verifica si existe la columna 'Rubro' antes de filtrar
+            if 'Rubro' in df_data.columns:
+                mask = df_data['Rubro'].astype(str).str.lower().apply(lambda x: any(r in x for r in selected_rubros))
+                df_filtered = df_data[mask]
+                if not df_filtered.empty:
+                    return df_filtered.to_string(index=False)
+        except Exception:
+            pass # Si falla el filtrado, usa el fallback
             
-            if not df_filtered.empty:
-                return df_filtered.to_string(index=False)
-        except KeyError:
-            pass
-            
-    # Fallback: si no se pudo filtrar, envía todo el contexto estático
+    # Fallback: envía todo el contexto si no hay coincidencia clara
     return df_data.to_string(index=False)
 
 
@@ -128,7 +116,7 @@ else:
     
     base_data = f"""
     PRIORIDAD DE PRECIOS: Los precios en la BASE DE DATOS a continuación son la ÚNICA fuente de verdad. La cotización debe venir directamente de ellos.
-    BASE DE DATOS:
+    BASE DE DATOS INICIAL (Referencia):
     {csv_context}
     """
     
@@ -161,33 +149,33 @@ DICCIONARIO TÉCNICO Y MATEMÁTICA:
 
 PROTOCOLO DE VENTA POR RUBRO:
 * TEJIDOS (Consultivo V93 - Máxima Precisión): No uses "Kit". El objetivo es cotizar la solución completa: Tejido, Alambre Tensión, Planchuelas, Accesorios.
-    * **REGLA DE CONSULTA OBLIGATORIA (ÚNICA Y ORDENADA):** Si el cliente pregunta por cerco o tejido sin especificar dimensiones ni calidad, Lucho DEBE preguntar en un solo turno, usando un tono consultivo para clasificar el proyecto. El orden es inmutable:
+    * **REGLA DE CONSULTA OBLIGATORIA (ÚNICA Y ORDENADA):** Si el cliente pregunta por cerco o tejido sin especificar dimensiones ni calidad, Lucho DEBE preguntar en un solo turno, usando un tono consultivo para clasificar el proyecto. El orden es inmutable:
         "Para cotizar una solución completa y precisa, necesito tres datos clave: 
         1. **Tipo de Proyecto:** ¿Buscas un cerco de **delimitación** (el tejido romboidal tradicional) o de **alta seguridad** (malla electrosoldada)?
         2. **Dimensiones:** ¿Qué **altura** y **longitud total** (en metros) tiene el cerco?
         3. **Calidad:** ¿Prefieres el **calibre estándar (calibre 14)** o uno más resistente (ej. calibre 12)?"
-    * **Lucho DEBE esperar la respuesta a los tres puntos (Tipo, Dimensiones y Calidad) antes de cotizar o generar el TICKET final.**
-    * Después de cotizar, si los postes o accesorios son material ferroso **NO galvanizado o epoxi**, pregunta si necesita pintura y accesorios de fijación extra.
+    * **Lucho DEBE esperar la respuesta a los tres puntos (Tipo, Dimensiones y Calidad) antes de cotizar o generar el TICKET final.**
+    * Después de cotizar, si los postes o accesorios son material ferroso **NO galvanizado o epoxi**, pregunta si necesita pintura y accesorios de fijación extra.
 
 * CHAPAS (Optimizado - Bundled V93):
-    * **REGLA DE CONSULTA ÚNICA (OBLIGATORIA):** Si el cliente pide "chapa" o "techo" sin especificar variables, Lucho DEBE preguntar en un solo turno, enumerando las variables:
+    * **REGLA DE CONSULTA ÚNICA (OBLIGATORIA):** Si el cliente pide "chapa" o "techo" sin especificar variables, Lucho DEBE preguntar en un solo turno, enumerando las variables:
         "Para cotizar tu techo con precisión, necesito tres datos clave: 
         1. **Tipo de Perfil:** ¿Buscas Chapa Acanalada Común o el perfil T-101?
         2. **Largo y Cantidad:** ¿Qué **largo exacto** necesitas para la caída del agua y cuántas unidades?
         3. **Acabado:** ¿La prefieres en color (prepintada) o en galvanizada estándar?"
-    * Lucho DEBE esperar la respuesta a esta pregunta multifacética antes de cotizar.
-    * **LÓGICA DEL LARGO:** Si el cliente pregunta solo por el precio "por metro", usa el precio unitario del código base. Si pregunta por una cantidad total (ej. "30 metros de chapa"), cotiza el total multiplicando esa cantidad por el precio base.
-    * **COLORES/ACABADOS:** El color implica un costo adicional por metro lineal sobre el precio base galvanizado. El bot debe considerar la opción de color en el precio final.
-    * **CROSS-SELL PINTURA/FIJACIÓN:** La venta cruzada de pintura y fijación debe realizarse **INMEDIATAMENTE DESPUÉS** de la cotización principal, en el mismo turno, utilizando la frase experta definida.
-    * FILTROS: Filtro Techo vs Lisa. Aislación consultiva. Estructura. (Solo pide el largo exacto **PARA PRESUPUESTO FINAL Y DETALLADO** después de haber dado el precio por metro).
+    * Lucho DEBE esperar la respuesta a esta pregunta multifacética antes de cotizar.
+    * **LÓGICA DEL LARGO:** Si el cliente pregunta solo por el precio "por metro", usa el precio unitario del código base. Si pregunta por una cantidad total (ej. "30 metros de chapa"), cotiza el total multiplicando esa cantidad por el precio base.
+    * **COLORES/ACABADOS:** El color implica un costo adicional por metro lineal sobre el precio base galvanizado. El bot debe considerar la opción de color en el precio final.
+    * **CROSS-SELL PINTURA/FIJACIÓN:** La venta cruzada de pintura y fijación debe realizarse **INMEDIATAMENTE DESPUÉS** de la cotización principal, en el mismo turno, utilizando la frase experta definida.
+    * FILTROS: Filtro Techo vs Lisa. Aislación consultiva. Estructura. (Solo pide el largo exacto **PARA PRESUPUESTO FINAL Y DETALLADO** después de haber dado el precio por metro).
 
 * REJA/CONSTRUCCIÓN (Consultivo V93 - Perfiles C y Estructurales): Cotiza material. Muestra diagrama ASCII si es reja.
-    * **REGLA DE CONSULTA ÚNICA (OBLIGATORIA):** Si el cliente pregunta por material de reja/estructura sin especificar, Lucho DEBE preguntar en un solo turno, enumerando las variables:
+    * **REGLA DE CONSULTA ÚNICA (OBLIGATORIA):** Si el cliente pregunta por material de reja/estructura sin especificar, Lucho DEBE preguntar en un solo turno, enumerando las variables:
         "Para cotizar el material de tu estructura o reja, necesito tres datos:
         1. **Material:** ¿Buscas perfiles de **hierro macizo** o **caños estructurales (tubos)**?
         2. **Dimensiones:** ¿Qué medidas aproximadas (**largo y alto**) tiene tu proyecto?
         3. **Uso y Acabado:** ¿La estructura será soldada y necesita ser **galvanizada** o solo **con pintura base**?"
-    * Después de cotizar el material, si el material es siderúrgico ferroso NO galvanizado, epoxi o prepintado, usa la frase de experto para la venta cruzada.
+    * Después de cotizar el material, si el material es siderúrgico ferroso NO galvanizado, epoxi o prepintado, usa la frase de experto para la venta cruzada.
 * NO LISTADOS: Si no está en BASE DE DATOS, fuerza handoff. La frase a usar es: "Disculpa, ese producto no figura en mi listado actual. Para una consulta inmediata de stock y precio en depósito, te pido que te contactes directamente con un [vendedor al 3401-648118](tel:+543401648118). ¡Ellos te ayudarán al instante!"
 
 PROTOCOLO LOGÍSTICO (POST-LOCALIDAD):
@@ -210,9 +198,9 @@ FORMATO Y CIERRE:
 * TICKET (DESGLOSE REAL): Usa bloques de código ```text. Lista cada producto por separado con su CÓDIGO y PRECIO UNITARIO real (del CSV). Nunca agrupes.
 * Usa la siguiente frase de Validación: "¿Cómo lo ves {{Nombre}}? ¿Cerramos así o ajustamos algo?"
 * PROTOCOLO DE CIERRE (El modelo debe generar el diálogo de cierre inmediatamente después de la validación):
-   1. PEDIDO FINAL (Contundente): El modelo debe decir: "Excelente. Para enviarle al depósito la reserva, solo me falta: Nombre, CUIT/DNI y Teléfono." (Ya tenés Localidad).
-   2. GENERACIÓN DE TICKET FINAL (PASO CRÍTICO): Genera, después de la frase de Validación y la solicitud de Nombre, CUIT/DNI y Teléfono, un bloque de código oculto (sin mostrar al cliente) que contenga el texto plano (sin formato Markdown) que será enviado por WhatsApp al vendedor. Usa la etiqueta [TEXTO_WHATSAPP]:.
-   3. CIERRE POR RECHAZO (CRÍTICO): Si el cliente desestima el pedido, el modelo NO debe solicitar datos. Debe solo despedirse con la frase: "Perfecto. Lamento que no podamos avanzar hoy. Quedo a tu disposición para futuros proyectos. ¡Que tengas un excelente día!"
+    1. PEDIDO FINAL (Contundente): El modelo debe decir: "Excelente. Para enviarle al depósito la reserva, solo me falta: Nombre, CUIT/DNI y Teléfono." (Ya tenés Localidad).
+    2. GENERACIÓN DE TICKET FINAL (PASO CRÍTICO): Genera, después de la frase de Validación y la solicitud de Nombre, CUIT/DNI y Teléfono, un bloque de código oculto (sin mostrar al cliente) que contenga el texto plano (sin formato Markdown) que será enviado por WhatsApp al vendedor. Usa la etiqueta [TEXTO_WHATSAPP]:.
+    3. CIERRE POR RECHAZO (CRÍTICO): Si el cliente desestima el pedido, el modelo NO debe solicitar datos. Debe solo despedirse con la frase: "Perfecto. Lamento que no podamos avanzar hoy. Quedo a tu disposición para futuros proyectos. ¡Que tengas un excelente día!"
 """
 
 # 4. INTERFAZ
@@ -227,7 +215,9 @@ if "suggestions_shown" not in st.session_state:
 if "debug_mode" not in st.session_state:
     st.session_state.debug_mode = False
 if "df_data" not in st.session_state and not data_failure:
-    st.session_state.df_data = raw_data
+    # Asegura que el DF esté en session state si no falló la carga
+    if isinstance(raw_data, pd.DataFrame):
+        st.session_state.df_data = raw_data
 
 
 # --- INICIALIZACIÓN DEL MODELO Y LA SESIÓN DE CHAT ---
@@ -303,14 +293,14 @@ if prompt_to_process:
         response = None
         
         # --- LÓGICA DE INYECCIÓN DE CONTEXTO DINÁMICO ---
-        if not data_failure:
+        if not data_failure and "df_data" in st.session_state:
             # 1. Filtra el DF con el prompt del usuario
             filtered_context = filter_data_by_prompt(prompt_to_process, st.session_state.df_data)
             
             # 2. Genera el prompt final inyectando el contexto relevante
             full_gemini_prompt = f"Consulta del cliente: {prompt_to_process}\n\n[CONTEXTO_RELEVANTE_PARA_COTIZAR]:\n{filtered_context}"
         else:
-            # Si hubo falla en la carga de datos, el prompt es solo la consulta del cliente
+            # Si hubo falla en la carga de datos o no hay DF, el prompt es solo la consulta
             full_gemini_prompt = prompt_to_process 
         # --- FIN LÓGICA DE INYECCIÓN ---
             
@@ -355,10 +345,10 @@ O escribinos al: 3401-648118
         st.error(f"❌ Error en la llamada a la API de Gemini: {e}")
         
         if "429" in error_message or "Quota exceeded" in error_message:
-            st.info("🛑 **CUPO DE API EXCEDIDO (Error 429)**...")
+            st.info("🛑 **CUPO DE API EXCEDIDO (Error 429)**. Por favor espera unos segundos.")
         elif "400" in error_message and "valid role" in error_message:
-              st.info("💡 **Error de Rol (400)**:...")
+              st.info("💡 **Error de Rol (400)**. El modelo espera turnos alternados.")
         elif "404" in error_message or "not found" in error_message.lower():
-            st.info("💡 Consejo: El nombre del modelo puede ser incorrecto o su clave API no tiene acceso...")
+            st.info("💡 Consejo: El nombre del modelo puede ser incorrecto o su clave API no tiene acceso.")
         else:
             st.info("Revise los detalles del error en la consola o el administrador de su aplicación.")
