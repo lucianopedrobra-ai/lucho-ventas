@@ -43,7 +43,7 @@ if raw_data is not None:
 else:
     csv_context = "ERROR: No se pudo cargar la lista de precios. Cotizar manual."
 
-# --- 4. CEREBRO DE VENTAS (MODO ESTABLE 1.5 FLASH) ---
+# --- 4. CEREBRO DE VENTAS (MODO 2.0 FLASH LITE) ---
 sys_prompt = f"""
 ROL: Eres Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**
 TONO: **PROFESIONAL, TÉCNICO Y CONCISO.** (CERO vulgaridad. No uses 'maestro', 'genio'. Sé breve y directo).
@@ -90,9 +90,8 @@ if "messages" not in st.session_state:
 
 if "chat_session" not in st.session_state:
     try:
-        # CORRECCIÓN DEFINITIVA: Usamos 'gemini-1.5-flash'. 
-        # Es el modelo más estable y rápido para producción web hoy.
-        model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=sys_prompt)
+        # CORRECCIÓN: Usamos 'gemini-2.0-flash-lite-preview-02-05' que es el nombre técnico exacto.
+        model = genai.GenerativeModel('gemini-2.0-flash-lite-preview-02-05', system_instruction=sys_prompt)
         
         initial_history = []
         if len(st.session_state.messages) > 1:
@@ -102,7 +101,12 @@ if "chat_session" not in st.session_state:
         
         st.session_state.chat_session = model.start_chat(history=initial_history)
     except Exception as e:
-        st.error(f"Error de sistema: {e}")
+        # Fallback de emergencia si el nombre cambia mañana, intenta el genérico
+        try:
+            model = genai.GenerativeModel('gemini-2.0-flash-exp', system_instruction=sys_prompt)
+            st.session_state.chat_session = model.start_chat(history=initial_history)
+        except:
+            st.error(f"Error crítico al conectar con Gemini: {e}")
 
 # --- 6. INTERFAZ ---
 for msg in st.session_state.messages:
