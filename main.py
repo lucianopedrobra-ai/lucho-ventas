@@ -19,7 +19,7 @@ except Exception as e:
     st.error(f"🚨 Error de configuración de Gemini: {e}")
     st.stop()
 
-# 2. CARGA DE DATOS (Reversión: Devuelve String Completo)
+# 2. CARGA DE DATOS (Contexto Estático)
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
 @st.cache_data(ttl=600)
@@ -27,7 +27,6 @@ def load_data():
     """Carga los datos desde la URL de la hoja de cálculo y los convierte a string completo."""
     try:
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip')
-        # 🚨 REVERSIÓN: Devuelve el DataFrame como una cadena de texto (el método que funcionaba)
         return df.to_string(index=False)
     except Exception as e:
         error_msg = str(e)
@@ -39,23 +38,18 @@ def load_data():
             st.error(f"Error inesperado leyendo la lista de productos: {e}")
         return "ERROR_DATA_LOAD_FAILED"
 
-# 🚨 REVERSIÓN: Carga de datos directa a csv_context como string
 csv_context = load_data() 
 data_failure = (csv_context == "ERROR_DATA_LOAD_FAILED")
 
 if not data_failure:
-    # Si la carga fue exitosa, el contexto es la cadena completa.
     pass
 else:
     st.warning(
         "⚠️ Atención: El sistema de precios no pudo cargar la base de datos. "
         "Lucho solo podrá tomar tus datos de contacto y derivarte a un vendedor humano."
     )
-    # csv_context ya tiene el valor de error
 
-# 2.5. FUNCIÓN DE BÚSQUEDA LOCAL DE DATOS (ELIMINADA) - Reemplazada por contexto estático.
-
-# 2.6. FUNCIÓN DE VALIDACIÓN DE DATOS LOCAL (Se mantiene por ser local)
+# 2.6. FUNCIÓN DE VALIDACIÓN DE DATOS LOCAL
 def validate_contact_data(text_input):
     """
     Busca patrones de CUIT/DNI y Teléfono en el texto y valida su formato.
@@ -87,7 +81,7 @@ def validate_contact_data(text_input):
 
     return None
 
-# 3. EL CEREBRO (PROMPT V87 - Contexto Estático)
+# 3. EL CEREBRO (PROMPT V90 - Gemini Pro y Tejidos Optimizado)
 
 if data_failure:
     rol_persona = "ROL CRÍTICO: Eres Lucho, Ejecutivo Comercial Senior. Tu base de datos falló. NO DEBES COTIZAR NINGÚN PRECIO. Tu única función es disculparte por la 'falla temporal en el sistema de precios', tomar el Nombre, Localidad, CUIT/DNI y Teléfono del cliente, e informar que Martín Zimaro (3401 52-7780) le llamará de inmediato. IGNORA todas las reglas de cotización y enfócate en la derivación."
@@ -96,7 +90,6 @@ if data_failure:
 else:
     rol_persona = "ROL Y PERSONA: Eres Lucho, Ejecutivo Comercial Senior. Tu tono es profesional, cercano y EXTREMADAMENTE CONCISO. Tu objetivo es cotizar rápido y derivar al humano. En tus sugerencias y cotizaciones consultivas, prioriza discretamente las opciones de mayor valor (ticket) para el cliente, sin usar adjetivos de valor como 'más económico' o 'mejor diseño'."
     
-    # 🚨 REVERSIÓN: Inyección completa del CSV en la BASE DE DATOS
     base_data = f"""
     PRIORIDAD DE PRECIOS: Los precios en la BASE DE DATOS a continuación son la ÚNICA fuente de verdad. La cotización debe venir directamente de ellos.
     BASE DE DATOS:
@@ -128,15 +121,15 @@ DICCIONARIO TÉCNICO Y MATEMÁTICA:
 * RENDIMIENTO PINTURAS (Tersuave Sintético): 12 m² por litro por mano. Para estructuras metálicas y chapas, se recomiendan 2 manos (24 m² por litro, trabajo terminado).
 
 PROTOCOLO DE VENTA POR RUBRO:
-* TEJIDOS (Consultivo V85): No uses "Kit". Cotiza item por item: 1. Tejido, 2. Alambre Tensión, 3. Planchuelas, 4. Accesorios. Si el cliente pregunta por un cerco o tejido sin especificar material, pregunta primero: "¿Buscas tejido romboidal tradicional o algún otro tipo de malla de seguridad?". Después de cotizar, si los postes o accesorios son material ferroso **NO galvanizado o epoxi**, pregunta si necesita pintura y accesorios de fijación extra.
+* TEJIDOS (Consultivo V90 - Bundled): No uses "Kit". Cotiza item por item: 1. Tejido, 2. Alambre Tensión, 3. Planchuelas, 4. Accesorios. Si el cliente pregunta por un cerco o tejido sin especificar material, **DEBE preguntar primero en un solo turno:** "¿Buscas tejido romboidal tradicional o malla de seguridad? Y para calcular postes, ¿qué altura tiene el cerco y qué longitud total necesitas?". Después de cotizar, si los postes o accesorios son material ferroso **NO galvanizado o epoxi**, pregunta si necesita pintura y accesorios de fijación extra.
 * CHAPAS (Optimizado - Consultivo V85):
-    * **REGLA DE CONSULTA/COTIZACIÓN POR METRO (SIN ADJETIVOS DE VALOR):** Si el cliente solo pide "chapa" o "techo" sin especificar el tipo, DEBE preguntar primero: "¿Buscas la chapa Acanalada Común o la chapa T-101?". **ESTÁ ESTRICTAMENTE PROHIBIDO usar cualquier adjetivo de valor (ej. 'más económico', 'mejor diseño') o códigos internos al nombrar los productos. Tu enfoque es encontrar y cotizar la mercadería que busca el cliente.**
+    * **REGLA DE CONSULTA DE TIPO:** Si el cliente solo pide "chapa" o "techo" sin especificar el tipo, DEBE preguntar primero: "¿Buscas la chapa Acanalada Común o la chapa T-101?". **ESTÁ ESTRICTAMENTE PROHIBIDO usar cualquier adjetivo de valor o códigos internos al nombrar los productos. Tu enfoque es encontrar y cotizar la mercadería que busca el cliente.**
     * Una vez que el cliente elige, cotiza solo el tipo seleccionado por Metro Lineal (ML) usando los datos del CSV.
     * **CROSS-SELL PINTURA/FIJACIÓN (Activo):** Si la chapa cotizada es Común o T-101 (es decir, NO galvanizada/epoxi/prepintada), después de la cotización, usa la siguiente frase experta para cotizar pintura y fijaciones: "Para proteger tu techo de la oxidación y evitar filtraciones, ¿Cuántos metros cuadrados (m²) de superficie total necesitas cubrir con dos manos? También te incluimos los insumos de fijación necesarios."
     * **LÓGICA DEL LARGO:** Si el cliente pregunta solo por el precio "por metro", usa el precio unitario del código base. Si pregunta por una cantidad total (ej. "30 metros de chapa"), cotiza el total multiplicando esa cantidad por el precio base.
-    * **COLORES/ACABADOS:** Asume que la venta es por metro y que el color no afecta la cotización, ya que no hay hojas precortadas predefinidas.
+    * **COLORES/ACABADOS:** El color implica un costo adicional por metro lineal sobre el precio base galvanizado. El bot debe considerar la opción de color.
     * FILTROS: Filtro Techo vs Lisa. Aislación consultiva. Estructura. (Solo pide el largo exacto **PARA PRESUPUESTO FINAL Y DETALLADO** después de haber dado el precio por metro).
-* REJA/CONSTRUCCIÓN (Consultivo V85 - Perfiles C y Estructurales): Cotiza material. Muestra diagrama ASCII si es reja. Si el cliente pregunta por material para reja sin especificar, pregunta primero: "¿Buscas perfiles de hierro macizo o caños estructurales (tubos)?". Después de cotizar el material (Perfiles C, vigas, tubos estructurales, etc.), si el material es siderúrgico ferroso NO galvanizado, epoxi o prepintado, usa la siguiente frase de experto: "Para proteger esta estructura de la oxidación y asegurar la unión de las piezas, ¿Cuántos metros cuadrados (m²) de superficie total necesitas cubrir con dos manos? También te incluimos los consumibles de soldadura (electrodos, discos) para un acabado profesional."
+* REJA/CONSTRUCCIÓN (Consultivo V85 - Perfiles C y Estructurales): Cotiza material. Muestra diagrama ASCII si es reja. Si el cliente pregunta por material para reja sin especificar, DEBE realizar una **PREGUNTA ÚNICA** sobre el material y las dimensiones: "¿Buscas perfiles de hierro macizo o caños estructurales (tubos), y qué medidas aproximadas (largo y alto) tiene tu proyecto?" Después de cotizar el material, si el material es siderúrgico ferroso NO galvanizado, epoxi o prepintado, usa la frase de experto para la venta cruzada.
 * NO LISTADOS: Si no está en BASE DE DATOS, fuerza handoff. La frase a usar es: "Disculpa, ese producto no figura en mi listado actual. Para una consulta inmediata de stock y precio en depósito, te pido que te contactes directamente con un [vendedor al 3401-648118](tel:+543401648118). ¡Ellos te ayudarán al instante!"
 
 PROTOCOLO LOGÍSTICO (POST-LOCALIDAD):
@@ -173,18 +166,20 @@ if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "Hola, buenas. Soy Lucho. ¿Qué proyecto tenés hoy?"}]
 if "suggestions_shown" not in st.session_state:
     st.session_state.suggestions_shown = False
-
-# 🚨 REVERSIÓN: La depuración local ya no es necesaria con el contexto estático.
-# Si quieres activar la depuración en la consola, puedes poner st.session_state.debug_mode = True aquí.
-# Mantenemos el flag en False por defecto.
 if "debug_mode" not in st.session_state:
     st.session_state.debug_mode = False
+
+
+# --- DEPURACIÓN (DEBUG MODE) ---
+# Se mantiene el código de depuración si se desea activar desde el código
+# ----------------------------------
 
 
 # --- INICIALIZACIÓN DEL MODELO Y LA SESIÓN DE CHAT ---
 if "chat_session" not in st.session_state:
     try:
-        model = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt)
+        # 🚨 CAMBIO CLAVE: Se usa Gemini 2.5 Pro para mayor precisión
+        model = genai.GenerativeModel('gemini-2.5-pro', system_instruction=sys_prompt)
         
         initial_history = []
         if len(st.session_state.messages) > 1:
@@ -252,9 +247,9 @@ if prompt_to_process:
         chat = st.session_state.chat_session
         response = None
         
-        # 🚨 REVERSIÓN: Ya no usamos el filtro dinámico, el prompt es el original del cliente.
-        dynamic_prompt = prompt_to_process 
-        
+        # 🚨 Envío directo del prompt sin filtro dinámico (contexto estático)
+        dynamic_prompt = prompt_to_process
+            
         with st.chat_message("assistant", avatar="🧑‍💼"):
             with st.spinner("Lucho está cotizando..."):
                 response = chat.send_message(dynamic_prompt)
