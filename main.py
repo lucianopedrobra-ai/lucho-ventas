@@ -21,7 +21,7 @@ try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
 except Exception:
-    st.error("⚠️ Iniciando sistema...")
+    st.error("⚠️ Sistema conectando...")
     st.stop()
 
 # --- 3. DATOS ---
@@ -42,48 +42,50 @@ if raw_data is not None:
 else:
     csv_context = "ERROR: Stock no disponible."
 
-# --- 4. CEREBRO DE VENTAS (CON DICCIONARIO DE SINÓNIMOS) ---
+# --- 4. CEREBRO DE VENTAS (PERFIL EJECUTIVO / SOBRIO) ---
 sys_prompt = f"""
-ROL: Eres Lucho, Cotizador Oficial de **Pedro Bravin S.A.**
-TONO: Vendedor astuto. Tu objetivo es subir el volumen de venta.
+ROL: Eres Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**
+TONO: **SOBRIO, PROFESIONAL, CONCISO Y DIRECTO.**
+(Prohibido el trato vulgar tipo "maestro", "genio", "tirame", "espectacular". Habla como un profesional técnico).
 
-BASE DE DATOS (TU VERDAD ABSOLUTA):
+BASE DE DATOS (STOCK Y PRECIOS):
 ------------------------------------------------------------
 {csv_context}
 ------------------------------------------------------------
 
-🧠 **TRADUCTOR DE PRODUCTOS (IMPORTANTE):**
-El cliente usa palabras comunes, tú busca el técnico en la lista:
-* Si piden **"GAS"** -> Busca **"EPOXI"** o **"REVESTIDO"**. (¡SÍ VENDEMOS EPOXI!).
-* Si piden **"AGUA"** -> Busca **"GALVANIZADO"** o **"HIDRO"**.
-* Si piden **"TECHO"** -> Busca **"CHAPA"**, **"CINCALUM"**, **"COLOR"**.
-* Si piden **"CERCO"** -> Busca **"MALLA"**, **"TEJIDO"**, **"ROMBOIDAL"**.
+🧠 **TRADUCTOR TÉCNICO:**
+* "GAS" = EPOXI / REVESTIDO.
+* "AGUA" = GALVANIZADO / HIDRO3.
+* "TECHO" = CHAPA / T-101 / SINUSOIDAL.
 
-🔥 **POLÍTICA DE BONIFICACIONES (ESCALA 5-12-18%):**
+🔥 **POLÍTICA DE PRECIOS (ESCALA 5-12-18%):**
 Base: (Precio CSV x 1.21). Sobre eso aplica:
-1.  **NIVEL 1 (5% OFF):** Consultas chicas/sueltas. "Promo Web".
-2.  **NIVEL 2 (12% OFF):** Proyectos (Techo completo, >10 un). "Pack Obra".
-3.  **NIVEL 3 (18% OFF):** Acopio/Mayorista. "Cierre Ya".
+1.  **NIVEL 1 (5% OFF):** Consultas estándar.
+2.  **NIVEL 2 (12% OFF):** Obras/Proyectos (>10 un).
+3.  **NIVEL 3 (18% OFF):** Acopio/Mayorista.
 
-⚠️ **REGLA DE ORO:** * Confía en tu lista. Si dice "Epoxi", ES GAS. No digas que no vendemos.
-* Siempre muestra el PRECIO FINAL con el descuento ya aplicado.
-
-**LOGÍSTICA:**
-Siempre pregunta: *"¿Para qué localidad es?"*.
+⚠️ **PROTOCOLOS DE RESPUESTA (ESTRICTO):**
+1.  **SALUDO CORTO:** "Hola, buenas tardes. Soy Lucho." (Sin adornos).
+2.  **AL GRANO:** Si faltan datos, pídelos en lista técnica:
+    * *"Para cotizar necesito: Tipo de material, Medidas y Cantidad."*
+3.  **ARGUMENTO DE PRECIO:**
+    * *"Precio de lista: $X. Con bonificación Web aplicada: **$Y Final**."*
+4.  **LOGÍSTICA:**
+    * *"Indique localidad de entrega para coordinar logística."*
 
 **FORMATO FINAL (SOLO AL CONFIRMAR):**
 [TEXTO_WHATSAPP]:
 Hola Equipo Bravin, soy {{Nombre}}.
-Pedido Web (Bonif. Aplicada: [5%/12%/18%]):
+Pedido Web (Bonif. [5%/12%/18%]):
 - (COD: [SKU]) [Producto] x [Cant]
-Total Final: $[Monto calculado]
+Total Final: $[Monto]
 Logística: {{Localidad}} - {{Retiro/Envío}}
 Datos: {{DNI}} - {{Teléfono}}
 """
 
 # --- 5. LÓGICA DE SESIÓN ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hola, soy Lucho de **Pedro Bravin S.A.** 🏗️\n\n¿Qué materiales necesitás? Tengo stock en perfiles, chapas, caños epoxi y ferretería."}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hola. Soy Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**\n\nIndícame qué materiales necesitas cotizar (Producto y Cantidad)."}]
 
 if "chat_session" not in st.session_state:
     try:
@@ -102,14 +104,14 @@ for msg in st.session_state.messages:
     avatar = "🧑‍💼" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-if prompt := st.chat_input("Ej: Necesito caños para gas de 1 pulgada..."):
+if prompt := st.chat_input("Ej: 5 caños de gas 1 pulgada..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").markdown(prompt)
 
     try:
         chat = st.session_state.chat_session
         with st.chat_message("assistant", avatar="🧑‍💼"):
-            with st.spinner("Buscando en stock..."):
+            with st.spinner("Cotizando..."):
                 response = chat.send_message(prompt)
                 full_text = response.text
                 
@@ -128,7 +130,7 @@ if prompt := st.chat_input("Ej: Necesito caños para gas de 1 pulgada..."):
                         background-color: #25D366; color: white;
                         text-align: center; padding: 14px; border-radius: 8px;
                         text-decoration: none; font-weight: bold; font-family: Arial, sans-serif;
-                    ">👉 CONFIRMAR CON DESCUENTO</a>
+                    ">👉 CONFIRMAR PEDIDO</a>
                     """, unsafe_allow_html=True)
                     
                     st.session_state.messages.append({"role": "assistant", "content": dialogue.strip() + f"\n\n[👉 Confirmar]({wa_url})"})
