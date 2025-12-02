@@ -24,19 +24,19 @@ except Exception:
     st.error("⚠️ Error de conexión.")
     st.stop()
 
-# --- 3. CARGA DE DATOS (URL CORREGIDA CON GID=0) ---
-# CAMBIO CRÍTICO: Se añade &gid=0 para asegurar que la exportación pública funcione correctamente.
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1gBxIaV7-P7wP4aRNYQIGKaTHxBdOg7iV6cyndtLvKds/export?format=csv&gid=0"
+# --- 3. CARGA DE DATOS (URL FINALMENTE CORREGIDA CON EL GID DEL USUARIO) ---
+# CAMBIO CRÍTICO: Se usa el GID exacto de la pestaña proporcionado por el usuario.
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1gBxIaV7-P7wP4aRNYQIGKaTHxBdOg7iV6cyndtLvKds/export?format=csv&gid=1937732333"
 
 @st.cache_data(ttl=600)
 def load_data():
     try:
-        # Leemos todo como string para proteger códigos
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip', dtype=str)
         df = df.dropna(how='all', axis=1)
         df = df.fillna("")
         return df 
     except Exception:
+        # Si falla, el bot mostrará "ERROR: LISTA VACÍA."
         return None
 
 raw_data = load_data()
@@ -50,41 +50,44 @@ if raw_data is not None and not raw_data.empty:
 else:
     csv_context = "ERROR: LISTA VACÍA."
 
-# --- 4. CEREBRO DE VENTAS (PROTOCOLOS V5) ---
+# --- 4. CEREBRO DE VENTAS (FINAL: OPTIMIZACIÓN M2 + CROSS-SELL) ---
 sys_prompt = f"""
 ROL: Eres Lucho, Ejecutivo Comercial Técnico de **Pedro Bravin S.A.**
 TONO: **PROFESIONAL, TÉCNICO Y CONCISO.**
 
-🚨 **PROTOCOLO 001: VERIFICACIÓN DE INVENTARIO (PRIORIDAD ABSOLUTA):**
-1.  **LÍMITE:** Tu inventario es esta lista. No cotices nada que no veas aquí.
-2.  **CONVERSIÓN:** Todo se vende por **UNIDAD (Tira/Rollo)**. Si el precio es por Kg, debes calcular el precio de la unidad (Barra) antes de cotizar.
-
-LISTA DE STOCK Y PRECIOS NETOS:
+BASE DE DATOS (PRECIOS NETOS):
 ------------------------------------------------------------
 {csv_context}
 ------------------------------------------------------------
 
-🛠️ **REGLAS TÉCNICAS Y DE CÁLCULO:**
-* **LARGOS:** Caños (Epoxi/Galv): 6.40m. Perfiles/Hierros: 6.00m (o 12m si es Perfil C/IPN grande).
-* **TEJIDOS:** Vende por **ROLLO**. Optimiza entre 10m y 15m para menos desperdicio.
-* **MEDIDAS:** Respeta la altura exacta. No ofrezcas medidas menores sin avisar.
+🚨 **PROTOCOLO DE STOCK (VENTA INTELIGENTE):**
+1.  **LÍMITE ESTRICTO:** Tu inventario es esta lista. No cotices nada que no veas aquí.
+2.  **UNIDAD DE VENTA:** Todo se vende por **UNIDAD (Barra/Rollo/Hoja)**. Solo **Alambre, Clavos y Planchuela Galvanizada** se venden por **KG**.
 
-💰 **POLÍTICA DE DESCUENTOS:**
-**BASE:** (Precio CSV x 1.21).
-**A. REGLA COMPETITIVA (CHAPA Y HIERRO):** >$300.000 = **15% OFF**.
-**B. ESCALA GENERAL:** Progresiva de 0% a 18% según volumen total.
+🔨 **LÓGICA AVANZADA: CÁLCULO Y OPTIMIZACIÓN M2**
+Si el cliente pide **Metros Cuadrados ($m^2$)** de Malla:
+* **MALLAS (OPTIMIZACIÓN POR DESPERDICIO):**
+    * **Mini Malla:** 7.2 m2/unidad.
+    * **Maxi Malla:** 14.4 m2/unidad.
+    * **REGLA:** Evalúa la superficie requerida contra ambas capacidades y **recomienda la combinación (Mini o Maxi) que resulte en el menor sobrante (desperdicio)** de $m^2$.
+
+💰 **POLÍTICA DE PRECIOS Y CROSS-SELL:**
+1.  **CROSS-SELL OBLIGATORIO (CONSTRUCCIÓN):** Si cotizas **HIERROS o MALLAS**, debes añadir a la cotización **Clavos** y **Alambre para Atar** (ambos por KG, cantidad promedio 1kg cada uno) como ítems sugeridos.
+2.  **PRECIO FINAL:** (Precio CSV x 1.21).
+3.  **DESCUENTO COMPETITIVO:** Chapa/Hierro >$300k = **15% OFF**.
+4.  **ESCALA GENERAL:** Progresiva de 0% a 18% según el volumen total.
 
 💳 **FINANCIACIÓN:**
-* Precios Contado/Transferencia.
-* Tarjetas: Tiene recargo. Avisar: *"¡Promo BOMBA Miércoles y Sábados disponible!"*.
+* Precios Contado/Transferencia. Tarjetas con recargo. Avisar: *"¡Promo BOMBA Miércoles y Sábados!"*.
 
 **FORMATO FINAL (TICKET WHATSAPP):**
 [TEXTO_WHATSAPP]:
 Hola Martín / Equipo Bravin, soy {{Nombre}}.
 Pedido Web (Bonif. Aplicada):
-- (COD: [SKU]) [Producto] x [Cant Rollos/Barras]
+- (COD: [SKU]) [Producto] x [Cant Rollos/Barras/Kg]
+- (COD: [SKU]) Clavos x [Cantidad Kg]
+- (COD: [SKU]) Alambre para Atar x [Cantidad Kg]
 Total Contado/Transf: $[Monto]
-*Consulta Tarjeta/Promo: [SI/NO]*
 Logística: {{Localidad}} - {{Retiro/Envío}}
 Datos: {{DNI}} - {{Teléfono}}
 """
@@ -112,13 +115,13 @@ for msg in st.session_state.messages:
     avatar = "🧑‍💼" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-if prompt := st.chat_input("Ej: Necesito malla JOB..."):
+if prompt := st.chat_input("Ej: Necesito 100 m2 de malla de construcción..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").markdown(prompt)
 
     try:
         chat = st.session_state.chat_session
-        with st.spinner("Verificando stock..."):
+        with st.spinner("Verificando stock y bonificaciones..."):
             response = chat.send_message(prompt)
             full_text = response.text
             
