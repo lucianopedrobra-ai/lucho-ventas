@@ -3,173 +3,161 @@ import pandas as pd
 import google.generativeai as genai
 import urllib.parse
 
-# --- 1. CONFIGURACIÓN ---
-st.set_page_config(page_title="Lucho | Pedro Bravin", page_icon="🧑‍💼", layout="wide")
+# --- 1. CONFIGURACIÓN VISUAL (MARCA BLANCA) ---
+st.set_page_config(page_title="Cotizador Online", page_icon="🏗️", layout="wide")
 
-# Estilos visuales limpios (Móvil First)
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    .stChatInput {padding-bottom: 20px;}
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 0rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    .stChatMessage .stChatMessageAvatar {
+        background-color: #003366; 
+        color: white;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. AUTENTICACIÓN ---
+# --- 2. SEGURIDAD ---
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
-except Exception as e:
-    st.error(f"🚨 Error de configuración de Gemini: {e}")
+except Exception:
+    st.error("⚠️ Sistema conectando...")
     st.stop()
 
-# --- 3. CARGA DE DATOS (CATÁLOGO COMPLETO) ---
+# --- 3. CARGA DE DATOS ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
 @st.cache_data(ttl=600)
 def load_data():
     try:
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip')
-        df = df.dropna(how='all', axis=1) # Limpieza básica
+        df = df.dropna(how='all', axis=1)
         return df 
     except Exception:
-        return "ERROR_DATA_LOAD_FAILED"
+        return None
 
 raw_data = load_data()
-
-if isinstance(raw_data, pd.DataFrame):
-    # La IA lee TODO el Excel para poder sacar los códigos
+if raw_data is not None:
     csv_context = raw_data.to_string(index=False)
 else:
-    csv_context = "ERROR_DATA_LOAD_FAILED"
-    st.warning("⚠️ El sistema de precios falló. Modo captura de contacto.")
+    csv_context = "ERROR: Stock no disponible."
 
-# --- 4. PROMPT DE VENTA (V95 + CODIFICACIÓN INTERNA) ---
+# --- 4. CEREBRO DE VENTAS (ESTRATEGIA PRECIO + ENVÍO) ---
 sys_prompt = f"""
-ROL Y PERSONA: Eres Lucho, Ejecutivo Comercial Senior. Tu tono es profesional, cercano y EXTREMADAMENTE CONCISO. Tu objetivo es obtener el CLICK del cliente en el enlace de WhatsApp para enviar la orden.
+ROL: Eres Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**
+TU FILOSOFÍA: "Ser expeditivo no es tirar precios, es cerrar ventas".
+TU ESTRATEGIA: El precio puede parecer alto, así que TU MISIÓN es amortiguarlo con la **BONIFICACIÓN** y el **ENVÍO**.
 
-BASE DE DATOS Y BÚSQUEDA (STOCK COMPLETO):
+BASE DE DATOS (PRECIOS NETOS - INTERNO):
 ------------------------------------------------------------
 {csv_context}
 ------------------------------------------------------------
-**INSTRUCCIÓN DE BARRIDO:** Tu prioridad es vender. Revisa EXHAUSTIVAMENTE el listado disponible. Si el producto está en la lista, TIENES que ofrecerlo.
 
-PSICOLOGÍA DE VENTA (BENEFICIOS Y URGENCIA):
-* **NO NEGOCIES, OTORGA:** Tú no "bajas precios". Tú "aplicas bonificaciones por volumen" o "destrabas beneficios".
-* **GENERAR URGENCIA:** Usa frases sutiles para inducir el cierre AHORA: *"Te recomiendo reservar esto hoy para congelar el precio"*, *"El stock de esto rota muy rápido"*, *"Cerremos la orden para asegurarte la entrega en la próxima salida"*.
-* **EL VOLUMEN ES LA LLAVE:** Antes de dar el precio, pregunta la cantidad sugiriendo una oportunidad: *"Decime qué cantidad necesitás, así veo si puedo activarte la tarifa mayorista o algún beneficio de acopio."*
+PROTOCOLOS OBLIGATORIOS DE ACTUACIÓN:
 
-DICCIONARIO TÉCNICO Y LOGICA DE PRODUCTO:
-* **PRECIOS E IVA:** Los precios base son NETOS. Multiplica SIEMPRE por 1.21.
-* **AISLANTES:** Si es cochera/galería (sol directo/indirecto) y sin cielorraso -> RECOMIENDA **"Isolant Doble Aluminio"**.
-* **CHAPAS:** Techo -> Ofrece: Aislante + Tornillos + Perfiles.
-* **SIDERÚRGICA:** Perfiles/Tubos -> Ofrece: Electrodos, discos, guantes.
+1.  **LA REGLA DEL "PRECIO AMORTIGUADO" (CRÍTICO):**
+    * Calcula el Precio Final (Precio Lista x 1.21).
+    * **NUNCA** des el precio "seco" (Ej: "Cuesta $100").
+    * **SIEMPRE** preséntalo como una oportunidad:
+        * *"El precio de lista es alto, pero te aplico la **Bonificación Web** y te queda en [Precio Final]."*
+        * *"Por esa cantidad, te activo el descuento de acopio."*
 
-MANEJO DE "NO LISTADO":
-Si no está en el CSV, genera un enlace directo: "Ese producto lo valido en depósito. Consultalo acá:" seguido del link markdown: `[👉 Consultar Stock WhatsApp](https://wa.me/5493401648118?text=Busco%20precio%20de%20este%20producto%20no%20listado...)`.
+2.  **EL ENVÍO COMO CIERRE (OBLIGATORIO):**
+    * Inmediatamente después del precio (o antes), usa el envío para cerrar.
+    * *"Decime para qué localidad es, así veo si te puedo bonificar el flete o sumarlo al reparto de la zona."*
+    * (Esto hace que el cliente piense en la logística y no solo en el número final).
 
-PROTOCOLO DE CIERRE Y LOGÍSTICA (EL EMBUDO):
-1. **Validación:** *"¿Cómo lo ves {{Nombre}}? ¿Te preparo la reserva?"*
-2. **Logística:** *"¿Preferís retirar o te lo enviamos? (Pasame tu dirección para ver si te bonificamos el envío)."*
-3. **OBTENCIÓN DE DATOS:** Pide Nombre, CUIT/DNI y Teléfono.
+3.  **CROSS-SELLING INTELIGENTE:**
+    * No preguntes "¿querés algo más?".
+    * Afirma: *"Te calculé también los tornillos/discos para que te lleves el equipo completo y no vuelvas."*
 
-**FORMATO FINAL OBLIGATORIO (TEXTO OCULTO PARA WHATSAPP):**
-Solo cuando el cliente confirma compra y da sus datos, cierra con este bloque exacto.
-IMPORTANTE: Para facilitar la facturación al vendedor, debes incluir el **CÓDIGO (ID/SKU)** de cada producto extraído de la tabla CSV.
+4.  **DATOS PARA WHATSAPP:**
+    * Una vez que el cliente "muerda" el anzuelo de la bonificación o el envío, pide Nombre y Teléfono para formalizar.
+
+FORMATO FINAL (OCULTO PARA EL BOTÓN):
+Solo genera esto al confirmar la venta. INCLUYE LOS CÓDIGOS (SKU) DEL CSV.
 
 [TEXTO_WHATSAPP]:
-Hola, soy {{Nombre}}. Quiero reservar:
-- (COD: [Insertar Codigo CSV]) [Producto] x [Cantidad] 
-- (COD: [Insertar Codigo CSV]) [Producto] x [Cantidad]
-Total Aprox: $[Total con IVA]
-Datos Cliente:
-- DNI/CUIT: {{DNI}}
-- Tel: {{Teléfono}}
+Hola Equipo Bravin, soy {{Nombre}}.
+Pedido Web (Precio Bonificado):
+- (COD: [SKU]) [Producto] x [Cant]
+- (COD: [SKU]) [Producto] x [Cant]
+Total Final (Con Bonificación): $[Monto]
+Logística:
+- Localidad: {{Localidad}}
 - Entrega: {{Retiro/Envío}}
-
-(No muestres códigos en el chat visible, solo en el bloque [TEXTO_WHATSAPP]).
+Datos: {{DNI}} - {{Teléfono}}
 """
 
-# --- 5. GESTIÓN DE SESIÓN ---
+# --- 5. LÓGICA DE SESIÓN ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hola, buenas tardes. Soy Lucho. ¿Qué proyecto tenés hoy?"}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hola, soy Lucho de **Pedro Bravin S.A.** 🏗️\n\nPasame qué materiales necesitás y te calculo el mejor precio con la bonificación actual."}]
 
 if "chat_session" not in st.session_state:
     try:
-        # Mantenemos Gemini 2.5 Pro como solicitaste
+        # Usamos Gemini 2.5 Pro (o 1.5 Pro si 2.5 no está disponible en tu cuenta)
         model = genai.GenerativeModel('gemini-2.5-pro', system_instruction=sys_prompt)
-        
         initial_history = []
         if len(st.session_state.messages) > 1:
             for m in st.session_state.messages[1:]: 
                 api_role = "model" if m["role"] == "assistant" else "user"
                 initial_history.append({"role": api_role, "parts": [{"text": m["content"]}]})
-            
         st.session_state.chat_session = model.start_chat(history=initial_history)
-        
-    except Exception as e:
-        st.error(f"❌ Error al inicializar el modelo/chat: {e}")
+    except:
+        st.error("Conexión inestable. Recarga la página.")
 
-# --- 6. INTERFAZ GRÁFICA ---
-st.title("🏗️ Hablá con Lucho")
-st.markdown("**Atención Comercial | Pedro Bravin**")
-
-# Historial
+# --- 6. INTERFAZ ---
 for msg in st.session_state.messages:
-    avatar = "🧑‍💼" if msg["role"] == "assistant" else "user"
+    avatar = "🧑‍💼" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-# Sugerencias visuales
-if len(st.session_state.messages) == 1:
-    st.info("💡 **Tips:** Cotizá 'Techo de chapa 8x4', 'Perfiles C' o 'Malla Romboidal'.")
-
-# --- 7. LÓGICA DE PROCESAMIENTO ---
 if prompt := st.chat_input("Escribe tu consulta..."):
-    
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").markdown(prompt)
 
     try:
         chat = st.session_state.chat_session
-        
         with st.chat_message("assistant", avatar="🧑‍💼"):
-            with st.spinner("Lucho está calculando..."):
+            with st.spinner("Aplicando bonificaciones..."):
                 response = chat.send_message(prompt)
                 full_text = response.text
                 
-                # PARSEO DEL LINK WHATSAPP
                 WHATSAPP_TAG = "[TEXTO_WHATSAPP]:"
-                
                 if WHATSAPP_TAG in full_text:
-                    dialogue_part, whatsapp_part = full_text.split(WHATSAPP_TAG, 1)
+                    dialogue, wa_part = full_text.split(WHATSAPP_TAG, 1)
+                    st.markdown(dialogue.strip())
                     
-                    st.markdown(dialogue_part.strip())
+                    wa_encoded = urllib.parse.quote(wa_part.strip())
+                    wa_url = f"https://wa.me/5493401648118?text={wa_encoded}"
                     
-                    # Generar Link
-                    clean_wa_text = whatsapp_part.strip()
-                    encoded_text = urllib.parse.quote(clean_wa_text)
-                    whatsapp_url = f"https://wa.me/5493401648118?text={encoded_text}"
-                    
-                    # Botón de Cierre
                     st.markdown(f"""
                     <br>
-                    <a href="{whatsapp_url}" target="_blank" style="
-                        display: block; width: 100%; background-color: #25D366; color: white;
-                        text-align: center; padding: 12px; border-radius: 8px;
-                        text-decoration: none; font-weight: bold; font-family: sans-serif; font-size: 1.1em;
+                    <a href="{wa_url}" target="_blank" style="
+                        display: block; width: 100%; 
+                        background-color: #25D366; 
+                        color: white;
+                        text-align: center; 
+                        padding: 14px; 
+                        border-radius: 8px;
+                        text-decoration: none; 
+                        font-weight: bold; 
+                        font-family: Arial, sans-serif;
+                        font-size: 16px;
                         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                    ">
-                    👉 CONFIRMAR PEDIDO EN WHATSAPP
-                    </a>
+                    ">👉 CONFIRMAR PRECIO BONIFICADO</a>
                     """, unsafe_allow_html=True)
                     
-                    history_content = dialogue_part.strip() + f"\n\n[👉 Pedido listo para enviar]({whatsapp_url})"
+                    st.session_state.messages.append({"role": "assistant", "content": dialogue.strip() + f"\n\n[👉 Confirmar Precio]({wa_url})"})
                 else:
                     st.markdown(full_text)
-                    history_content = full_text
-                
-                st.session_state.messages.append({"role": "assistant", "content": history_content})
-
+                    st.session_state.messages.append({"role": "assistant", "content": full_text})
     except Exception as e:
-        st.error(f"Error de comunicación: {e}")
+        st.error(f"Error: {e}")
