@@ -6,6 +6,7 @@ import urllib.parse
 # --- 1. CONFIGURACIÓN VISUAL ---
 st.set_page_config(page_title="Cotizador Online", page_icon="🏗️", layout="wide")
 
+# Estilos para ocultar marcas de agua de Streamlit y ajustar el chat
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
@@ -43,7 +44,7 @@ if raw_data is not None:
 else:
     csv_context = "ERROR: No se pudo cargar la lista de precios. Cotizar manual."
 
-# --- 4. CEREBRO DE VENTAS (MODO ESTABLE 1.5 PRO) ---
+# --- 4. CEREBRO DE VENTAS (PERFIL EJECUTIVO + LÓGICA DE PRECIOS) ---
 sys_prompt = f"""
 ROL: Eres Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**
 TONO: **PROFESIONAL, TÉCNICO Y CONCISO.** (CERO vulgaridad. No uses 'maestro', 'genio'. Sé breve y directo).
@@ -84,7 +85,7 @@ if "messages" not in st.session_state:
 
 if "chat_session" not in st.session_state:
     try:
-        # CORRECCIÓN CRÍTICA: Usamos 'gemini-1.5-pro' que es estable y potente.
+        # CORRECCIÓN CRÍTICA: Usamos 'gemini-1.5-pro' para evitar el crash en Streamlit Cloud
         model = genai.GenerativeModel('gemini-1.5-pro', system_instruction=sys_prompt)
         
         initial_history = []
