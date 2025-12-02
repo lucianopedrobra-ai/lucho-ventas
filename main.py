@@ -3,9 +3,9 @@ import pandas as pd
 import google.generativeai as genai
 import urllib.parse
 
+# --- 1. CONFIGURACIÓN VISUAL ---
 st.set_page_config(page_title="Cotizador Online", page_icon="🏗️", layout="wide")
 
-# CSS para limpiar la interfaz dentro del Iframe
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
@@ -16,13 +16,15 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# --- 2. AUTENTICACIÓN ---
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
 except Exception:
-    st.error("⚠️ Error de conexión.")
+    st.error("⚠️ Error de conexión. Verifique la API Key.")
     st.stop()
 
+# --- 3. CARGA DE DATOS ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
 @st.cache_data(ttl=600)
@@ -35,30 +37,39 @@ def load_data():
         return None
 
 raw_data = load_data()
-csv_context = raw_data.to_string(index=False) if raw_data is not None else "ERROR: Sin lista."
+if raw_data is not None:
+    csv_context = raw_data.to_string(index=False)
+else:
+    csv_context = "ERROR: No se pudo cargar la lista de precios."
 
-# --- CEREBRO GEMINI 2.5 ---
+# --- 4. CEREBRO DE VENTAS (MODO GEMINI 2.5 PRO) ---
 sys_prompt = f"""
 ROL: Eres Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**
 TONO: **PROFESIONAL, TÉCNICO Y CONCISO.**
 
-BASE DE DATOS:
+BASE DE DATOS (PRECIOS NETOS):
+------------------------------------------------------------
 {csv_context}
+------------------------------------------------------------
 
-TRADUCTOR TÉCNICO:
+🧠 **TRADUCTOR TÉCNICO:**
 * "GAS" = EPOXI / REVESTIDO.
 * "AGUA" = GALVANIZADO / HIDRO3.
 * "TECHO" = CHAPA / T-101 / SINUSOIDAL.
 
-POLÍTICA DE PRECIOS (5-12-18%):
-Base: (Precio CSV x 1.21).
-1. NIVEL 1 (5%): Estándar.
-2. NIVEL 2 (12%): Obra.
-3. NIVEL 3 (18%): Acopio.
+🔥 **POLÍTICA DE PRECIOS (ESCALA 5-12-18%):**
+Base: (Precio CSV x 1.21). Sobre eso aplica:
+1.  **NIVEL 1 (5% OFF):** Consultas estándar.
+2.  **NIVEL 2 (12% OFF):** Obras/Proyectos (>10 un).
+3.  **NIVEL 3 (18% OFF):** Acopio/Mayorista.
 
-FORMATO FINAL (SOLO AL CONFIRMAR):
+⚠️ **REGLAS DE VENTA:**
+1.  **PRECIO:** Siempre presenta el precio final como "Con Bonificación Web Aplicada".
+2.  **LOGÍSTICA:** Obligatorio preguntar: "¿Localidad de entrega?".
+
+**FORMATO FINAL (SOLO AL CONFIRMAR):**
 [TEXTO_WHATSAPP]:
-Hola Equipo Bravin, soy {{Nombre}}.
+Hola Martín / Equipo Bravin, soy {{Nombre}}.
 Pedido Web (Bonif. [5%/12%/18%]):
 - (COD: [SKU]) [Producto] x [Cant]
 Total Final: $[Monto]
@@ -66,27 +77,31 @@ Logística: {{Localidad}} - {{Retiro/Envío}}
 Datos: {{DNI}} - {{Teléfono}}
 """
 
+# --- 5. SESIÓN Y MODELO ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hola. Soy Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**\n\nIndícame material y medidas para cotizar."}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hola. Soy Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**\n\nIndícame material, medidas y cantidades para cotizar."}]
 
 if "chat_session" not in st.session_state:
     try:
-        # MODELO 2.5 PRO (COMO PEDISTE)
+        # MODELO: gemini-2.5-pro (Si falla, cambiar a gemini-1.5-pro o gemini-2.0-flash-exp)
         model = genai.GenerativeModel('gemini-2.5-pro', system_instruction=sys_prompt)
+        
         initial_history = []
         if len(st.session_state.messages) > 1:
             for m in st.session_state.messages[1:]: 
                 api_role = "model" if m["role"] == "assistant" else "user"
                 initial_history.append({"role": api_role, "parts": [{"text": m["content"]}]})
+        
         st.session_state.chat_session = model.start_chat(history=initial_history)
     except Exception as e:
-        st.error(f"Error: {e}")
+        st.error(f"Error al iniciar el modelo: {e}")
 
+# --- 6. INTERFAZ ---
 for msg in st.session_state.messages:
     avatar = "🧑‍💼" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-if prompt := st.chat_input("Escribe tu consulta..."):
+if prompt := st.chat_input("Ej: 5 caños de gas 1 pulgada..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").markdown(prompt)
 
@@ -96,16 +111,30 @@ if prompt := st.chat_input("Escribe tu consulta..."):
             with st.spinner("Cotizando..."):
                 response = chat.send_message(prompt)
                 full_text = response.text
-                if "[TEXTO_WHATSAPP]:" in full_text:
-                    dialogue, wa_part = full_text.split("[TEXTO_WHATSAPP]:", 1)
+                
+                WHATSAPP_TAG = "[TEXTO_WHATSAPP]:"
+                if WHATSAPP_TAG in full_text:
+                    dialogue, wa_part = full_text.split(WHATSAPP_TAG, 1)
                     st.markdown(dialogue.strip())
-                    wa_url = f"https://wa.me/5493401648118?text={urllib.parse.quote(wa_part.strip())}"
-                    st.markdown(f"""<br><a href="{wa_url}" target="_blank" style="display: block; width: 100%; background-color: #25D366; color: white; text-align: center; padding: 14px; border-radius: 8px; text-decoration: none; font-weight: bold; font-family: Arial, sans-serif;">👉 CONFIRMAR PEDIDO</a>""", unsafe_allow_html=True)
-                    st.session_state.messages.append({"role": "assistant", "content": dialogue.strip() + f"\n\n[👉 Confirmar]({wa_url})"})
+                    
+                    wa_encoded = urllib.parse.quote(wa_part.strip())
+                    
+                    # --- CAMBIO REALIZADO AQUÍ: NÚMERO DE MARTÍN ---
+                    wa_url = f"https://wa.me/5493401527780?text={wa_encoded}"
+                    
+                    st.markdown(f"""
+                    <br>
+                    <a href="{wa_url}" target="_blank" style="
+                        display: block; width: 100%; 
+                        background-color: #25D366; color: white;
+                        text-align: center; padding: 14px; border-radius: 8px;
+                        text-decoration: none; font-weight: bold; font-family: Arial, sans-serif;
+                    ">👉 CONFIRMAR PEDIDO (Enviar a Martín)</a>
+                    """, unsafe_allow_html=True)
+                    
+                    st.session_state.messages.append({"role": "assistant", "content": dialogue.strip() + f"\n\n[👉 Confirmar Pedido]({wa_url})"})
                 else:
                     st.markdown(full_text)
                     st.session_state.messages.append({"role": "assistant", "content": full_text})
-    except Exception as e:
-        st.error(f"Error: {e}")
     except Exception as e:
         st.error(f"Error: {e}")
