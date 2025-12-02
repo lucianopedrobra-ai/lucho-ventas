@@ -30,7 +30,7 @@ SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkp
 @st.cache_data(ttl=600)
 def load_data():
     try:
-        # Leemos todo como string para proteger códigos y evitar formateo automático
+        # Leemos todo como string para proteger la data cruda
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip', dtype=str)
         df = df.dropna(how='all', axis=1)
         df = df.fillna("")
@@ -40,7 +40,6 @@ def load_data():
 
 raw_data = load_data()
 
-# Contexto de Precios
 if raw_data is not None and not raw_data.empty:
     try:
         csv_context = raw_data.to_markdown(index=False)
@@ -49,55 +48,50 @@ if raw_data is not None and not raw_data.empty:
 else:
     csv_context = "ERROR: LISTA VACÍA."
 
-# --- 4. CEREBRO DE VENTAS (CON REGLA DE M2 PARA TECHOS) ---
+# --- 4. CEREBRO DE VENTAS (MODO CIERRE) ---
 sys_prompt = f"""
-ROL: Eres Lucho, Ejecutivo Comercial Técnico de **Pedro Bravin S.A.**
-TONO: **PROFESIONAL, TÉCNICO Y CONCISO.**
+ROL: Eres Lucho, el Mejor Vendedor de **Pedro Bravin S.A.**
+TU OBJETIVO ÚNICO: **QUE EL CLIENTE HAGA CLIC EN EL BOTÓN DE WHATSAPP**.
+ACTITUD: Proactiva, Ejecutiva, Resolutiva. No dudes. Cotiza y cierra.
 
-BASE DE DATOS (STOCK Y PRECIOS NETOS):
+BASE DE DATOS (PRECIOS NETOS):
 ------------------------------------------------------------
 {csv_context}
 ------------------------------------------------------------
 
-🏠 **REGLA TÉCNICA: CHAPAS DE TECHO (POR M2 vs LINEAL):**
-El precio de lista suele ser por METRO LINEAL.
-Si el cliente pide **METROS CUADRADOS (m2)** y no da medidas de corte:
-1.  **Conversión:** Asume que **1 m2 = 1 Metro Lineal** (Ancho útil estandar 1m).
-2.  **SELECCIÓN DE CÓDIGO (IMPORTANTE):**
-    * Si pide **CINCALUM ACANALADA** (Común): Usa el precio del **CÓDIGO 4**.
-    * Si pide **CINCALUM T-101** (Trapezoidal): Usa el precio del **CÓDIGO 6**.
-    * Si pide **COLOR**: Busca el precio por metro del color en lista.
+⚡ **PROTOCOLOS DE ACCIÓN RÁPIDA:**
 
-📏 **REGLA DE LARGOS (PERFILES):**
-1.  **6.40m:** Epoxi, Galvanizado, Schedule, Mecánico.
-2.  **6.00m:** Ángulos, Planchuelas, Hierros, Estructurales.
-*(Cálculo de precio hierros: Precio Kg x Peso x Largo x 1.21)*.
+1.  **INTERPRETACIÓN INTELIGENTE (NO PREGUNTES OBVIEDADES):**
+    * Si piden "Gas" -> Cotiza **Epoxi**.
+    * Si piden "Techo" -> Cotiza **Chapa Cincalum + Perfil C**.
+    * Si piden "Cerrar lote" -> Cotiza **Tejido Romboidal**.
+    * **Medidas:**
+        * Caños (Gas/Agua/Mecánico): Tiras de **6.40m**.
+        * Perfiles/Hierros: Tiras de **6.00m**.
+        * Tejidos: Vende por **ROLLO**. (Si piden 40m, ofrece 4 rollos de 10m Eco o 3 de 15m Acindar).
 
-💰 **POLÍTICA DE PRECIOS ($$$):**
-**BASE:** (Precio CSV x 1.21).
+2.  **MOTOR DE PRECIOS (MATEMÁTICA INTERNA):**
+    * **Paso A:** Busca el precio en lista. Si está en Kg, pásalo a UNIDAD (Barra/Rollo) multiplicando por el peso/largo.
+    * **Paso B:** Súmale IVA (**x 1.21**).
+    * **Paso C (DESCUENTO):** Aplica la bonificación según el total:
+        * **REGLA ORO (Chapa/Hierro):** >$300k = **15% OFF**.
+        * **ESCALA COMÚN:** <$100k (0%), $100k-$500k (5%), $500k-$1M (8%), $1M-$2M (12%), $2M-$3M (15%), >$3M (18%).
 
-**A. REGLA COMPETITIVA (CHAPA Y HIERRO):**
-* > $300.000: **15% OFF DIRECTO**.
-* > $3.000.000: **18% OFF**.
+3.  **EL CIERRE (TU PRIORIDAD):**
+    * Una vez que das el precio, **NO TE QUEDES CALLADO**.
+    * Genera el link de WhatsApp INMEDIATAMENTE.
+    * **Argumento:** *"El precio de lista es $X, pero con la **Bonificación Web** te queda en **$Y Final**. ¿Para qué localidad es? Te preparo el pedido ya."*
 
-**B. ESCALA GENERAL (RESTO):**
-1. < $100k: **0%**.
-2. $100k - $500k: **5%**.
-3. $500k - $1M: **8%**.
-4. $1M - $2M: **12%**.
-5. $2M - $3M: **15%**.
-6. > $3M: **18%**.
+💳 **INFO DE PAGO:**
+* Precio es **CONTADO/TRANSFERENCIA**.
+* Tarjeta: *"Tiene recargo, pero aprovechá la PROMO MIÉRCOLES Y SÁBADOS."*
 
-💳 **FINANCIACIÓN:**
-* Precios con descuento son **CONTADO/TRANSFERENCIA**.
-* **Tarjeta:** Tiene recargo. *"¡Promo BOMBA Miércoles y Sábados disponible!"*.
-
-**FORMATO FINAL (SOLO AL CONFIRMAR):**
+**FORMATO FINAL OBLIGATORIO (GENERA ESTO SIEMPRE QUE COTICES):**
 [TEXTO_WHATSAPP]:
 Hola Martín / Equipo Bravin, soy {{Nombre}}.
 Pedido Web (Bonif. Aplicada):
-- (COD: [SKU]) [Producto] x [Cant/Metros]
-Total Contado/Transf: $[Monto Final]
+- (COD: [SKU]) [Producto] x [Cant]
+Total Contado/Transf: $[Monto]
 *Consulta Tarjeta/Promo: [SI/NO]*
 Logística: {{Localidad}} - {{Retiro/Envío}}
 Datos: {{DNI}} - {{Teléfono}}
@@ -105,12 +99,12 @@ Datos: {{DNI}} - {{Teléfono}}
 
 # --- 5. SESIÓN Y MODELO ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hola. Soy Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**\n\n¿Qué materiales necesitás cotizar hoy?"}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hola. Soy Lucho de **Pedro Bravin S.A.** 🏗️\n\nPasame tu lista de materiales y te armo la cotización con descuento ahora mismo."}]
 
 if "chat_session" not in st.session_state:
     try:
-        # MODELO: gemini-2.0-flash (Inteligente y Rápido)
-        # Si da error, volver a gemini-1.5-pro
+        # MODELO: gemini-2.0-flash (Velocidad + Razonamiento)
+        # Si prefieres más "cerebro" y menos velocidad, cambia a 'gemini-1.5-pro'
         model = genai.GenerativeModel('gemini-2.0-flash', system_instruction=sys_prompt)
         
         initial_history = []
@@ -128,14 +122,14 @@ for msg in st.session_state.messages:
     avatar = "🧑‍💼" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-if prompt := st.chat_input("Ej: 100 m2 de chapa acanalada cincalum..."):
+if prompt := st.chat_input("Ej: 5 caños de gas 1 pulgada..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").markdown(prompt)
 
     try:
         chat = st.session_state.chat_session
         with st.chat_message("assistant", avatar="🧑‍💼"):
-            with st.spinner("Calculando m2 y descuentos..."):
+            with st.spinner("Cotizando y aplicando descuentos..."):
                 response = chat.send_message(prompt)
                 full_text = response.text
                 
@@ -146,9 +140,10 @@ if prompt := st.chat_input("Ej: 100 m2 de chapa acanalada cincalum..."):
                     
                     wa_encoded = urllib.parse.quote(wa_part.strip())
                     
-                    # DESTINO: MARTÍN
+                    # DESTINO: MARTÍN (3401 52-7780)
                     wa_url = f"https://wa.me/5493401527780?text={wa_encoded}"
                     
+                    # BOTÓN DE CIERRE AGRESIVO
                     st.markdown(f"""
                     <br>
                     <a href="{wa_url}" target="_blank" style="
@@ -156,7 +151,12 @@ if prompt := st.chat_input("Ej: 100 m2 de chapa acanalada cincalum..."):
                         background-color: #25D366; color: white;
                         text-align: center; padding: 14px; border-radius: 8px;
                         text-decoration: none; font-weight: bold; font-family: Arial, sans-serif;
-                    ">👉 CONFIRMAR PEDIDO (A Martín)</a>
+                        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+                        font-size: 1.1em;
+                    ">👉 CONFIRMAR PEDIDO (Enviar a Martín)</a>
+                    <div style="text-align:center; font-size:0.8em; color:gray; margin-top:5px;">
+                        Hacé clic para reservar el stock y congelar el precio.
+                    </div>
                     """, unsafe_allow_html=True)
                     
                     st.session_state.messages.append({"role": "assistant", "content": dialogue.strip() + f"\n\n[👉 Confirmar Pedido]({wa_url})"})
