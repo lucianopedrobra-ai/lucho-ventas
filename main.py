@@ -3,10 +3,9 @@ import pandas as pd
 import google.generativeai as genai
 import urllib.parse
 
-# --- 1. CONFIGURACIÓN VISUAL (MARCA BLANCA) ---
+# --- 1. CONFIGURACIÓN VISUAL ---
 st.set_page_config(page_title="Cotizador Online", page_icon="🏗️", layout="wide")
 
-# CSS para ocultar marcas de Streamlit y dar look profesional
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
@@ -21,147 +20,125 @@ st.markdown("""
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
-except KeyError:
-    st.error("🚨 Error: Falta la API Key en los Secrets.")
-    st.stop()
-except Exception as e:
-    st.error(f"🚨 Error de configuración: {e}")
+except Exception:
+    st.error("⚠️ Iniciando sistema...")
     st.stop()
 
-# --- 3. CARGA DE DATOS (SIN FILTROS - CONTEXTO TOTAL) ---
+# --- 3. DATOS ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
 @st.cache_data(ttl=600)
 def load_data():
     try:
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip')
-        df = df.dropna(how='all', axis=1) # Limpieza básica
+        df = df.dropna(how='all', axis=1)
         return df 
     except Exception:
         return None
 
 raw_data = load_data()
-
-# Aquí está la clave: NO filtramos. Convertimos TODO el Excel a texto para la IA.
-if isinstance(raw_data, pd.DataFrame):
+if raw_data is not None:
     csv_context = raw_data.to_string(index=False)
 else:
-    csv_context = "ERROR: No se pudo cargar la lista de precios."
-    st.warning("⚠️ El sistema funciona en modo manual (sin precios).")
+    csv_context = "ERROR: Stock no disponible."
 
-# --- 4. CEREBRO COMERCIAL (PROMPT V95 + BONIFICACIÓN) ---
+# --- 4. CEREBRO DE VENTAS (ESCALA DE BONIFICACIONES 5% - 12% - 18%) ---
 sys_prompt = f"""
-ROL: Eres Lucho, Ejecutivo Comercial Senior de **Pedro Bravin S.A.**
-TONO: Profesional, Expeditivo, Astuto.
-OBJETIVO: Cerrar la venta obteniendo el clic en WhatsApp.
+ROL: Eres Lucho, Cotizador Oficial de **Pedro Bravin S.A.**
+TONO: Vendedor astuto. Tu objetivo es subir el volumen de venta usando los descuentos como "zanahoria".
 
-BASE DE DATOS (CATÁLOGO COMPLETO):
+BASE DE DATOS (PRECIOS NETOS DE LISTA):
 ------------------------------------------------------------
 {csv_context}
 ------------------------------------------------------------
 
-REGLAS DE NEGOCIO OBLIGATORIAS:
+🔥 **POLÍTICA DE BONIFICACIONES DINÁMICAS (TU ESTRATEGIA):**
+No des el 18% de entrada. Úsalo para cerrar ventas grandes.
+El precio base es: **(Precio CSV x 1.21)**. Sobre eso aplicas:
 
-1.  **MATEMÁTICA DEL PRECIO (LA BONIFICACIÓN):**
-    * Los precios del CSV son NETOS.
-    * **Cálculo Real:** Precio CSV x 1.21.
-    * **Narrativa:** NO des el precio "seco". Presentalo así: *"El precio de lista es más alto, pero te aplico la **Bonificación Web** y te queda en $[Precio Calculado] final."*
+1.  **NIVEL 1: "Promo Web" (5% OFF)**
+    * **Cuándo:** Consultas chicas, precios unitarios, pocas unidades.
+    * **Cálculo:** (Total Base) x 0.95.
+    * **Argumento:** "Por consultar vía web tenés un 5% de atención."
 
-2.  **LOGÍSTICA (EL CIERRE):**
-    * Nunca termines una cotización sin resolver la entrega.
-    * Pregunta: *"¿Para qué localidad es? Así veo si te puedo bonificar el envío con el reparto de la zona."*
+2.  **NIVEL 2: "Pack Obra" (12% OFF)**
+    * **Cuándo:** Si piden un **PROYECTO COMPLETO** (ej: Techo con aislante y tornillos, Cerco con postes, o Cantidad > 10).
+    * **Cálculo:** (Total Base) x 0.88.
+    * **Argumento:** "Como estás llevando el kit completo/cantidad, te paso a la lista de 'Obra' con un 12% de descuento."
 
-3.  **CROSS-SELLING (FERRETERÍA):**
-    * Como tienes toda la lista, ofrece complementos lógicos.
-    * Si llevan Perfiles -> Ofrece Discos y Electrodos.
-    * Si llevan Techo -> Ofrece Aislante y Tornillos.
+3.  **NIVEL 3: "Acopio/Mayorista" (18% OFF)**
+    * **Cuándo:** Si mencionan "Acopio", compras muy grandes, o si piden mejorar el precio del Nivel 2.
+    * **Cálculo:** (Total Base) x 0.82.
+    * **Argumento:** "Mirá, si cerramos la operación completa ahora, te activo el descuento máximo de Acopio del 18%."
 
-4.  **FORMATO DE SALIDA (WHATSAPP):**
-    * Solo cuando el cliente confirme, genera el bloque oculto.
-    * **IMPORTANTE:** Incluye el CÓDIGO (SKU) que figura en el CSV para facilitar la facturación.
+⚠️ **REGLA DE ORO:** Siempre muestra el PRECIO FINAL con el descuento ya aplicado.
 
+**LOGÍSTICA:**
+Siempre pregunta: *"¿Para qué localidad es?"* para coordinar retiro o envío.
+
+**FORMATO FINAL (SOLO AL CONFIRMAR):**
 [TEXTO_WHATSAPP]:
 Hola Equipo Bravin, soy {{Nombre}}.
-Pedido Web (Bonificado):
+Pedido Web (Bonif. Aplicada: [5% / 12% / 18%]):
 - (COD: [SKU]) [Producto] x [Cant]
-Total Final: $[Monto]
+Total Final: $[Monto calculado]
 Logística: {{Localidad}} - {{Retiro/Envío}}
 Datos: {{DNI}} - {{Teléfono}}
 """
 
-# --- 5. INICIALIZACIÓN DE SESIÓN ---
+# --- 5. LÓGICA DE SESIÓN ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hola, soy Lucho de **Pedro Bravin**. 🏗️\n\n¿Qué materiales estás buscando hoy? Te calculo el mejor precio."}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hola, soy Lucho de **Pedro Bravin S.A.** 🏗️\n\nContame qué estás buscando. Si armamos un pedido completo tengo descuentos fuertes por volumen."}]
 
 if "chat_session" not in st.session_state:
     try:
-        # Usamos el modelo solicitado. Si da error 404 es porque tu cuenta no tiene acceso a la beta 2.5 aún.
-        # Si falla, cámbialo a 'gemini-1.5-pro' que es igual de potente.
         model = genai.GenerativeModel('gemini-2.5-pro', system_instruction=sys_prompt)
-        
         initial_history = []
         if len(st.session_state.messages) > 1:
             for m in st.session_state.messages[1:]: 
                 api_role = "model" if m["role"] == "assistant" else "user"
                 initial_history.append({"role": api_role, "parts": [{"text": m["content"]}]})
-            
         st.session_state.chat_session = model.start_chat(history=initial_history)
-        
-    except Exception as e:
-        st.error(f"Error al iniciar Lucho: {e}")
+    except:
+        st.error("Reconectando...")
 
-# --- 6. INTERFAZ GRÁFICA ---
-# Renderizar chat previo
+# --- 6. INTERFAZ ---
 for msg in st.session_state.messages:
     avatar = "🧑‍💼" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-# --- 7. PROCESAMIENTO ---
-if prompt := st.chat_input("Escribe tu consulta..."):
-    # Guardar input usuario
+if prompt := st.chat_input("Ej: Necesito 10 chapas cincalum de 4 metros..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").markdown(prompt)
 
     try:
         chat = st.session_state.chat_session
-        
         with st.chat_message("assistant", avatar="🧑‍💼"):
-            with st.spinner("Consultando stock y bonificaciones..."):
-                # Enviamos el prompt directo. La IA ya tiene el CSV en su memoria (system_instruction)
+            with st.spinner("Analizando volumen y descuentos..."):
                 response = chat.send_message(prompt)
                 full_text = response.text
                 
-                # Detectar Bloque WhatsApp
                 WHATSAPP_TAG = "[TEXTO_WHATSAPP]:"
-                
                 if WHATSAPP_TAG in full_text:
-                    dialogue_part, whatsapp_part = full_text.split(WHATSAPP_TAG, 1)
+                    dialogue, wa_part = full_text.split(WHATSAPP_TAG, 1)
+                    st.markdown(dialogue.strip())
                     
-                    # Mostrar respuesta verbal
-                    st.markdown(dialogue_part.strip())
-                    
-                    # Crear Link
-                    wa_encoded = urllib.parse.quote(whatsapp_part.strip())
+                    wa_encoded = urllib.parse.quote(wa_part.strip())
                     wa_url = f"https://wa.me/5493401648118?text={wa_encoded}"
                     
-                    # Botón CTA Profesional
                     st.markdown(f"""
                     <br>
                     <a href="{wa_url}" target="_blank" style="
                         display: block; width: 100%; 
                         background-color: #25D366; color: white;
-                        text-align: center; padding: 12px; border-radius: 8px;
-                        text-decoration: none; font-weight: bold; font-family: sans-serif;
-                        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                    ">👉 CONFIRMAR PEDIDO BONIFICADO</a>
+                        text-align: center; padding: 14px; border-radius: 8px;
+                        text-decoration: none; font-weight: bold; font-family: Arial, sans-serif;
+                    ">👉 CONFIRMAR CON DESCUENTO</a>
                     """, unsafe_allow_html=True)
                     
-                    # Guardar en historial
-                    st.session_state.messages.append({"role": "assistant", "content": dialogue_part.strip() + f"\n\n[👉 Confirmar Pedido]({wa_url})"})
+                    st.session_state.messages.append({"role": "assistant", "content": dialogue.strip() + f"\n\n[👉 Confirmar]({wa_url})"})
                 else:
-                    # Respuesta normal
                     st.markdown(full_text)
                     st.session_state.messages.append({"role": "assistant", "content": full_text})
-
     except Exception as e:
-        st.error(f"Error de comunicación: {e}")
+        st.error(f"Error: {e}")
