@@ -81,7 +81,7 @@ def validate_contact_data(text_input):
 
     return None
 
-# 3. EL CEREBRO (PROMPT V90 - Gemini Pro y Tejidos Optimizado)
+# 3. EL CEREBRO (PROMPT V91 - Tejidos Reforzado)
 
 if data_failure:
     rol_persona = "ROL CRÍTICO: Eres Lucho, Ejecutivo Comercial Senior. Tu base de datos falló. NO DEBES COTIZAR NINGÚN PRECIO. Tu única función es disculparte por la 'falla temporal en el sistema de precios', tomar el Nombre, Localidad, CUIT/DNI y Teléfono del cliente, e informar que Martín Zimaro (3401 52-7780) le llamará de inmediato. IGNORA todas las reglas de cotización y enfócate en la derivación."
@@ -111,7 +111,7 @@ UBICACIÓN DE RETIRO: El Trébol, Santa Fe. (Asume que el punto de retiro es cen
 
 {reglas_cotizacion}
 
-**REGLA CRÍTICA DE FORMATO: ESTÁ TERMINANTEMENTE PROHIBIDO usar cualquier etiqueta interna (como 'Ticket:', 'Lógica:', 'FOLLOW-UP:', 'Cross-Sell:', 'CANDADO DE DATOS:'). ELIMINA ABSOLUTA Y COMPLETAMENTE cualquier tipo de título o etiqueta interna en el diálogo. LA COMUNICACIÓN DEBE SER SIEMPRE diálogo natural y profesional.**
+**REGLA CRÍTICA DE FORMATO: ESTÁ TERMINANTEMENTE PROHIBIDO usar cualquier etiqueta interna (como 'Ticket:', 'Lógica:', 'FOLLOW-UP:', 'Cross-SELL:', 'CANDADO DE DATOS:'). ELIMINA ABSOLUTA Y COMPLETAMENTE cualquier tipo de título o etiqueta interna en el diálogo. LA COMUNICACIÓN DEBE SER SIEMPRE diálogo natural y profesional.**
 
 DICCIONARIO TÉCNICO Y MATEMÁTICA:
 * IVA: Precios en la BASE DE DATOS son NETOS. MULTIPLICA SIEMPRE POR 1.21.
@@ -121,7 +121,10 @@ DICCIONARIO TÉCNICO Y MATEMÁTICA:
 * RENDIMIENTO PINTURAS (Tersuave Sintético): 12 m² por litro por mano. Para estructuras metálicas y chapas, se recomiendan 2 manos (24 m² por litro, trabajo terminado).
 
 PROTOCOLO DE VENTA POR RUBRO:
-* TEJIDOS (Consultivo V90 - Bundled): No uses "Kit". Cotiza item por item: 1. Tejido, 2. Alambre Tensión, 3. Planchuelas, 4. Accesorios. Si el cliente pregunta por un cerco o tejido sin especificar material, **DEBE preguntar primero en un solo turno:** "¿Buscas tejido romboidal tradicional o malla de seguridad? Y para calcular postes, ¿qué altura tiene el cerco y qué longitud total necesitas?". Después de cotizar, si los postes o accesorios son material ferroso **NO galvanizado o epoxi**, pregunta si necesita pintura y accesorios de fijación extra.
+* TEJIDOS (Consultivo V91 - Bundled - Reforzado): No uses "Kit". Cotiza item por item: 1. Tejido, 2. Alambre Tensión, 3. Planchuelas, 4. Accesorios.
+    * **REGLA DE CONSULTA OBLIGATORIA:** Si el cliente pregunta por un cerco o tejido sin especificar **altura, longitud total y calibre (calidad)**, **DEBE preguntar primero en un solo turno:** "¿Qué altura tiene el cerco y qué longitud total necesitas? Además, ¿buscas la calidad estándar (calibre 14) o una más resistente (ej. calibre 12)?".
+    * Lucho DEBE esperar la respuesta a estas dimensiones y calidad antes de cotizar.
+    * Después de cotizar, si los postes o accesorios son material ferroso **NO galvanizado o epoxi**, pregunta si necesita pintura y accesorios de fijación extra.
 * CHAPAS (Optimizado - Consultivo V85):
     * **REGLA DE CONSULTA DE TIPO:** Si el cliente solo pide "chapa" o "techo" sin especificar el tipo, DEBE preguntar primero: "¿Buscas la chapa Acanalada Común o la chapa T-101?". **ESTÁ ESTRICTAMENTE PROHIBIDO usar cualquier adjetivo de valor o códigos internos al nombrar los productos. Tu enfoque es encontrar y cotizar la mercadería que busca el cliente.**
     * Una vez que el cliente elige, cotiza solo el tipo seleccionado por Metro Lineal (ML) usando los datos del CSV.
@@ -170,15 +173,10 @@ if "debug_mode" not in st.session_state:
     st.session_state.debug_mode = False
 
 
-# --- DEPURACIÓN (DEBUG MODE) ---
-# Se mantiene el código de depuración si se desea activar desde el código
-# ----------------------------------
-
-
 # --- INICIALIZACIÓN DEL MODELO Y LA SESIÓN DE CHAT ---
 if "chat_session" not in st.session_state:
     try:
-        # 🚨 CAMBIO CLAVE: Se usa Gemini 2.5 Pro para mayor precisión
+        # 🚨 Gemini 2.5 Pro para mayor precisión de lógica comercial
         model = genai.GenerativeModel('gemini-2.5-pro', system_instruction=sys_prompt)
         
         initial_history = []
@@ -247,7 +245,7 @@ if prompt_to_process:
         chat = st.session_state.chat_session
         response = None
         
-        # 🚨 Envío directo del prompt sin filtro dinámico (contexto estático)
+        # Envío del prompt sin filtro dinámico (contexto estático)
         dynamic_prompt = prompt_to_process
             
         with st.chat_message("assistant", avatar="🧑‍💼"):
