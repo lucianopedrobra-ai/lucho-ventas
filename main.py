@@ -25,51 +25,49 @@ except Exception:
     st.error("⚠️ Error de conexión. Verifique la API Key.")
     st.stop()
 
-# --- 3. CARGA DE DATOS (BLINDADA) ---
+# --- 3. CARGA DE DATOS (CONVERTIR A TEXTO LIMPIO) ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
 @st.cache_data(ttl=600)
 def load_data():
     try:
-        # Forzamos la lectura como string para que no se pierdan ceros ni códigos
+        # Leemos todo como texto para evitar errores de formato
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip', dtype=str)
-        df = df.dropna(how='all', axis=1) # Eliminar columnas vacías
-        df = df.fillna("") # Rellenar huecos con vacío para no romper el texto
+        df = df.dropna(how='all', axis=1)
+        df = df.fillna("")
         return df 
     except Exception:
         return None
 
 raw_data = load_data()
 
-# Construcción del Contexto (Formato Texto Plano Claro)
+# Usamos to_markdown si tabulate está instalado, sino to_string simple
 if raw_data is not None and not raw_data.empty:
-    # Convertimos el DataFrame a un formato de lista legible para la IA
-    csv_context = raw_data.to_markdown(index=False)
+    try:
+        csv_context = raw_data.to_markdown(index=False)
+    except ImportError:
+        csv_context = raw_data.to_string(index=False)
 else:
-    csv_context = "ADVERTENCIA: LA LISTA DE PRECIOS ESTÁ VACÍA O NO CARGÓ. NO INVENTES PRECIOS."
+    csv_context = "ADVERTENCIA: LISTA VACÍA."
 
-# --- 4. CEREBRO DE VENTAS (MODO ESTRICTO: SOLO LO QUE HAY) ---
+# --- 4. CEREBRO DE VENTAS (DICCIONARIO AMPLIADO) ---
 sys_prompt = f"""
 ROL: Eres Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**
-OBJETIVO: Vender productos EXCLUSIVAMENTE de nuestro stock.
-
-🛑 **REGLA DE ORO (INSTRUCCIÓN DE SEGURIDAD):**
-Tu conocimiento sobre productos se divide en dos fases:
-1. **EXISTENCIA Y PRECIO:** ÚNICAMENTE puedes sacar esta información de la "LISTA DE STOCK" de abajo. Si el cliente pide algo que NO figura ahí (ej: ladrillos, cemento), di: *"Disculpá, no trabajamos ese material, pero tengo..."* y ofrece una alternativa de la lista. **NO INVENTES PRECIOS NI STOCK.**
-2. **DESCRIPCIÓN TÉCNICA:** Una vez que confirmaste que el producto ESTÁ en la lista, USA tu conocimiento de internet para explicar sus beneficios (ej: si vendes una chapa T101 de la lista, puedes explicar que es resistente al granizo).
+OBJETIVO: Vender productos de nuestro stock.
 
 LISTA DE STOCK Y PRECIOS BASE (TU ÚNICA VERDAD):
 ------------------------------------------------------------
 {csv_context}
 ------------------------------------------------------------
 
-🧠 **TRADUCTOR TÉCNICO (Sinónimos permitidos):**
-* "GAS" = Busca en lista: EPOXI / REVESTIDO.
-* "AGUA" = Busca en lista: GALVANIZADO / HIDRO3.
-* "TECHO" = Busca en lista: CHAPA / T-101 / SINUSOIDAL / CINCALUM.
+🧠 **TRADUCTOR TÉCNICO (INTERPRETA LA INTENCIÓN):**
+El cliente habla informal, tú busca el producto técnico en la lista de arriba:
+* Si piden **"GAS"** -> Busca: EPOXI / REVESTIDO.
+* Si piden **"AGUA"** -> Busca: GALVANIZADO / HIDRO3.
+* Si piden **"TECHO"** -> Busca: CHAPA / T-101 / SINUSOIDAL / CINCALUM.
+* Si piden **"CERRAR TERRENO" / "TAPIAL" / "TEJIDO"** -> Busca: **TEJIDO ROMBOIDAL / ALAMBRE / POSTE / MALLA**.
 
 🔥 **POLÍTICA DE PRECIOS ($$$):**
-(El precio de lista es el del CSV. Tu trabajo es calcular el PRECIO FINAL con IVA y Descuento).
 Cálculo: (Precio CSV x 1.21). Sobre ese total aplica:
 1.  **< $100.000:** 0% OFF (Precio de Lista).
 2.  **$100k - $500k:** 5% OFF.
@@ -79,9 +77,10 @@ Cálculo: (Precio CSV x 1.21). Sobre ese total aplica:
 6.  **> $3M:** 18% OFF.
 
 ⚠️ **REGLAS DE INTERACCIÓN:**
-1.  **PRECIO:** Aclara siempre que es **CONTADO / TRANSFERENCIA**.
-2.  **TARJETAS:** "Con tarjeta aplica recargo financiero. ¡Promo Miércoles y Sábados disponible!".
-3.  **LOGÍSTICA:** Pregunta siempre: "¿Para qué localidad es?".
+1.  **STOCK:** Si el cliente pide algo vago ("cerrar terreno"), NO digas que no tienes el material. OFRECE la solución que sí tienes en lista (Tejido Romboidal).
+2.  **PRECIO:** Aclara siempre que es **CONTADO / TRANSFERENCIA**.
+3.  **TARJETAS:** "Con tarjeta aplica recargo financiero. ¡Promo Miércoles y Sábados disponible!".
+4.  **LOGÍSTICA:** Pregunta siempre: "¿Para qué localidad es?".
 
 **FORMATO FINAL (SOLO AL CONFIRMAR):**
 [TEXTO_WHATSAPP]:
@@ -100,7 +99,7 @@ if "messages" not in st.session_state:
 
 if "chat_session" not in st.session_state:
     try:
-        # Usamos el modelo Flash Lite 2.0 (Rápido y capaz)
+        # MODELO: gemini-2.0-flash-lite-preview-02-05 (El más nuevo y rápido)
         model = genai.GenerativeModel('gemini-2.0-flash-lite-preview-02-05', system_instruction=sys_prompt)
         
         initial_history = []
@@ -110,12 +109,12 @@ if "chat_session" not in st.session_state:
                 initial_history.append({"role": api_role, "parts": [{"text": m["content"]}]})
         
         st.session_state.chat_session = model.start_chat(history=initial_history)
-    except Exception as e:
-        # Fallback de seguridad
+    except Exception:
+        # Fallback silencioso al 1.5 Flash si el 2.0 falla
         try:
             model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=sys_prompt)
             st.session_state.chat_session = model.start_chat(history=initial_history)
-        except:
+        except Exception as e:
             st.error(f"Error de conexión: {e}")
 
 # --- 6. INTERFAZ ---
@@ -123,14 +122,14 @@ for msg in st.session_state.messages:
     avatar = "🧑‍💼" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-if prompt := st.chat_input("Ej: 5 caños de gas 1 pulgada..."):
+if prompt := st.chat_input("Ej: Necesito cerrar un terreno de 10x30..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").markdown(prompt)
 
     try:
         chat = st.session_state.chat_session
         with st.chat_message("assistant", avatar="🧑‍💼"):
-            with st.spinner("Verificando stock en depósito..."):
+            with st.spinner("Buscando productos..."):
                 response = chat.send_message(prompt)
                 full_text = response.text
                 
