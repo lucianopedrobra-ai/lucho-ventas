@@ -25,7 +25,7 @@ except Exception:
     st.error("⚠️ Error de conexión. Verifique la API Key.")
     st.stop()
 
-# --- 3. CARGA DE DATOS (CONVERTIR A TEXTO LIMPIO) ---
+# --- 3. CARGA DE DATOS ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
 @st.cache_data(ttl=600)
@@ -41,7 +41,7 @@ def load_data():
 
 raw_data = load_data()
 
-# Usamos to_markdown si tabulate está instalado, sino to_string simple
+# Preparación del contexto
 if raw_data is not None and not raw_data.empty:
     try:
         csv_context = raw_data.to_markdown(index=False)
@@ -50,25 +50,24 @@ if raw_data is not None and not raw_data.empty:
 else:
     csv_context = "ADVERTENCIA: LISTA VACÍA."
 
-# --- 4. CEREBRO DE VENTAS (DICCIONARIO AMPLIADO) ---
+# --- 4. CEREBRO DE VENTAS (GEMINI 2.5 FLASH LITE) ---
 sys_prompt = f"""
 ROL: Eres Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**
-OBJETIVO: Vender productos de nuestro stock.
+OBJETIVO: Vender productos EXCLUSIVAMENTE de nuestro stock.
 
 LISTA DE STOCK Y PRECIOS BASE (TU ÚNICA VERDAD):
 ------------------------------------------------------------
 {csv_context}
 ------------------------------------------------------------
 
-🧠 **TRADUCTOR TÉCNICO (INTERPRETA LA INTENCIÓN):**
-El cliente habla informal, tú busca el producto técnico en la lista de arriba:
-* Si piden **"GAS"** -> Busca: EPOXI / REVESTIDO.
-* Si piden **"AGUA"** -> Busca: GALVANIZADO / HIDRO3.
-* Si piden **"TECHO"** -> Busca: CHAPA / T-101 / SINUSOIDAL / CINCALUM.
-* Si piden **"CERRAR TERRENO" / "TAPIAL" / "TEJIDO"** -> Busca: **TEJIDO ROMBOIDAL / ALAMBRE / POSTE / MALLA**.
+🧠 **TRADUCTOR TÉCNICO (USA TU LÓGICA):**
+* "Cerrar terreno/lote" -> Ofrece: **TEJIDO ROMBOIDAL + POSTES**.
+* "Techo" -> Ofrece: **CHAPA (Cincalum/T101) + PERFIL C + AISLANTE**.
+* "Gas" -> Ofrece: **CAÑO EPOXI**.
+* "Agua" -> Ofrece: **CAÑO GALVANIZADO**.
 
 🔥 **POLÍTICA DE PRECIOS ($$$):**
-Cálculo: (Precio CSV x 1.21). Sobre ese total aplica:
+Cálculo: (Precio CSV x 1.21). Aplica descuento sobre total:
 1.  **< $100.000:** 0% OFF (Precio de Lista).
 2.  **$100k - $500k:** 5% OFF.
 3.  **$500k - $1M:** 8% OFF.
@@ -76,10 +75,10 @@ Cálculo: (Precio CSV x 1.21). Sobre ese total aplica:
 5.  **$2M - $3M:** 15% OFF.
 6.  **> $3M:** 18% OFF.
 
-⚠️ **REGLAS DE INTERACCIÓN:**
-1.  **STOCK:** Si el cliente pide algo vago ("cerrar terreno"), NO digas que no tienes el material. OFRECE la solución que sí tienes en lista (Tejido Romboidal).
+⚠️ **REGLAS:**
+1.  **STOCK:** Si piden algo vago, ofrece la solución de la lista.
 2.  **PRECIO:** Aclara siempre que es **CONTADO / TRANSFERENCIA**.
-3.  **TARJETAS:** "Con tarjeta aplica recargo financiero. ¡Promo Miércoles y Sábados disponible!".
+3.  **TARJETAS:** "Con tarjeta aplica recargo. ¡Promo Miércoles y Sábados!".
 4.  **LOGÍSTICA:** Pregunta siempre: "¿Para qué localidad es?".
 
 **FORMATO FINAL (SOLO AL CONFIRMAR):**
@@ -99,8 +98,9 @@ if "messages" not in st.session_state:
 
 if "chat_session" not in st.session_state:
     try:
-        # MODELO: gemini-2.0-flash-lite-preview-02-05 (El más nuevo y rápido)
-        model = genai.GenerativeModel('gemini-2.0-flash-lite-preview-02-05', system_instruction=sys_prompt)
+        # MODELO NUEVO: gemini-2.5-flash-lite
+        # Es la versión más eficiente y actual que reemplaza a la 1.5
+        model = genai.GenerativeModel('gemini-2.5-flash-lite', system_instruction=sys_prompt)
         
         initial_history = []
         if len(st.session_state.messages) > 1:
@@ -109,27 +109,27 @@ if "chat_session" not in st.session_state:
                 initial_history.append({"role": api_role, "parts": [{"text": m["content"]}]})
         
         st.session_state.chat_session = model.start_chat(history=initial_history)
-    except Exception:
-        # Fallback silencioso al 1.5 Flash si el 2.0 falla
+    except Exception as e:
+        # Fallback de seguridad por si la API requiere la version '001' o similar
         try:
-            model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=sys_prompt)
+            model = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt)
             st.session_state.chat_session = model.start_chat(history=initial_history)
-        except Exception as e:
-            st.error(f"Error de conexión: {e}")
+        except Exception as e2:
+             st.error(f"Error crítico de conexión con Gemini 2.5: {e2}")
 
 # --- 6. INTERFAZ ---
 for msg in st.session_state.messages:
     avatar = "🧑‍💼" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-if prompt := st.chat_input("Ej: Necesito cerrar un terreno de 10x30..."):
+if prompt := st.chat_input("Ej: Necesito cerrar un terreno..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").markdown(prompt)
 
     try:
         chat = st.session_state.chat_session
         with st.chat_message("assistant", avatar="🧑‍💼"):
-            with st.spinner("Buscando productos..."):
+            with st.spinner("Analizando requerimiento..."):
                 response = chat.send_message(prompt)
                 full_text = response.text
                 
