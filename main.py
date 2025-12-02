@@ -12,6 +12,7 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
     .block-container {padding-top: 1rem;}
+    /* Avatar Corporativo */
     .stChatMessage .stChatMessageAvatar {background-color: #003366; color: white;}
     </style>
     """, unsafe_allow_html=True)
@@ -21,10 +22,10 @@ try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
 except Exception:
-    st.error("⚠️ Sistema conectando...")
+    st.error("⚠️ Error de conexión. Verifique la API Key.")
     st.stop()
 
-# --- 3. DATOS ---
+# --- 3. CARGA DE DATOS ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
 @st.cache_data(ttl=600)
@@ -40,15 +41,14 @@ raw_data = load_data()
 if raw_data is not None:
     csv_context = raw_data.to_string(index=False)
 else:
-    csv_context = "ERROR: Stock no disponible."
+    csv_context = "ERROR: No se pudo cargar la lista de precios. Cotizar manual."
 
-# --- 4. CEREBRO DE VENTAS (PERFIL EJECUTIVO / SOBRIO) ---
+# --- 4. CEREBRO DE VENTAS (MODO ESTABLE 1.5 PRO) ---
 sys_prompt = f"""
 ROL: Eres Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**
-TONO: **SOBRIO, PROFESIONAL, CONCISO Y DIRECTO.**
-(Prohibido el trato vulgar tipo "maestro", "genio", "tirame", "espectacular". Habla como un profesional técnico).
+TONO: **PROFESIONAL, TÉCNICO Y CONCISO.** (CERO vulgaridad. No uses 'maestro', 'genio'. Sé breve y directo).
 
-BASE DE DATOS (STOCK Y PRECIOS):
+BASE DE DATOS (STOCK Y PRECIOS NETOS):
 ------------------------------------------------------------
 {csv_context}
 ------------------------------------------------------------
@@ -59,19 +59,14 @@ BASE DE DATOS (STOCK Y PRECIOS):
 * "TECHO" = CHAPA / T-101 / SINUSOIDAL.
 
 🔥 **POLÍTICA DE PRECIOS (ESCALA 5-12-18%):**
-Base: (Precio CSV x 1.21). Sobre eso aplica:
-1.  **NIVEL 1 (5% OFF):** Consultas estándar.
-2.  **NIVEL 2 (12% OFF):** Obras/Proyectos (>10 un).
-3.  **NIVEL 3 (18% OFF):** Acopio/Mayorista.
+Base de cálculo: (Precio CSV x 1.21). Sobre ese total aplica:
+1.  **NIVEL 1 (5% OFF):** Consultas chicas/estándar.
+2.  **NIVEL 2 (12% OFF):** Obras/Proyectos (>10 unidades).
+3.  **NIVEL 3 (18% OFF):** Acopio/Mayorista (Cierre inmediato).
 
-⚠️ **PROTOCOLOS DE RESPUESTA (ESTRICTO):**
-1.  **SALUDO CORTO:** "Hola, buenas tardes. Soy Lucho." (Sin adornos).
-2.  **AL GRANO:** Si faltan datos, pídelos en lista técnica:
-    * *"Para cotizar necesito: Tipo de material, Medidas y Cantidad."*
-3.  **ARGUMENTO DE PRECIO:**
-    * *"Precio de lista: $X. Con bonificación Web aplicada: **$Y Final**."*
-4.  **LOGÍSTICA:**
-    * *"Indique localidad de entrega para coordinar logística."*
+⚠️ **REGLAS DE VENTA:**
+1.  **PRECIO:** Presentalo siempre como "Precio con Bonificación Web aplicada".
+2.  **LOGÍSTICA:** Obligatorio preguntar: "¿Localidad de entrega?" para coordinar.
 
 **FORMATO FINAL (SOLO AL CONFIRMAR):**
 [TEXTO_WHATSAPP]:
@@ -83,21 +78,24 @@ Logística: {{Localidad}} - {{Retiro/Envío}}
 Datos: {{DNI}} - {{Teléfono}}
 """
 
-# --- 5. LÓGICA DE SESIÓN ---
+# --- 5. SESIÓN Y MODELO ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hola. Soy Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**\n\nIndícame qué materiales necesitas cotizar (Producto y Cantidad)."}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hola. Soy Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**\n\nIndícame material, medidas y cantidades para cotizar."}]
 
 if "chat_session" not in st.session_state:
     try:
-        model = genai.GenerativeModel('gemini-2.5-pro', system_instruction=sys_prompt)
+        # CORRECCIÓN CRÍTICA: Usamos 'gemini-1.5-pro' que es estable y potente.
+        model = genai.GenerativeModel('gemini-1.5-pro', system_instruction=sys_prompt)
+        
         initial_history = []
         if len(st.session_state.messages) > 1:
             for m in st.session_state.messages[1:]: 
                 api_role = "model" if m["role"] == "assistant" else "user"
                 initial_history.append({"role": api_role, "parts": [{"text": m["content"]}]})
+        
         st.session_state.chat_session = model.start_chat(history=initial_history)
-    except:
-        st.error("Reconectando...")
+    except Exception as e:
+        st.error(f"Error de sistema: {e}")
 
 # --- 6. INTERFAZ ---
 for msg in st.session_state.messages:
