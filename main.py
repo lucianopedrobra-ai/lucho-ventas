@@ -25,53 +25,63 @@ except Exception:
     st.error("⚠️ Error de conexión. Verifique la API Key.")
     st.stop()
 
-# --- 3. CARGA DE DATOS ---
+# --- 3. CARGA DE DATOS (BLINDADA) ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkpYiIVCzUaFbNKLC8_R9ZpwIbgMc7suQMR7yActsCdkww1VxtgBHcXOv4EGvXj/pub?gid=1937732333&single=true&output=csv"
 
 @st.cache_data(ttl=600)
 def load_data():
     try:
-        df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip')
-        df = df.dropna(how='all', axis=1)
+        # Forzamos la lectura como string para que no se pierdan ceros ni códigos
+        df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip', dtype=str)
+        df = df.dropna(how='all', axis=1) # Eliminar columnas vacías
+        df = df.fillna("") # Rellenar huecos con vacío para no romper el texto
         return df 
     except Exception:
         return None
 
 raw_data = load_data()
-if raw_data is not None:
-    csv_context = raw_data.to_string(index=False)
-else:
-    csv_context = "ERROR: No se pudo cargar la lista de precios. Cotizar manual."
 
-# --- 4. CEREBRO DE VENTAS (MODO 2.0 FLASH LITE) ---
+# Construcción del Contexto (Formato Texto Plano Claro)
+if raw_data is not None and not raw_data.empty:
+    # Convertimos el DataFrame a un formato de lista legible para la IA
+    csv_context = raw_data.to_markdown(index=False)
+else:
+    csv_context = "ADVERTENCIA: LA LISTA DE PRECIOS ESTÁ VACÍA O NO CARGÓ. NO INVENTES PRECIOS."
+
+# --- 4. CEREBRO DE VENTAS (MODO ESTRICTO: SOLO LO QUE HAY) ---
 sys_prompt = f"""
 ROL: Eres Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**
-TONO: **PROFESIONAL, TÉCNICO Y CONCISO.** (CERO vulgaridad. No uses 'maestro', 'genio'. Sé breve y directo).
+OBJETIVO: Vender productos EXCLUSIVAMENTE de nuestro stock.
 
-BASE DE DATOS (STOCK Y PRECIOS NETOS):
+🛑 **REGLA DE ORO (INSTRUCCIÓN DE SEGURIDAD):**
+Tu conocimiento sobre productos se divide en dos fases:
+1. **EXISTENCIA Y PRECIO:** ÚNICAMENTE puedes sacar esta información de la "LISTA DE STOCK" de abajo. Si el cliente pide algo que NO figura ahí (ej: ladrillos, cemento), di: *"Disculpá, no trabajamos ese material, pero tengo..."* y ofrece una alternativa de la lista. **NO INVENTES PRECIOS NI STOCK.**
+2. **DESCRIPCIÓN TÉCNICA:** Una vez que confirmaste que el producto ESTÁ en la lista, USA tu conocimiento de internet para explicar sus beneficios (ej: si vendes una chapa T101 de la lista, puedes explicar que es resistente al granizo).
+
+LISTA DE STOCK Y PRECIOS BASE (TU ÚNICA VERDAD):
 ------------------------------------------------------------
 {csv_context}
 ------------------------------------------------------------
 
-🧠 **TRADUCTOR TÉCNICO:**
-* "GAS" = EPOXI / REVESTIDO.
-* "AGUA" = GALVANIZADO / HIDRO3.
-* "TECHO" = CHAPA / T-101 / SINUSOIDAL.
+🧠 **TRADUCTOR TÉCNICO (Sinónimos permitidos):**
+* "GAS" = Busca en lista: EPOXI / REVESTIDO.
+* "AGUA" = Busca en lista: GALVANIZADO / HIDRO3.
+* "TECHO" = Busca en lista: CHAPA / T-101 / SINUSOIDAL / CINCALUM.
 
-🔥 **POLÍTICA DE PRECIOS (ESCALA 0-18%):**
-Base de cálculo: (Precio CSV x 1.21).
-Calcula el total y aplica descuento según escala:
-1.  **< $100.000:** 0% OFF (Precio Lista).
+🔥 **POLÍTICA DE PRECIOS ($$$):**
+(El precio de lista es el del CSV. Tu trabajo es calcular el PRECIO FINAL con IVA y Descuento).
+Cálculo: (Precio CSV x 1.21). Sobre ese total aplica:
+1.  **< $100.000:** 0% OFF (Precio de Lista).
 2.  **$100k - $500k:** 5% OFF.
 3.  **$500k - $1M:** 8% OFF.
 4.  **$1M - $2M:** 12% OFF.
 5.  **$2M - $3M:** 15% OFF.
 6.  **> $3M:** 18% OFF.
 
-⚠️ **REGLAS DE VENTA:**
-1.  **PRECIOS:** Aclara siempre que son **CONTADO / TRANSFERENCIA**.
-2.  **TARJETAS:** "Con tarjeta aplica recargo financiero. ¡Aprovechá la PROMO BOMBA Miércoles y Sábados!".
-3.  **LOGÍSTICA:** Obligatorio preguntar: "¿Localidad de entrega?" para coordinar.
+⚠️ **REGLAS DE INTERACCIÓN:**
+1.  **PRECIO:** Aclara siempre que es **CONTADO / TRANSFERENCIA**.
+2.  **TARJETAS:** "Con tarjeta aplica recargo financiero. ¡Promo Miércoles y Sábados disponible!".
+3.  **LOGÍSTICA:** Pregunta siempre: "¿Para qué localidad es?".
 
 **FORMATO FINAL (SOLO AL CONFIRMAR):**
 [TEXTO_WHATSAPP]:
@@ -86,11 +96,11 @@ Datos: {{DNI}} - {{Teléfono}}
 
 # --- 5. SESIÓN Y MODELO ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hola. Soy Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**\n\nIndícame qué materiales necesitás y te paso el mejor precio de contado."}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hola. Soy Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**\n\n¿Qué materiales necesitás cotizar hoy?"}]
 
 if "chat_session" not in st.session_state:
     try:
-        # CORRECCIÓN: Usamos 'gemini-2.0-flash-lite-preview-02-05' que es el nombre técnico exacto.
+        # Usamos el modelo Flash Lite 2.0 (Rápido y capaz)
         model = genai.GenerativeModel('gemini-2.0-flash-lite-preview-02-05', system_instruction=sys_prompt)
         
         initial_history = []
@@ -101,12 +111,12 @@ if "chat_session" not in st.session_state:
         
         st.session_state.chat_session = model.start_chat(history=initial_history)
     except Exception as e:
-        # Fallback de emergencia si el nombre cambia mañana, intenta el genérico
+        # Fallback de seguridad
         try:
-            model = genai.GenerativeModel('gemini-2.0-flash-exp', system_instruction=sys_prompt)
+            model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=sys_prompt)
             st.session_state.chat_session = model.start_chat(history=initial_history)
         except:
-            st.error(f"Error crítico al conectar con Gemini: {e}")
+            st.error(f"Error de conexión: {e}")
 
 # --- 6. INTERFAZ ---
 for msg in st.session_state.messages:
@@ -120,7 +130,7 @@ if prompt := st.chat_input("Ej: 5 caños de gas 1 pulgada..."):
     try:
         chat = st.session_state.chat_session
         with st.chat_message("assistant", avatar="🧑‍💼"):
-            with st.spinner("Cotizando..."):
+            with st.spinner("Verificando stock en depósito..."):
                 response = chat.send_message(prompt)
                 full_text = response.text
                 
@@ -130,8 +140,6 @@ if prompt := st.chat_input("Ej: 5 caños de gas 1 pulgada..."):
                     st.markdown(dialogue.strip())
                     
                     wa_encoded = urllib.parse.quote(wa_part.strip())
-                    
-                    # DESTINO: MARTÍN (3401 52-7780)
                     wa_url = f"https://wa.me/5493401527780?text={wa_encoded}"
                     
                     st.markdown(f"""
