@@ -12,6 +12,7 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
     .block-container {padding-top: 1rem;}
+    /* Avatar Corporativo */
     .stChatMessage .stChatMessageAvatar {background-color: #003366; color: white;}
     </style>
     """, unsafe_allow_html=True)
@@ -21,7 +22,7 @@ try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
 except Exception:
-    st.error("⚠️ Error de conexión.")
+    st.error("⚠️ Error de conexión. Verifique la API Key.")
     st.stop()
 
 # --- 3. CARGA DE DATOS ---
@@ -30,7 +31,7 @@ SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTgHzHMiNP9jH7vBAkp
 @st.cache_data(ttl=600)
 def load_data():
     try:
-        # Leemos todo como string para proteger la data
+        # Leemos todo como string para proteger códigos y medidas
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip', dtype=str)
         df = df.dropna(how='all', axis=1)
         df = df.fillna("")
@@ -40,7 +41,6 @@ def load_data():
 
 raw_data = load_data()
 
-# Contexto simplificado para la IA
 if raw_data is not None and not raw_data.empty:
     try:
         csv_context = raw_data.to_markdown(index=False)
@@ -49,79 +49,106 @@ if raw_data is not None and not raw_data.empty:
 else:
     csv_context = "ERROR: LISTA VACÍA."
 
-# --- 4. CEREBRO DE VENTAS (FUSIÓN: LÓGICA + CIERRE AGRESIVO) ---
+# --- 4. CEREBRO DE VENTAS (V. ACTUALIZADA CON LARGOS 12M Y TARJETAS) ---
 sys_prompt = f"""
-ROL: Eres Lucho, Vendedor de **Pedro Bravin S.A.**
-TU MISIÓN: Cotizar rápido y conseguir que el cliente haga CLIC en el botón de WhatsApp.
+ROL: Eres Lucho, Ejecutivo Comercial Técnico de **Pedro Bravin S.A.**
+TONO: **PROFESIONAL, TÉCNICO Y CONCISO.**
+ESTRATEGIA: Genera una **mini urgencia** sutil para cerrar (ej: "tengo stock ahora", "antes de cambio de lista").
 
-BASE DE DATOS (PRECIOS NETOS):
+BASE DE DATOS (STOCK Y PRECIOS NETOS):
 ------------------------------------------------------------
 {csv_context}
 ------------------------------------------------------------
 
-⚡ **REGLAS DE ORO (STOCK Y MEDIDAS):**
-1.  **NO INVENTES:** Si el producto no está en la lista, di: *"No tengo eso exacto, pero te ofrezco esto que es similar:"* y da la opción de la lista.
-2.  **MEDIDAS EXACTAS:**
-    * Si piden **Tejido 1.50m**, busca códigos con "150". Si solo hay "125", **AVISA**: *"Tengo de 1.25m en oferta"*.
-    * Caños: Vienen de 6.40m.
-    * Perfiles: Vienen de 6.00m.
+🛠️ **REGLAS DE COTIZACIÓN (INTELIGENCIA DE PRODUCTO):**
 
-💰 **MOTOR DE PRECIOS (TU CALCULADORA):**
-1.  Toma el Precio de Lista del CSV.
-2.  Súmale IVA (**x 1.21**).
-3.  Multiplica por la cantidad.
-4.  **APLICA DESCUENTO AUTOMÁTICO (SEGÚN TOTAL):**
-    * < $100k: 0% OFF.
-    * $100k - $500k: 5% OFF.
-    * $500k - $1M: 8% OFF.
-    * > $1M: 12% OFF.
-    * > $3M: 18% OFF.
-    * **SI ES CHAPA/HIERRO > $300k:** **15% OFF DIRECTO.**
+1.  **CHAPAS TECHO:**
+    * **Conversión:** Si piden $m^2$, asume 1 $m^2$ = 1 Metro Lineal.
+    * **ACANALADA** = Busca precio COD 4.
+    * **T101** = Busca precio COD 6.
+    * **COLOR** = El precio en lista es por **METRO LINEAL**. Cotiza directo.
 
-🚀 **EL CIERRE (OBLIGATORIO):**
-En cuanto des el precio, **NO PREGUNTES "¿TE GUSTA?"**.
-Di esto:
-*"El precio de lista es $X, pero con la Bonificación Web te queda en **$Y Final**. ¿Para qué localidad es? Confirmame y te reservo el stock ya."*
+2.  **HIERROS/PERFILES (Calculadora de Precio por Barra):**
+    * Fórmula: `Precio Kg Lista` * `Peso Barra` * `1.21`.
+    * **REGLA DE LARGOS (¡MUY IMPORTANTE!):**
+        * **12.00 Metros:** Perfil C (Negro/Galv) y Perfiles IPN/UPN mayores a 80mm.
+        * **6.40 Metros:** Caños Epoxi (Gas), Galvanizados (Agua), Schedule.
+        * **6.00 Metros:** Ángulos, Hierros construcción, Planchuelas, IPN/UPN chicos (<80mm).
+
+3.  **TEJIDOS:**
+    * Cotiza por **ROLLO CERRADO**.
+    * Optimiza cortes (Eco 10m vs Acindar 15m) para reducir desperdicio.
+
+💰 **POLÍTICA DE PRECIOS ($$$):**
+**BASE:** (Precio CSV x 1.21).
+
+**A. REGLA ORO (CHAPA Y HIERRO):**
+* > $300.000 = **15% OFF DIRECTO**.
+* > $3.000.000 = **18% OFF**.
+
+**B. ESCALA GENERAL (RESTO):**
+1. < $100k: **0%**.
+2. $100k - $500k: **5%**.
+3. $500k - $1M: **8%**.
+4. $1M - $2M: **12%**.
+5. $2M - $3M: **15%**.
+6. > $3M: **18%**.
+
+💳 **FINANCIACIÓN (COSTOS REALES):**
+* Los precios con descuento son **CONTADO/TRANSFERENCIA**.
+* **TARJETAS (Recargos sobre precio de lista):**
+    * **Visa/Master:** 3 cuotas (+7.5%) | 6 cuotas (+14%).
+    * **Amex:** 3 cuotas (+14%) | 6 cuotas (+25%).
+* **PROMO:** *"¡Recordá que Miércoles y Sábados tenemos **PROMO BOMBA**!"* (Menciónala siempre).
 
 **FORMATO FINAL (SOLO AL CONFIRMAR):**
 [TEXTO_WHATSAPP]:
-Hola Martín, soy {{Nombre}}.
-Quiero reservar:
+Hola Martín / Equipo Bravin, soy {{Nombre}}.
+Pedido Web (Bonif. Aplicada):
 - (COD: [SKU]) [Producto] x [Cant]
-Total c/Descuento: $[Monto]
-Datos: {{Localidad}} - {{Teléfono}}
+Total Contado/Transf: $[Monto Final]
+*Financiación: [Detalle si aplica]*
+Logística: {{Localidad}} - {{Retiro/Envío}}
+Datos: {{DNI}} - {{Teléfono}}
 """
 
 # --- 5. SESIÓN Y MODELO ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hola. Soy Lucho de **Pedro Bravin S.A.** 🏗️\n\n¿Qué materiales estás buscando hoy?"}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hola. Soy Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**\n\n¿Qué materiales necesitás cotizar hoy?"}]
 
 if "chat_session" not in st.session_state:
     try:
-        # INTENTO 1: Modelo Nuevo (Rápido)
-        model = genai.GenerativeModel('gemini-2.0-flash-lite-preview-02-05', system_instruction=sys_prompt)
-        st.session_state.chat_session = model.start_chat(history=[])
-    except Exception:
-        # INTENTO 2: Modelo Estable (Seguro)
+        # MODELO: gemini-2.0-flash (Inteligente y Rápido)
+        model = genai.GenerativeModel('gemini-2.0-flash', system_instruction=sys_prompt)
+        
+        initial_history = []
+        if len(st.session_state.messages) > 1:
+            for m in st.session_state.messages[1:]: 
+                api_role = "model" if m["role"] == "assistant" else "user"
+                initial_history.append({"role": api_role, "parts": [{"text": m["content"]}]})
+        
+        st.session_state.chat_session = model.start_chat(history=initial_history)
+    except Exception as e:
+        # Fallback de seguridad
         try:
-            model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=sys_prompt)
-            st.session_state.chat_session = model.start_chat(history=[])
-        except Exception as e:
-            st.error(f"Error de sistema: {e}")
+            model = genai.GenerativeModel('gemini-1.5-pro', system_instruction=sys_prompt)
+            st.session_state.chat_session = model.start_chat(history=initial_history)
+        except:
+            st.error(f"Error de conexión: {e}")
 
 # --- 6. INTERFAZ ---
 for msg in st.session_state.messages:
     avatar = "🧑‍💼" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-if prompt := st.chat_input("Ej: 40 metros de tejido 1.50..."):
+if prompt := st.chat_input("Ej: 10 Perfiles C 100..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").markdown(prompt)
 
     try:
         chat = st.session_state.chat_session
         with st.chat_message("assistant", avatar="🧑‍💼"):
-            with st.spinner("Cotizando..."):
+            with st.spinner("Verificando stock y financiación..."):
                 response = chat.send_message(prompt)
                 full_text = response.text
                 
@@ -131,6 +158,8 @@ if prompt := st.chat_input("Ej: 40 metros de tejido 1.50..."):
                     st.markdown(dialogue.strip())
                     
                     wa_encoded = urllib.parse.quote(wa_part.strip())
+                    
+                    # DESTINO: MARTÍN
                     wa_url = f"https://wa.me/5493401527780?text={wa_encoded}"
                     
                     st.markdown(f"""
@@ -143,7 +172,7 @@ if prompt := st.chat_input("Ej: 40 metros de tejido 1.50..."):
                     ">👉 CONFIRMAR PEDIDO (A Martín)</a>
                     """, unsafe_allow_html=True)
                     
-                    st.session_state.messages.append({"role": "assistant", "content": dialogue.strip() + f"\n\n[👉 Confirmar]({wa_url})"})
+                    st.session_state.messages.append({"role": "assistant", "content": dialogue.strip() + f"\n\n[👉 Confirmar Pedido]({wa_url})"})
                 else:
                     st.markdown(full_text)
                     st.session_state.messages.append({"role": "assistant", "content": full_text})
