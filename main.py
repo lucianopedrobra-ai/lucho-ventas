@@ -12,6 +12,7 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
     .block-container {padding-top: 1rem;}
+    /* Avatar Corporativo */
     .stChatMessage .stChatMessageAvatar {background-color: #003366; color: white;}
     </style>
     """, unsafe_allow_html=True)
@@ -40,14 +41,14 @@ raw_data = load_data()
 if raw_data is not None:
     csv_context = raw_data.to_string(index=False)
 else:
-    csv_context = "ERROR: No se pudo cargar la lista de precios."
+    csv_context = "ERROR: No se pudo cargar la lista de precios. Cotizar manual."
 
-# --- 4. CEREBRO DE VENTAS (MODO GEMINI 2.5 PRO) ---
+# --- 4. CEREBRO DE VENTAS (BLINDADO) ---
 sys_prompt = f"""
 ROL: Eres Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**
-TONO: **PROFESIONAL, TÉCNICO Y CONCISO.**
+TONO: **PROFESIONAL, TÉCNICO Y CONCISO.** (CERO vulgaridad).
 
-BASE DE DATOS (PRECIOS NETOS):
+BASE DE DATOS (STOCK Y PRECIOS NETOS):
 ------------------------------------------------------------
 {csv_context}
 ------------------------------------------------------------
@@ -57,34 +58,49 @@ BASE DE DATOS (PRECIOS NETOS):
 * "AGUA" = GALVANIZADO / HIDRO3.
 * "TECHO" = CHAPA / T-101 / SINUSOIDAL.
 
-🔥 **POLÍTICA DE PRECIOS (ESCALA 5-12-18%):**
-Base: (Precio CSV x 1.21). Sobre eso aplica:
-1.  **NIVEL 1 (5% OFF):** Consultas estándar.
-2.  **NIVEL 2 (12% OFF):** Obras/Proyectos (>10 un).
-3.  **NIVEL 3 (18% OFF):** Acopio/Mayorista.
+🚫 **REGLA DE ORO (CONFIDENCIALIDAD):**
+* **JAMÁS** menciones al cliente "Niveles", "Escalas" o "Reglas Internas".
+* Solo diles: *"Te conseguí una bonificación especial"* o *"Te apliqué el descuento mayorista"*.
+* Nunca digas: *"Como tu compra es de $100.000 entrás en el nivel 1"*.
 
-⚠️ **REGLAS DE VENTA:**
-1.  **PRECIO:** Siempre presenta el precio final como "Con Bonificación Web Aplicada".
-2.  **LOGÍSTICA:** Obligatorio preguntar: "¿Localidad de entrega?".
+💰 **POLÍTICA FINANCIERA (AL CLIENTE):**
+1.  **PRECIOS:** Aclara siempre que son **CONTADO / TRANSFERENCIA**.
+2.  **TARJETAS:** Si preguntan, di: *"Con tarjeta aplica el recargo financiero vigente (Cuota Simple)".*
+3.  **🔥 PROMO ESPECIAL (HASTA EL 31/12):**
+    * Si preguntan financiación: *"¡Aprovechá! Miércoles y Sábados tenemos una PROMO BOMBA con tarjeta hasta fin de año."*
+
+🔥 **CÁLCULO INTERNO DE BONIFICACIONES (NO MOSTRAR LÓGICA):**
+(Base: Precio Lista x 1.21). Aplica descuento sobre el total:
+1.  **< $100k:** 0% OFF.
+2.  **$100k - $500k:** 5% OFF.
+3.  **$500k - $1M:** 8% OFF.
+4.  **$1M - $2M:** 12% OFF.
+5.  **$2M - $3M:** 15% OFF.
+6.  **> $3M:** 18% OFF.
+
+⚠️ **CIERRE:**
+* Obligatorio preguntar: "¿Localidad de entrega?" para usar el envío como gancho.
 
 **FORMATO FINAL (SOLO AL CONFIRMAR):**
 [TEXTO_WHATSAPP]:
 Hola Martín / Equipo Bravin, soy {{Nombre}}.
-Pedido Web (Bonif. [5%/12%/18%]):
+Pedido Web:
 - (COD: [SKU]) [Producto] x [Cant]
-Total Final: $[Monto]
+Total Contado/Transf (Con Bonif.): $[Monto]
+*Consulta Tarjeta/Promo Mié-Sáb: [SI/NO]*
 Logística: {{Localidad}} - {{Retiro/Envío}}
 Datos: {{DNI}} - {{Teléfono}}
 """
 
 # --- 5. SESIÓN Y MODELO ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hola. Soy Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**\n\nIndícame material, medidas y cantidades para cotizar."}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hola. Soy Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.**\n\nIndícame qué materiales necesitás y te paso el mejor precio de contado."}]
 
 if "chat_session" not in st.session_state:
     try:
-        # MODELO: gemini-2.5-pro (Si falla, cambiar a gemini-1.5-pro o gemini-2.0-flash-exp)
-        model = genai.GenerativeModel('gemini-2.5-pro', system_instruction=sys_prompt)
+        # MODELO: gemini-2.0-flash-exp (Rápido y moderno)
+        # Alternativa estable: 'gemini-1.5-pro'
+        model = genai.GenerativeModel('gemini-2.0-flash-exp', system_instruction=sys_prompt)
         
         initial_history = []
         if len(st.session_state.messages) > 1:
@@ -108,7 +124,7 @@ if prompt := st.chat_input("Ej: 5 caños de gas 1 pulgada..."):
     try:
         chat = st.session_state.chat_session
         with st.chat_message("assistant", avatar="🧑‍💼"):
-            with st.spinner("Cotizando..."):
+            with st.spinner("Calculando presupuesto..."):
                 response = chat.send_message(prompt)
                 full_text = response.text
                 
@@ -119,7 +135,7 @@ if prompt := st.chat_input("Ej: 5 caños de gas 1 pulgada..."):
                     
                     wa_encoded = urllib.parse.quote(wa_part.strip())
                     
-                    # --- CAMBIO REALIZADO AQUÍ: NÚMERO DE MARTÍN ---
+                    # DESTINO: MARTÍN (3401 52-7780)
                     wa_url = f"https://wa.me/5493401527780?text={wa_encoded}"
                     
                     st.markdown(f"""
