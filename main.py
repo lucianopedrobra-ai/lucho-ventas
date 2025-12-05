@@ -90,11 +90,12 @@ st.markdown("""
     /* Spinner de carga personalizado */
     .stSpinner > div { border-top-color: #0f2c59 !important; }
     
-    /* !!! CORRECCIÓN CRÍTICA PARA MÓVILES !!! */
-    @media (max-width: 600px) {
-        /* Asegura que el historial de chat no quede oculto bajo la barra de input fijo. */
+    /* !!! CORRECCIÓN CRÍTICA FINAL PARA MÓVILES !!! */
+    /* Este fix asegura que el historial de chat nunca sea tapado por el input fijo */
+    @media (max-width: 800px) {
         .stApp {
-            padding-bottom: 120px !important; /* Más margen para que quepan mensajes y el botón de chat */
+            /* Forzamos un margen inferior extra grande, más seguro que 120px */
+            padding-bottom: 140px !important; 
         }
         .stChatInput {
             height: 70px; /* Altura constante para el input */
@@ -257,6 +258,7 @@ if "chat_session" not in st.session_state:
         st.session_state.chat_session = model.start_chat(history=[])
     except Exception:
         try:
+            # Fallback
             model = genai.GenerativeModel('gemini-1.5-pro', system_instruction=sys_prompt)
             st.session_state.chat_session = model.start_chat(history=[])
         except Exception:
