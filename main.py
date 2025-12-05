@@ -294,4 +294,6 @@ if st.session_state.admin_mode:
     else:
         st.info("No hay datos nuevos en esta sesión.")
         
-    if st.button("🔴 Salir
+    if st.button("🔴 Salir del Admin"):
+        st.session_state.admin_mode = False
+        st.rerun()
