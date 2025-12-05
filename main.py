@@ -30,7 +30,7 @@ PIAMONTE, VILA, SAN FRANCISCO.
 """
 
 # ==========================================
-# 2. INTERFAZ VISUAL (MÁXIMA SIMPLIFICACIÓN Y VISIBILIDAD)
+# 2. INTERFAZ VISUAL (SOLUCIÓN SCROLL Y VISIBILIDAD)
 # ==========================================
 st.markdown("""
     <style>
@@ -39,17 +39,19 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* 1. ANULACIÓN DE FONDO OSCURO EN CONTENEDORES RAÍZ */
+    /* 1. ANULACIÓN DE FONDO OSCURO Y BASE */
     .stApp, .main, html, body { 
         background-color: white !important; 
+    }
+    html, body, [class*="css"] {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
     /* 2. HEADER FIJO */
     .fixed-header {
         position: fixed; top: 0; left: 0; width: 100%; height: 55px;
         background-color: #ffffff; border-bottom: 1px solid #ddd;
-        z-index: 1000; /* Alto, pero no excesivo */
-        display: flex; justify-content: space-between; align-items: center;
+        z-index: 1000; display: flex; justify-content: space-between; align-items: center;
         padding: 0 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
     
@@ -63,38 +65,35 @@ st.markdown("""
         display: flex; align-items: center; gap: 5px;
     }
 
-    /* 3. ESPACIADO CRÍTICO PARA MÓVIL */
+    /* 3. ESPACIADO CRÍTICO (BUFFER SUPERIOR E INFERIOR) */
     .block-container {
         padding-top: 70px !important;
-        padding-bottom: 140px !important; /* Margen de seguridad para el teclado */
+        padding-bottom: 140px !important; 
     }
 
-    /* 4. ARREGLO DEL INPUT (SOLUCIÓN DE COLOR Y VISIBILIDAD) */
+    /* 4. ARREGLO DE INPUT (SOLUCIÓN DE VISIBILIDAD Y BOTÓN) */
     
-    /* Contenedor principal de la barra de chat (Aseguramos el fondo y z-index) */
+    /* Contenedor principal de la barra de chat (Streamlit Native Footer) */
     div[data-testid="stChatInput"] {
         background-color: #ffffff !important;
         border-top: 1px solid #e0e0e0 !important;
-        /* Quitamos paddings agresivos para restaurar el botón de envío */
+        /* MUY IMPORTANTE: Quitamos paddings excesivos para que el botón de envío reaparezca */
         padding-bottom: 10px !important;
         padding-top: 10px !important;
         z-index: 999; 
     }
     
-    /* El área de texto donde se escribe: FORZAMOS COLORES */
+    /* El área de texto: Forzamos colores y bordes */
     textarea[data-testid="stChatInputTextArea"] {
         background-color: #ffffff !important;
-        color: #000000 !important; /* Texto negro forzado */
-        caret-color: #000000 !important; /* Cursor negro forzado */
+        color: #000000 !important;
+        caret-color: #000000 !important; 
         border: 1px solid #cccccc !important;
         border-radius: 20px !important;
+        /* Aseguramos un tamaño mínimo para que el botón no se monte */
+        min-height: 38px;
     }
-    
-    /* Restaurar el botón de envío (No hacemos override, solo aseguramos que el icono no esté oculto) */
-    div[data-testid="chat-input-progress"] {
-        background-color: transparent !important;
-    }
-    
+
     /* 5. ESTILOS DE MENSAJES */
     .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) { 
         background-color: #f4f6f9; 
@@ -124,6 +123,21 @@ st.markdown("""
     </div>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     """, unsafe_allow_html=True)
+
+
+# Función JavaScript para forzar el scroll al final
+# Se llama después de que el bot responde.
+def scroll_to_bottom():
+    js = """
+    <script>
+        const chatContainer = parent.document.querySelector('.block-container');
+        if (chatContainer) {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    </script>
+    """
+    st.markdown(js, unsafe_allow_html=True)
+
 
 # ==========================================
 # 3. BACKEND & LÓGICA DE BÚSQUEDA
@@ -236,7 +250,7 @@ if prompt := st.chat_input("Escribe aquí tu consulta..."):
                 
                 if stock_encontrado:
                     mensaje_final = f"""
-                    DATOS DE STOCK ENCONTRTRADOS (Usa esto para responder):
+                    DATOS DE STOCK ENCONTRADOS (Usa esto para responder):
                     {stock_encontrado}
                     PREGUNTA DEL CLIENTE: {prompt}
                     """
@@ -259,6 +273,9 @@ if prompt := st.chat_input("Escribe aquí tu consulta..."):
             response_placeholder.markdown(full_response)
             log_interaction(prompt, full_response)
             
+            # --- LLAMADA AL SCRIPT DE SCROLL ---
+            scroll_to_bottom()
+
             if "[TEXTO_WHATSAPP]:" in full_response:
                 dialogue, wa_part = full_response.split("[TEXTO_WHATSAPP]:", 1)
                 
