@@ -29,7 +29,7 @@ st.markdown("""
     header {visibility: hidden;}
     html, body, [class*="css"] { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; }
 
-    /* HEADER */
+    /* HEADER FLOTANTE */
     .fixed-header {
         position: fixed; top: 0; left: 0; width: 100%;
         background-color: #ffffff; border-bottom: 1px solid #e0e0e0;
@@ -37,6 +37,7 @@ st.markdown("""
         display: flex; justify-content: space-between; align-items: center;
         box-shadow: 0 2px 10px rgba(0,0,0,0.05);
     }
+    .header-branding { display: flex; flex-direction: column; }
     .brand-name { color: #0f2c59; font-weight: 800; font-size: 0.95rem; text-transform: uppercase; }
     .brand-disclaimer { color: #666; font-size: 0.75rem; }
     
@@ -50,12 +51,12 @@ st.markdown("""
 
     .block-container { padding-top: 85px !important; padding-bottom: 40px !important; }
 
-    /* CHAT */
+    /* CHAT ESTILO WHATSAPP/MESSENGER */
     .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) { background-color: #f8f9fa; border: 1px solid #eee; border-radius: 10px; }
     .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) .stChatMessageAvatar { background-color: #0f2c59; color: white; }
     .stChatMessage[data-testid="stChatMessage"]:nth-child(even) { background-color: #fff; }
 
-    /* TARJETA FINAL */
+    /* TARJETA FINAL DE CIERRE */
     .final-action-card {
         background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
         color: white !important; text-align: center; padding: 18px; 
@@ -117,7 +118,7 @@ if raw_data is not None and not raw_data.empty:
 else:
     csv_context = "ERROR CRÍTICO: Base de datos no accesible."
 
-# --- 5. LOGS ---
+# --- 5. LOGS (EL CHIVATO) ---
 def log_interaction(user_text, bot_response):
     opportunity = "NORMAL"
     if "$" in bot_response:
@@ -129,10 +130,10 @@ def log_interaction(user_text, bot_response):
             pass
     print(f"LOG: {user_text} | Oportunidad: {opportunity}")
 
-# --- 6. CEREBRO DE VENTAS (HÍBRIDO CSV + SUGERENCIAS MANUALES) ---
+# --- 6. CEREBRO DE VENTAS (MODO EXPERTO + CLARIDAD IVA) ---
 sys_prompt = f"""
-ROL: Eres Lucho, **Asesor Técnico Virtual** de **Pedro Bravin S.A.**
-OBJETIVO: Vender lo que hay en stock y generar "leads" de lo que falta para que Martín lo cierre.
+ROL: Eres Lucho, **Asesor Técnico Virtual** de **Pedro Bravin S.A.** (El Trébol, Santa Fe).
+OBJETIVO: Cotizar EXCLUSIVAMENTE lo que hay en lista, calcular logística precisa y cerrar ventas.
 
 BASE DE DATOS (INVENTARIO WEB):
 ------------------------------------------------------------
@@ -142,56 +143,55 @@ DATOS OPERATIVOS:
 - DÓLAR BNA: ${DOLAR_BNA_REF}
 - ZONA GRATIS: {CIUDADES_GRATIS}
 
-🔒 **PROTOCOLOS DE SEGURIDAD E HIBRIDACIÓN:**
-1.  **SI EL PRODUCTO ESTÁ EN CSV:**
-    * Cotiza precio exacto + IVA. Confirma stock.
+🚨 **REGLA DE ORO DE PRECIOS (IMPUESTOS):**
+* Los precios del CSV son **NETOS**.
+* **OBLIGATORIO:** Cada vez que des un precio (unitario o total), debes escribir al lado: **"+ IVA"**.
+* **PROHIBIDO:** Decir "Precio Final" o "IVA Incluido". Si el cliente pregunta, aclara: "Todos los precios son Netos + IVA (10.5% o 21% según producto)".
 
-2.  **SI EL PRODUCTO/ACCESORIO NO ESTÁ EN CSV (Venta Cruzada Híbrida):**
-    * **NO INVENTES PRECIO.**
-    * **PERO OFRÉCELO IGUAL:** Di: "No tengo el precio de los [Producto] cargado en la web, pero **te los agrego al pedido para que Martín te los cotice manual**".
-    * **EN EL TICKET DE WHATSAPP:** Debes listar ese producto con la nota "(A cotizar por Martín)".
+🔒 **PROTOCOLOS DE SEGURIDAD (ANTI-ALUCINACIÓN):**
+1.  **SI ESTÁ EN CSV:** Cotiza precio exacto + IVA. Confirma Stock.
+2.  **SI NO ESTÁ:** DI: "No figura en mi lista web, pero **te lo agrego al pedido como 'A cotizar'** para que Martín te pase el precio." (No inventes precio).
 
 🧠 **ESTRATEGIA COMERCIAL:**
-1.  **LOGÍSTICA INTELIGENTE:**
-    * ZONA GRATIS -> ¡Véndelo como beneficio!
-    * NO GRATIS -> Calcula KM ida y vuelta al nodo más cercano x 0.85 USD x Dolar.
+1.  **TRADUCCIÓN:** "Gas"=EPOXI, "Estructural"=Tubo c/costura, "Techo"=Cincalum.
+2.  **LOGÍSTICA:**
+    * GRATIS -> ¡Véndelo como beneficio exclusivo!
+    * NO GRATIS -> Busca NODO CERCANO. Calcula (KM ida y vuelta al nodo) x 0.85 USD x Dolar. Explica el ahorro del redireccionamiento.
+3.  **GAMIFICACIÓN:**
+    * $200k-$299k -> "Estás cerca del MAYORISTA (15% OFF). ¿Agregamos algo?".
+    * >$300k -> "¡Tarifa MAYORISTA activada (15% OFF)!".
+4.  **CIERRE:** "Acopio 6 meses gratis."
 
-2.  **GAMIFICACIÓN:**
-    * **$200k - $299k:** ⚠️ "Estás cerca del MAYORISTA. Agregá algo para llegar a $300k y ganar el **15% OFF**".
-    * **> $300k:** 🎉 "¡Tarifa MAYORISTA activada (15% OFF)!".
-
-3.  **VENTA CRUZADA AGRESIVA (Alerta para Martín):**
-    * Si vendes Chapas -> Sugiere Tornillos/Cumbreras. (Si no están en CSV, agrégalos como "A cotizar").
-    * Si vendes Perfiles -> Sugiere Discos/Electrodos.
-
-📝 **FORMATO SALIDA WHATSAPP (OBLIGATORIO):**
+📝 **FORMATO SALIDA:**
 [TEXTO_WHATSAPP]:
 Hola Martín, vengo del Asesor Virtual.
 📍 Destino: [Localidad]
-📋 Pedido Web (Con precios):
+📋 Pedido Web:
 - (COD: [SKU]) [Producto] x [Cant]
-⚠️ **Items a Cotizar Manual (Sugeridos):**
-- [Producto sin precio en web] x [Cant]
-💰 Total Parcial IA: $[Monto] ([Nota])
+⚠️ A Cotizar Manual (Sugeridos):
+- [Items sin precio web]
+💰 Inversión Est. IA: $[Monto] + IVA ([Nota])
 Solicito confirmación final.
 Datos: [Nombre/DNI]
 """
 
-# --- 7. GESTIÓN DE SESIÓN ---
+# --- 7. GESTIÓN DE SESIÓN (MODELO POTENTE) ---
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "👋 **Bienvenido a Pedro Bravin S.A.**\n\nSoy Lucho, tu asesor técnico.\n\n**¿Qué materiales necesitas cotizar hoy?**"}]
 
 if "chat_session" not in st.session_state:
     try:
+        # VOLVEMOS AL MODELO PRO (CALIDAD MÁXIMA)
         generation_config = {"temperature": 0.2, "max_output_tokens": 8192}
         model = genai.GenerativeModel('gemini-2.5-pro', system_instruction=sys_prompt, generation_config=generation_config)
         st.session_state.chat_session = model.start_chat(history=[])
     except Exception:
         try:
+            # Fallback seguro
             model = genai.GenerativeModel('gemini-1.5-pro', system_instruction=sys_prompt)
             st.session_state.chat_session = model.start_chat(history=[])
         except Exception:
-            st.error("Error de conexión.")
+            st.error("Error de conexión con el cerebro IA.")
 
 # --- 8. INTERFAZ ---
 for msg in st.session_state.messages:
@@ -204,7 +204,7 @@ if prompt := st.chat_input("Ej: 20 chapas para San Jorge..."):
 
     try:
         chat = st.session_state.chat_session
-        with st.spinner("Verificando stock real y costos..."):
+        with st.spinner("Analizando stock y calculando (Precios + IVA)..."):
             response = chat.send_message(prompt)
             full_text = response.text
             
