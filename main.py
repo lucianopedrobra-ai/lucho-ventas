@@ -4,10 +4,10 @@ import google.generativeai as genai
 import urllib.parse
 import re
 import datetime
-import requests 
+import requests
+import threading # NUEVO: Para que el bot haga cosas en segundo plano
 
 # --- 1. CONFIGURACIÓN DE ANALÍTICAS (GOOGLE FORMS) ---
-# Si configuras esto, tendrás reporte automático por email vía Google.
 URL_FORM_GOOGLE = ""  
 ID_CAMPO_CLIENTE = "entry.xxxxxx"
 ID_CAMPO_MONTO = "entry.xxxxxx"
@@ -65,7 +65,7 @@ st.markdown("""
     .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) .stChatMessageAvatar { background-color: #0f2c59; color: white; }
     .stChatMessage[data-testid="stChatMessage"]:nth-child(even) { background-color: #fff; }
 
-    /* TARJETA DE CIERRE DE VENTA (NUEVO) */
+    /* TARJETA DE CIERRE DE VENTA */
     .final-action-card {
         background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
         color: white !important; text-align: center; padding: 18px; 
@@ -125,15 +125,15 @@ if raw_data is not None and not raw_data.empty:
 else:
     csv_context = "ERROR CRÍTICO: Base de datos no accesible."
 
-# --- 6. SISTEMA DE MÉTRICAS Y ADMIN ---
+# --- 6. SISTEMA DE MÉTRICAS (THREADED / ASÍNCRONO) ---
 if "log_data" not in st.session_state:
     st.session_state.log_data = []
 
 if "admin_mode" not in st.session_state:
     st.session_state.admin_mode = False
 
-def enviar_a_google_form(cliente, monto, oportunidad):
-    """Envía los datos a Google Forms (Silencioso)"""
+def enviar_a_google_form_background(cliente, monto, oportunidad):
+    """Función que corre en segundo plano para no frenar el chat"""
     if URL_FORM_GOOGLE and "docs.google.com" in URL_FORM_GOOGLE:
         try:
             payload = {
@@ -141,16 +141,15 @@ def enviar_a_google_form(cliente, monto, oportunidad):
                 ID_CAMPO_MONTO: str(monto),
                 ID_CAMPO_OPORTUNIDAD: str(oportunidad)
             }
-            requests.post(URL_FORM_GOOGLE, data=payload, timeout=2)
+            requests.post(URL_FORM_GOOGLE, data=payload, timeout=5)
         except:
-            pass 
+            pass
 
 def log_interaction(user_text, bot_response):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     opportunity = "NORMAL"
     monto_estimado = 0
     
-    # Análisis básico del texto para detectar montos
     if "$" in bot_response:
         try:
             precios = [int(s.replace('.','')) for s in re.findall(r'\$([\d\.]+)', bot_response) if s.replace('.','').isdigit()]
@@ -161,6 +160,7 @@ def log_interaction(user_text, bot_response):
         except:
             pass
 
+    # Guardado local (instantáneo)
     st.session_state.log_data.append({
         "Fecha": timestamp,
         "Usuario": user_text[:50],
@@ -168,9 +168,12 @@ def log_interaction(user_text, bot_response):
         "Monto Max": monto_estimado
     })
     
-    enviar_a_google_form(user_text, monto_estimado, opportunity)
+    # Envío a la nube en un HILO SEPARADO (Multitarea)
+    # Esto evita que el usuario espere a que Google responda
+    thread = threading.Thread(target=enviar_a_google_form_background, args=(user_text, monto_estimado, opportunity))
+    thread.start()
 
-# --- 7. CEREBRO DE VENTAS (TUS REGLAS DE ORO) ---
+# --- 7. CEREBRO DE VENTAS (MIGUEL VENDEDOR) ---
 sys_prompt = f"""
 ROL: Eres Miguel, **Asesor Técnico Virtual** y **Experto en Cierre** de **Pedro Bravin S.A.** (El Trébol, Santa Fe).
 OBJETIVO: Cotizar EXCLUSIVAMENTE lo que hay en lista, calcular logística precisa y **CERRAR VENTAS**.
@@ -207,7 +210,7 @@ Hola Martín, vengo del Asesor Virtual (Miguel).
 Solicito link de pago.
 """
 
-# --- 8. SESIÓN DE CHAT (IA) ---
+# --- 8. SESIÓN DE CHAT ---
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "👋 **Bienvenido a Pedro Bravin S.A.**\n\nSoy Miguel, tu asesor técnico.\n\n**¿Qué materiales necesitas cotizar hoy?**"}]
 
@@ -219,53 +222,69 @@ if "chat_session" not in st.session_state:
         st.session_state.chat_session = model.start_chat(history=[])
     except Exception:
         try:
-            # Fallback seguro
             model = genai.GenerativeModel('gemini-1.5-pro', system_instruction=sys_prompt)
             st.session_state.chat_session = model.start_chat(history=[])
         except Exception:
             st.error("Error de conexión con IA.")
 
-# --- 9. INTERFAZ DE USUARIO ---
+# --- 9. INTERFAZ DE USUARIO (CON STREAMING) ---
 for msg in st.session_state.messages:
     avatar = "👷‍♂️" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
 if prompt := st.chat_input("Ej: 20 chapas para San Jorge..."):
-    # --- PUERTA TRASERA (SOLO PARA VOS) ---
+    # --- ADMIN SHORTCUT ---
     if prompt == "#admin-miguel":
         st.session_state.admin_mode = True
         st.rerun()
-    # --------------------------------------
+    # ----------------------
 
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").markdown(prompt)
 
     try:
         chat = st.session_state.chat_session
-        with st.spinner("Miguel está analizando stock y calculando descuentos..."):
-            response = chat.send_message(prompt)
-            full_text = response.text
+        with st.chat_message("assistant", avatar="👷‍♂️"):
+            # STREAMING: Efecto escritura en tiempo real
+            response_placeholder = st.empty()
+            full_response = ""
             
-            # 1. Guardar Log
-            log_interaction(prompt, full_text)
+            # Solicitamos el stream=True para velocidad percibida
+            response_stream = chat.send_message(prompt, stream=True)
             
-            # 2. Procesar respuesta para WhatsApp
+            for chunk in response_stream:
+                if chunk.text:
+                    full_response += chunk.text
+                    # Actualizamos el texto a medida que llega
+                    response_placeholder.markdown(full_response + "▌")
+            
+            # Texto final limpio
+            response_placeholder.markdown(full_response)
+            
+            # --- PROCESAMIENTO POSTERIOR (YA SE MOSTRÓ EL TEXTO) ---
+            
+            # 1. Log en segundo plano (No frena la UI)
+            log_interaction(prompt, full_response)
+            
+            # 2. Análisis para Botón WhatsApp
             WHATSAPP_TAG = "[TEXTO_WHATSAPP]:"
-            if WHATSAPP_TAG in full_text:
-                dialogue, wa_part = full_text.split(WHATSAPP_TAG, 1)
+            if WHATSAPP_TAG in full_response:
+                dialogue, wa_part = full_response.split(WHATSAPP_TAG, 1)
                 
-                # Feedback visual de descuento
+                # Para limpiar visualmente el tag del chat si quedó visible
+                # (Opcional: re-renderizar solo el dialogo limpio)
+                response_placeholder.markdown(dialogue.strip())
+                st.session_state.messages.append({"role": "assistant", "content": dialogue.strip()})
+                
+                # Feedback Descuento
                 if "15%" in dialogue or "MAYORISTA" in dialogue:
                     st.balloons()
                     st.toast('🎉 ¡Tarifa Mayorista (15% OFF) Activada!', icon='💰')
                 
-                st.markdown(dialogue.strip())
-                st.session_state.messages.append({"role": "assistant", "content": dialogue.strip()})
-                
                 wa_encoded = urllib.parse.quote(wa_part.strip())
                 wa_url = f"https://wa.me/5493401527780?text={wa_encoded}"
                 
-                # BOTÓN DE CIERRE
+                # Botón
                 st.markdown(f"""
                 <a href="{wa_url}" target="_blank" class="final-action-card">
                     🚀 FINALIZAR PEDIDO CON MARTÍN<br>
@@ -273,16 +292,15 @@ if prompt := st.chat_input("Ej: 20 chapas para San Jorge..."):
                 </a>
                 """, unsafe_allow_html=True)
             else:
-                st.markdown(full_text)
-                st.session_state.messages.append({"role": "assistant", "content": full_text})
-                
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
+
     except Exception as e:
         st.error(f"Error: {e}")
 
 # --- 10. PANEL DE CONTROL OCULTO ---
 if st.session_state.admin_mode:
     st.markdown("---")
-    st.warning("🔐 MODO ADMINISTRADOR ACTIVADO (Solo visible para ti)")
+    st.warning("🔐 MODO ADMINISTRADOR (MIGUEL)")
     st.write("### 📊 Ventas y Cotizaciones (Sesión Actual)")
     
     if st.session_state.log_data:
@@ -292,8 +310,8 @@ if st.session_state.admin_mode:
         csv = df_log.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Descargar CSV", csv, "metricas.csv", "text/csv")
     else:
-        st.info("No hay datos nuevos en esta sesión.")
+        st.info("Sin datos recientes.")
         
-    if st.button("🔴 Salir del Admin"):
+    if st.button("🔴 Cerrar Panel"):
         st.session_state.admin_mode = False
         st.rerun()
