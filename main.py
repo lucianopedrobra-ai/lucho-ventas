@@ -3,8 +3,18 @@ import pandas as pd
 import google.generativeai as genai
 import urllib.parse
 import re
+import datetime
+import requests  # Necesario para enviar datos al formulario
 
-# --- 1. VARIABLES DE NEGOCIO ---
+# --- 1. CONFIGURACIÓN DE ANALÍTICAS (GOOGLE FORMS) ---
+# PASO 1: Crea un Google Form con 3 campos de texto.
+# PASO 2: Obtén el "link prellenado" para sacar los ID de los campos (entry.123456).
+URL_FORM_GOOGLE = ""  # Pega aquí la URL de acción del form (termina en /formResponse)
+ID_CAMPO_CLIENTE = "entry.xxxxxx" # ID para el texto del cliente
+ID_CAMPO_MONTO = "entry.xxxxxx"   # ID para el monto
+ID_CAMPO_OPORTUNIDAD = "entry.xxxxxx" # ID para el nivel de oportunidad
+
+# --- 2. VARIABLES DE NEGOCIO ---
 DOLAR_BNA_REF = 1060.00 
 CIUDADES_GRATIS = """
 EL TREBOL, LOS CARDOS, LAS ROSAS, SAN GENARO, CENTENO, CASAS, CAÑADA ROSQUIN, 
@@ -14,7 +24,7 @@ SAN JORGE, LAS PETACAS, ZENON PEREYRA, CARLOS PELLEGRINI, LANDETA, MARIA SUSANA,
 PIAMONTE, VILA, SAN FRANCISCO.
 """
 
-# --- 2. CONFIGURACIÓN VISUAL ---
+# --- 3. CONFIGURACIÓN VISUAL ---
 st.set_page_config(
     page_title="Asesor Técnico | Pedro Bravin S.A.",
     page_icon="🏗️",
@@ -64,13 +74,12 @@ st.markdown("""
         font-weight: 700; font-size: 1.1rem; margin-top: 20px;
         box-shadow: 0 10px 20px rgba(37, 211, 102, 0.3);
         transition: transform 0.2s;
+        border: 2px solid white;
     }
-    .final-action-card:hover { transform: translateY(-3px); }
+    .final-action-card:hover { transform: translateY(-3px); box-shadow: 0 15px 25px rgba(37, 211, 102, 0.4); }
     
-    @media (max-width: 600px) {
-        .fixed-header { padding: 8px 15px; }
-        .wa-pill-btn span { display: none; }
-    }
+    /* MODAL DE CARGA */
+    .stSpinner > div { border-top-color: #0f2c59 !important; }
     </style>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -87,7 +96,7 @@ st.markdown("""
     </div>
     """, unsafe_allow_html=True)
 
-# --- 3. AUTENTICACIÓN ---
+# --- 4. AUTENTICACIÓN ---
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
@@ -95,7 +104,7 @@ except Exception:
     st.error("⚠️ Sistema en mantenimiento.")
     st.stop()
 
-# --- 4. CARGA DE DATOS ---
+# --- 5. CARGA DE DATOS ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvnarDQ/pub?gid=2029869540&single=true&output=csv"
 
 @st.cache_data(ttl=600)
@@ -118,24 +127,56 @@ if raw_data is not None and not raw_data.empty:
 else:
     csv_context = "ERROR CRÍTICO: Base de datos no accesible."
 
-# --- 5. LOGS (EL CHIVATO) ---
+# --- 6. SISTEMA DE METRICAS Y LOGS ---
+if "log_data" not in st.session_state:
+    st.session_state.log_data = []
+
+def enviar_a_google_form(cliente, monto, oportunidad):
+    """Envía los datos silenciosamente a Google Forms si está configurado"""
+    if URL_FORM_GOOGLE and "docs.google.com" in URL_FORM_GOOGLE:
+        try:
+            payload = {
+                ID_CAMPO_CLIENTE: str(cliente),
+                ID_CAMPO_MONTO: str(monto),
+                ID_CAMPO_OPORTUNIDAD: str(oportunidad)
+            }
+            requests.post(URL_FORM_GOOGLE, data=payload, timeout=2)
+        except:
+            pass # Si falla, no interrumpimos al usuario
+
 def log_interaction(user_text, bot_response):
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     opportunity = "NORMAL"
+    monto_estimado = 0
+    
+    # Detección de Montos
     if "$" in bot_response:
         try:
             precios = [int(s.replace('.','')) for s in re.findall(r'\$([\d\.]+)', bot_response) if s.replace('.','').isdigit()]
-            if any(p > 300000 for p in precios):
-                opportunity = "🔥 ALTA (MAYORISTA)"
+            if precios:
+                monto_estimado = max(precios)
+                if monto_estimado > 300000:
+                    opportunity = "🔥 ALTA (MAYORISTA)"
         except:
             pass
-    print(f"LOG: {user_text} | Oportunidad: {opportunity}")
 
-# --- 6. CEREBRO DE VENTAS (MODO EXPERTO + CLARIDAD IVA) ---
+    # 1. Guardar en Memoria de Sesión (Para ver en Admin Panel ya mismo)
+    st.session_state.log_data.append({
+        "Fecha": timestamp,
+        "Usuario": user_text[:50],
+        "Oportunidad": opportunity,
+        "Monto Max": monto_estimado
+    })
+    
+    # 2. Enviar a la Nube (Google Forms)
+    enviar_a_google_form(user_text, monto_estimado, opportunity)
+
+# --- 7. CEREBRO DE VENTAS (MODO CIERRE AGRESIVO) ---
 sys_prompt = f"""
-ROL: Eres Lucho, **Asesor Técnico Virtual** de **Pedro Bravin S.A.** (El Trébol, Santa Fe).
-OBJETIVO: Cotizar EXCLUSIVAMENTE lo que hay en lista, calcular logística precisa y cerrar ventas.
+ROL: Eres Lucho, **Experto en Cierre de Ventas** y Asesor Técnico de **Pedro Bravin S.A.**
+OBJETIVO PRINCIPAL: No solo informar precios, sino **CONSEGUIR QUE EL CLIENTE HAGA CLIC EN "CONFIRMAR PEDIDO"**.
 
-BASE DE DATOS (INVENTARIO WEB):
+BASE DE DATOS:
 ------------------------------------------------------------
 {csv_context}
 ------------------------------------------------------------
@@ -143,80 +184,71 @@ DATOS OPERATIVOS:
 - DÓLAR BNA: ${DOLAR_BNA_REF}
 - ZONA GRATIS: {CIUDADES_GRATIS}
 
-🚨 **REGLA DE ORO DE PRECIOS (IMPUESTOS):**
-* Los precios del CSV son **NETOS**.
-* **OBLIGATORIO:** Cada vez que des un precio (unitario o total), debes escribir al lado: **"+ IVA"**.
-* **PROHIBIDO:** Decir "Precio Final" o "IVA Incluido". Si el cliente pregunta, aclara: "Todos los precios son Netos + IVA (10.5% o 21% según producto)".
+🔥 **TÉCNICAS DE CIERRE OBLIGATORIAS:**
+1.  **SENTIDO DE URGENCIA:** Si hay stock, menciona que "se mueve rápido" o "queda poco de este lote".
+2.  **PRECIO ANCLA:** Si el total supera $200.000, felicítalo por estar cerca del descuento mayorista o aplícalo si corresponde.
+3.  **SIEMPRE TERMINA CON PREGUNTA:** Nunca termines una frase con un punto. Termina invitando a la acción: 
+    * "¿Te preparo el link para reservarlo ya?"
+    * "¿Te parece bien el presupuesto para avanzar?"
+    * "¿Lo confirmamos antes de que cambie el dólar?"
 
-🔒 **PROTOCOLOS DE SEGURIDAD (ANTI-ALUCINACIÓN):**
-1.  **SI ESTÁ EN CSV:** Cotiza precio exacto + IVA. Confirma Stock.
-2.  **SI NO ESTÁ:** DI: "No figura en mi lista web, pero **te lo agrego al pedido como 'A cotizar'** para que Martín te pase el precio." (No inventes precio).
+🚨 **REGLA DE PRECIOS (IMPUESTOS):**
+* Precios CSV son **NETOS**.
+* Salida OBLIGATORIA: "$ [Precio] + IVA".
 
-🧠 **ESTRATEGIA COMERCIAL:**
-1.  **TRADUCCIÓN:** "Gas"=EPOXI, "Estructural"=Tubo c/costura, "Techo"=Cincalum.
-2.  **LOGÍSTICA:**
-    * GRATIS -> ¡Véndelo como beneficio exclusivo!
-    * NO GRATIS -> Busca NODO CERCANO. Calcula (KM ida y vuelta al nodo) x 0.85 USD x Dolar. Explica el ahorro del redireccionamiento.
-3.  **GAMIFICACIÓN:**
-    * $200k-$299k -> "Estás cerca del MAYORISTA (15% OFF). ¿Agregamos algo?".
-    * >$300k -> "¡Tarifa MAYORISTA activada (15% OFF)!".
-4.  **CIERRE:** "Acopio 6 meses gratis."
+🧠 **ESTRATEGIA LOGÍSTICA:**
+* Si es zona GRATIS -> "¡Estás de suerte! Hoy tenemos logística bonificada a tu zona. Aprovechalo."
+* Si no -> Calcula flete nodo cercano y véndelo como "Ahorro por Redireccionamiento".
 
-📝 **FORMATO SALIDA:**
+📝 **FORMATO SALIDA FINAL (IMPORTANTE):**
 [TEXTO_WHATSAPP]:
-Hola Martín, vengo del Asesor Virtual.
+Hola Martín, quiero cerrar este pedido Web.
 📍 Destino: [Localidad]
-📋 Pedido Web:
-- (COD: [SKU]) [Producto] x [Cant]
-⚠️ A Cotizar Manual (Sugeridos):
-- [Items sin precio web]
-💰 Inversión Est. IA: $[Monto] + IVA ([Nota])
-Solicito confirmación final.
-Datos: [Nombre/DNI]
+📋 Materiales:
+- [Detalle]
+💰 Total Aprox: $[Monto] + IVA
+✅ Estado: Cliente listo para cerrar.
 """
 
-# --- 7. GESTIÓN DE SESIÓN (MODELO POTENTE) ---
+# --- 8. GESTIÓN DE SESIÓN ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "👋 **Bienvenido a Pedro Bravin S.A.**\n\nSoy Lucho, tu asesor técnico.\n\n**¿Qué materiales necesitas cotizar hoy?**"}]
+    st.session_state.messages = [{"role": "assistant", "content": "👋 **¡Hola! Soy Lucho.**\n\nEstoy conectado al stock en tiempo real.\n\n**¿Qué materiales necesitas cotizar para cerrar tu obra hoy?**"}]
 
 if "chat_session" not in st.session_state:
     try:
-        # VOLVEMOS AL MODELO PRO (CALIDAD MÁXIMA)
-        generation_config = {"temperature": 0.2, "max_output_tokens": 8192}
-        model = genai.GenerativeModel('gemini-2.5-pro', system_instruction=sys_prompt, generation_config=generation_config)
+        # MODELO GEMINI 2.5 O 1.5 PRO
+        generation_config = {"temperature": 0.3, "max_output_tokens": 8192} # Temp baja para ser preciso en precios
+        model = genai.GenerativeModel('gemini-1.5-pro', system_instruction=sys_prompt, generation_config=generation_config)
         st.session_state.chat_session = model.start_chat(history=[])
     except Exception:
-        try:
-            # Fallback seguro
-            model = genai.GenerativeModel('gemini-1.5-pro', system_instruction=sys_prompt)
-            st.session_state.chat_session = model.start_chat(history=[])
-        except Exception:
-            st.error("Error de conexión con el cerebro IA.")
+        st.error("Error conectando con IA.")
 
-# --- 8. INTERFAZ ---
+# --- 9. INTERFAZ DE CHAT ---
 for msg in st.session_state.messages:
     avatar = "👷‍♂️" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-if prompt := st.chat_input("Ej: 20 chapas para San Jorge..."):
+if prompt := st.chat_input("Ej: Necesito 10 caños 40x40 para armar un galpón..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").markdown(prompt)
 
     try:
         chat = st.session_state.chat_session
-        with st.spinner("Analizando stock y calculando (Precios + IVA)..."):
+        with st.spinner("🔍 Lucho está calculando el mejor precio..."):
             response = chat.send_message(prompt)
             full_text = response.text
             
+            # REGISTRAR INTERACCIÓN (MÉTRICAS)
             log_interaction(prompt, full_text)
             
             WHATSAPP_TAG = "[TEXTO_WHATSAPP]:"
             if WHATSAPP_TAG in full_text:
                 dialogue, wa_part = full_text.split(WHATSAPP_TAG, 1)
                 
+                # DETECCIÓN DE MAYORISTA PARA EFECTO VISUAL
                 if "15%" in dialogue or "MAYORISTA" in dialogue:
                     st.balloons()
-                    st.toast('🎉 ¡Ahorro Mayorista Detectado!', icon='💰')
+                    st.toast('🎉 ¡Tarifa Mayorista Aplicada!', icon='📉')
                 
                 st.markdown(dialogue.strip())
                 st.session_state.messages.append({"role": "assistant", "content": dialogue.strip()})
@@ -224,14 +256,37 @@ if prompt := st.chat_input("Ej: 20 chapas para San Jorge..."):
                 wa_encoded = urllib.parse.quote(wa_part.strip())
                 wa_url = f"https://wa.me/5493401527780?text={wa_encoded}"
                 
+                # BOTÓN DE CIERRE GIGANTE
                 st.markdown(f"""
                 <a href="{wa_url}" target="_blank" class="final-action-card">
-                    <i class="fa-brands fa-whatsapp" style="margin-right:8px;"></i> CONFIRMAR PEDIDO CON MARTÍN
+                    🚀 FINALIZAR PEDIDO AHORA<br>
+                    <span style="font-size:0.8rem; font-weight:400;">Enviar detalle a Martín por WhatsApp</span>
                 </a>
                 """, unsafe_allow_html=True)
             else:
                 st.markdown(full_text)
                 st.session_state.messages.append({"role": "assistant", "content": full_text})
                 
-    except Exception:
-        st.error("Error de conexión. Use el botón superior.")
+    except Exception as e:
+        st.error(f"Ocurrió un error: {e}")
+
+# --- 10. PANEL DE CONTROL (ADMIN) ---
+# Se muestra solo si escribes "admin" en el chat o expandes esto
+with st.expander("🔐 Área Privada (Solo Dueños)"):
+    st.write("### 📊 Métricas de Sesión Actual")
+    if st.session_state.log_data:
+        df_log = pd.DataFrame(st.session_state.log_data)
+        st.dataframe(df_log)
+        
+        # Botón descarga
+        csv = df_log.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            "📥 Descargar Reporte CSV",
+            csv,
+            "reporte_ventas_lucho.csv",
+            "text/csv",
+            key='download-csv'
+        )
+        st.info("💡 Tip: Para tener métricas históricas de todos los días, configura la URL de Google Forms en el código.")
+    else:
+        st.warning("Aún no hay interacciones en esta sesión.")
