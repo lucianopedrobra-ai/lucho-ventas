@@ -11,14 +11,19 @@ import time
 # ==========================================
 # 1. CONFIGURACIÓN ESTRATÉGICA (BACKEND)
 # ==========================================
+st.set_page_config(
+    page_title="Asesor Comercial | Pedro Bravin S.A.",
+    page_icon="🏗️",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-# --- Analíticas Silenciosas (Google Forms) ---
+# --- Analíticas y Variables ---
 URL_FORM_GOOGLE = ""  
 ID_CAMPO_CLIENTE = "entry.xxxxxx"
 ID_CAMPO_MONTO = "entry.xxxxxx"
 ID_CAMPO_OPORTUNIDAD = "entry.xxxxxx"
 
-# --- Variables de Negocio (Reglas de Oro) ---
 DOLAR_BNA_REF = 1060.00 
 CIUDADES_GRATIS = """
 EL TREBOL, LOS CARDOS, LAS ROSAS, SAN GENARO, CENTENO, CASAS, CAÑADA ROSQUIN, 
@@ -29,106 +34,142 @@ PIAMONTE, VILA, SAN FRANCISCO.
 """
 
 # ==========================================
-# 2. INTERFAZ VISUAL (OPTIMIZADA MOBILE)
+# 2. INTERFAZ VISUAL (ARQUITECTURA MOBILE-FIRST)
 # ==========================================
-st.set_page_config(
-    page_title="Asesor Comercial | Pedro Bravin S.A.",
-    page_icon="🏗️",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
-
 st.markdown("""
     <style>
-    /* 1. RESET GLOBAL */
+    /* 1. LIMPIEZA TOTAL DE INTERFAZ NATIVA */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    html, body, [class*="css"] { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; }
+    
+    /* 2. FUENTES Y BASE */
+    html, body, [class*="css"] { 
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+        background-color: #ffffff;
+    }
 
-    /* 2. HEADER FLOTANTE (ESTABLE) */
+    /* 3. HEADER PERSONALIZADO (MÓVIL Y DESKTOP) */
     .fixed-header {
-        position: fixed; top: 0; left: 0; width: 100%;
+        position: fixed; 
+        top: 0; 
+        left: 0; 
+        width: 100%;
+        height: 60px; /* Altura fija para calcular paddings */
         background-color: #ffffff; 
         border-bottom: 1px solid #e0e0e0;
-        padding: 10px 15px; 
-        z-index: 1000000; /* Capa máxima */
-        display: flex; justify-content: space-between; align-items: center;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        z-index: 999999; /* Siempre arriba de todo */
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center;
+        padding: 0 15px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
     }
     
-    .brand-group { display: flex; flex-direction: column; }
-    .brand-name { color: #0f2c59; font-weight: 800; font-size: 0.9rem; text-transform: uppercase; }
-    .brand-sub { color: #666; font-size: 0.7rem; }
+    .brand-text { 
+        color: #0f2c59; 
+        font-weight: 800; 
+        font-size: 16px; 
+        line-height: 1.2;
+    }
+    .brand-sub { 
+        font-size: 10px; 
+        color: #888; 
+        font-weight: 400; 
+        display: block;
+    }
 
     /* Botón WhatsApp */
     .wa-btn {
-        background-color: #25D366; color: white !important;
-        text-decoration: none; padding: 6px 12px; border-radius: 50px;
-        font-weight: 600; font-size: 0.8rem; display: flex; align-items: center; gap: 5px;
-        box-shadow: 0 4px 6px rgba(37, 211, 102, 0.2);
-    }
-    
-    /* 3. AJUSTE DE CONTENEDOR (CRÍTICO PARA QUE NO SE TAPE NADA) */
-    .block-container { 
-        padding-top: 80px !important; 
-        padding-bottom: 100px !important; /* Espacio para el input */
+        background-color: #25D366; 
+        color: white !important;
+        text-decoration: none; 
+        padding: 8px 15px; 
+        border-radius: 20px;
+        font-weight: 600; 
+        font-size: 13px; 
+        display: flex; 
+        align-items: center; 
+        gap: 5px;
+        white-space: nowrap;
     }
 
-    /* 4. CHAT Y MENSAJES */
-    .stChatMessage { padding: 1rem !important; }
-    .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) { background-color: #f8f9fa; border: 1px solid #eee; border-radius: 10px; }
-    .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) .stChatMessageAvatar { background-color: #0f2c59; color: white; }
-    .stChatMessage[data-testid="stChatMessage"]:nth-child(even) { background-color: #fff; }
+    /* 4. AJUSTE DEL ÁREA DE CONTENIDO (CRÍTICO PARA MÓVIL) */
+    .block-container {
+        padding-top: 80px !important;    /* Espacio para el Header (60px + aire) */
+        padding-bottom: 150px !important; /* Espacio GIGANTE abajo para que el teclado no tape el último chat */
+        max-width: 100%;
+    }
 
-    /* 5. FIX DE INPUT (SOLUCIÓN "NO VEO LO QUE ESCRIBO") */
-    /* No forzamos position:fixed al contenedor para no romper el teclado nativo del celular */
-    .stChatInput {
-        padding-bottom: 15px !important;
-        background: transparent !important;
+    /* 5. MENSAJES DE CHAT */
+    .stChatMessage {
+        background-color: transparent;
+    }
+    .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) {
+        background-color: #f0f4f8; 
+        border-radius: 10px;
+        padding: 10px;
+    }
+
+    /* 6. CORRECCIÓN DE LA BARRA DE ENTRADA (EL FIX REAL) */
+    /* No usamos position:fixed aquí para no romper el teclado nativo.
+       Solo estilizamos el interior. */
+    .stChatInputContainer {
+        padding-bottom: 10px;
     }
     
-    /* Forzamos colores dentro de la caja de texto */
-    .stChatInput textarea {
-        background-color: #ffffff !important; 
+    div[data-testid="stChatInput"] {
+        background-color: white !important;
+        border-top: 1px solid #ddd;
+        padding-top: 10px;
+    }
+
+    /* Forzar colores para evitar problemas de Modo Oscuro/Claro */
+    textarea[data-testid="stChatInputTextArea"] {
+        background-color: #ffffff !important;
         color: #000000 !important;
-        caret-color: #000000 !important; /* Color del cursor */
-        border: 1px solid #ccc !important;
+        caret-color: #000000 !important;
+        border: 1px solid #cccccc !important;
+    }
+    
+    /* Placeholder visible */
+    textarea[data-testid="stChatInputTextArea"]::placeholder {
+        color: #666666 !important;
     }
 
-    /* 6. RESPONSIVE (CELULARES) */
-    @media (max-width: 600px) {
-        .brand-name { font-size: 0.75rem; }
-        .brand-sub { font-size: 0.6rem; }
-        .wa-btn span { display: none; } /* Solo icono en móvil */
-        .wa-btn::after { content: "WhatsApp"; font-size: 0.75rem; }
-        
-        /* Aumentamos padding inferior para seguridad con teclados iOS/Android */
-        .block-container { padding-bottom: 140px !important; }
-    }
-
-    /* TARJETA FINAL CTA */
-    .cta-card {
+    /* 7. TARJETA CTA FINAL */
+    .cta-box {
         background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
-        color: white !important; text-align: center; padding: 15px; 
-        border-radius: 12px; text-decoration: none; display: block;
-        font-weight: 700; margin-top: 15px;
-        box-shadow: 0 8px 15px rgba(37, 211, 102, 0.3);
+        color: white;
+        padding: 15px;
+        border-radius: 12px;
+        text-align: center;
+        margin-top: 15px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        text-decoration: none;
+        display: block;
+    }
+
+    /* 8. MEDIA QUERY ESPECÍFICA PARA CELULARES */
+    @media (max-width: 600px) {
+        .brand-text { font-size: 14px; }
+        .wa-btn span { display: none; } /* Ocultar texto en pantallas muy chicas */
+        .wa-btn::after { content: "WhatsApp"; }
+        .block-container { padding-bottom: 160px !important; } /* Más espacio en móvil */
     }
     </style>
-    
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
     <div class="fixed-header">
-        <div class="brand-group">
-            <span class="brand-name">Miguel | Pedro Bravin S.A.</span>
-            <span class="brand-sub">⚠️ Stock y Precios Estimados</span>
+        <div class="brand-wrapper">
+            <div class="brand-text">MIGUEL | PEDRO BRAVIN S.A.</div>
+            <span class="brand-sub">⚠️ Precios y Stock Estimados</span>
         </div>
         <a href="https://wa.me/5493401527780" target="_blank" class="wa-btn">
-            <i class="fa-brands fa-whatsapp"></i>
             <span>Hablar con Martín</span>
         </a>
     </div>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     """, unsafe_allow_html=True)
 
 # ==========================================
@@ -272,10 +313,12 @@ if "chat_session" not in st.session_state:
         except Exception:
             st.error("Error de conexión.")
 
+# Render Mensajes
 for msg in st.session_state.messages:
     avatar = "👷‍♂️" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
+# Input Usuario
 if prompt := st.chat_input("Ej: Necesito 20 chapas T101 para San Jorge..."):
     
     if prompt == "#admin-miguel":
@@ -306,6 +349,7 @@ if prompt := st.chat_input("Ej: Necesito 20 chapas T101 para San Jorge..."):
             response_placeholder.markdown(full_response)
             log_interaction(prompt, full_response)
             
+            # Procesamiento de Respuesta Final
             WHATSAPP_TAG = "[TEXTO_WHATSAPP]:"
             if WHATSAPP_TAG in full_response:
                 dialogue, wa_part = full_response.split(WHATSAPP_TAG, 1)
@@ -319,10 +363,11 @@ if prompt := st.chat_input("Ej: Necesito 20 chapas T101 para San Jorge..."):
                 wa_encoded = urllib.parse.quote(wa_part.strip())
                 wa_url = f"https://wa.me/5493401527780?text={wa_encoded}"
                 
+                # HTML Renderizado para el Botón CTA
                 st.markdown(f"""
-                <a href="{wa_url}" target="_blank" class="cta-card">
-                    🚀 FINALIZAR PEDIDO CON MARTÍN<br>
-                    <span style="font-size:0.8rem; font-weight:400;">Enviar cotización por WhatsApp</span>
+                <a href="{wa_url}" target="_blank" class="cta-box">
+                    <div style="font-weight:800; font-size: 1.1rem;">🚀 FINALIZAR PEDIDO</div>
+                    <div style="font-size:0.8rem; opacity: 0.9;">Enviar cotización a Martín</div>
                 </a>
                 """, unsafe_allow_html=True)
             else:
@@ -336,14 +381,10 @@ if prompt := st.chat_input("Ej: Necesito 20 chapas T101 para San Jorge..."):
 # ==========================================
 if st.session_state.admin_mode:
     st.markdown("---")
-    st.warning("🔐 ADMIN PANEL (MIGUEL)")
+    st.warning("🔐 ADMIN PANEL")
     if st.session_state.log_data:
         df_log = pd.DataFrame(st.session_state.log_data)
         st.dataframe(df_log, use_container_width=True)
-        csv = df_log.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Descargar CSV", csv, "metricas_miguel.csv", "text/csv")
-    else:
-        st.info("Sin datos.")
-    if st.button("🔴 Cerrar Panel"):
+    if st.button("🔴 Cerrar"):
         st.session_state.admin_mode = False
         st.rerun()
