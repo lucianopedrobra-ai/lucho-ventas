@@ -5,7 +5,7 @@ import urllib.parse
 import re
 import datetime
 import requests
-import threading # NUEVO: Para que el bot haga cosas en segundo plano
+import threading
 
 # --- 1. CONFIGURACIÓN DE ANALÍTICAS (GOOGLE FORMS) ---
 URL_FORM_GOOGLE = ""  
@@ -160,7 +160,6 @@ def log_interaction(user_text, bot_response):
         except:
             pass
 
-    # Guardado local (instantáneo)
     st.session_state.log_data.append({
         "Fecha": timestamp,
         "Usuario": user_text[:50],
@@ -168,15 +167,13 @@ def log_interaction(user_text, bot_response):
         "Monto Max": monto_estimado
     })
     
-    # Envío a la nube en un HILO SEPARADO (Multitarea)
-    # Esto evita que el usuario espere a que Google responda
     thread = threading.Thread(target=enviar_a_google_form_background, args=(user_text, monto_estimado, opportunity))
     thread.start()
 
-# --- 7. CEREBRO DE VENTAS (MIGUEL VENDEDOR) ---
+# --- 7. CEREBRO DE VENTAS (MIGUEL MAXIMIZADOR) ---
 sys_prompt = f"""
-ROL: Eres Miguel, **Asesor Técnico Virtual** y **Experto en Cierre** de **Pedro Bravin S.A.** (El Trébol, Santa Fe).
-OBJETIVO: Cotizar EXCLUSIVAMENTE lo que hay en lista, calcular logística precisa y **CERRAR VENTAS**.
+ROL: Eres Miguel, **Asesor Técnico Virtual** y **Experto en Cierre** de **Pedro Bravin S.A.**
+OBJETIVO: Maximizar el ticket de venta, calcular logística y cerrar operaciones.
 
 BASE DE DATOS (STOCK WEB):
 ------------------------------------------------------------
@@ -186,27 +183,31 @@ DATOS OPERATIVOS:
 - DÓLAR BNA: ${DOLAR_BNA_REF}
 - ZONA GRATIS: {CIUDADES_GRATIS}
 
-🚨 **REGLA DE ORO DE PRECIOS:**
-* Los precios del CSV son **NETOS**.
-* **OBLIGATORIO:** Cada vez que des un precio, escribe al lado: **"+ IVA"**.
+🚨 **REGLA DE PRECIOS:** Precios CSV son NETOS. Siempre sumar "+ IVA".
 
-🧠 **ESTRATEGIA COMERCIAL (NO MODIFICAR):**
-1.  **LOGÍSTICA:** * GRATIS en zona (El Trébol y alrededores).
-    * Si no, calcula flete (Redireccionamiento) y comunícalo como ahorro.
-2.  **GAMIFICACIÓN DE PRECIOS:**
-    * **$200k - $299k** -> "Estás cerca del MAYORISTA (15% OFF). ¿Qué más agregamos?".
-    * **Mayor a $300k** -> "¡Felicitaciones! Tarifa **MAYORISTA activada (15% OFF)**."
-3.  **CIERRE DE VENTA:** * Ofrece siempre: **"Acopio 6 meses gratis"**.
-    * Termina siempre invitando a confirmar: "¿Te paso el link para congelar el precio?".
+🧠 **ESTRATEGIA DE VENTA CRUZADA (CROSS-SELLING) - OBLIGATORIO:**
+1.  **DETECTA LO QUE FALTA:** Si pide chapas, necesita tornillos y aislante. Si pide perfiles, necesita electrodos o discos.
+2.  **REGLA DE STOCK (CRÍTICA):**
+    * **SI EL PRODUCTO ESTÁ EN CSV:** Ofrécelo activamente al cliente. Ej: "Tengo los tornillos para esas chapas en stock a $X, ¿los agrego?".
+    * **SI NO ESTÁ EN CSV:** NO des precio. Dile: "Te agrego los complementarios a la nota de pedido para que Martín te los cotice". Y agrégalos al Link de WhatsApp.
 
-📝 **FORMATO SALIDA (PARA WHATSAPP):**
+🏆 **GAMIFICACIÓN (AUMENTAR TICKET):**
+* **$200k - $299k:** "Estás cerca del MAYORISTA (15% OFF). ¿Agregamos algo más?".
+* **Mayor a $300k:** "¡Tarifa MAYORISTA (15% OFF) Activada!".
+
+🚚 **LOGÍSTICA:**
+* Gratis en zona. Si no, cobrar flete desde nodo cercano (Redireccionamiento).
+
+📝 **FORMATO SALIDA (LINK WHATSAPP):**
 [TEXTO_WHATSAPP]:
 Hola Martín, vengo del Asesor Virtual (Miguel).
 📍 Destino: [Localidad]
-📋 Pedido Web:
-- [SKU/Producto] x [Cantidad]
+📋 Pedido Web (Stock Confirmado):
+- [SKU] [Producto] x [Cant]
+⚠️ Sugerencias IA (A Cotizar Manual):
+- [Items complementarios que NO están en web]
 💰 Inversión Est: $[Monto] + IVA
-🎁 Beneficios: [Acopio Gratis / 15% OFF si aplica]
+🎁 Beneficios: [Acopio / 15% OFF]
 Solicito link de pago.
 """
 
@@ -216,7 +217,7 @@ if "messages" not in st.session_state:
 
 if "chat_session" not in st.session_state:
     try:
-        # MODELO GEMINI 2.5 PRO (TU MODELO POTENTE)
+        # MODELO GEMINI 2.5 PRO
         generation_config = {"temperature": 0.2, "max_output_tokens": 8192}
         model = genai.GenerativeModel('gemini-2.5-pro', system_instruction=sys_prompt, generation_config=generation_config)
         st.session_state.chat_session = model.start_chat(history=[])
@@ -227,7 +228,7 @@ if "chat_session" not in st.session_state:
         except Exception:
             st.error("Error de conexión con IA.")
 
-# --- 9. INTERFAZ DE USUARIO (CON STREAMING) ---
+# --- 9. INTERFAZ DE USUARIO (CON FEEDBACK DE CARGA + STREAMING) ---
 for msg in st.session_state.messages:
     avatar = "👷‍♂️" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
@@ -245,38 +246,32 @@ if prompt := st.chat_input("Ej: 20 chapas para San Jorge..."):
     try:
         chat = st.session_state.chat_session
         with st.chat_message("assistant", avatar="👷‍♂️"):
-            # STREAMING: Efecto escritura en tiempo real
+            # AQUÍ ESTÁ EL CAMBIO VISUAL:
+            # Mostramos un spinner de carga que desaparece automáticamente al empezar a escribir.
+            with st.spinner("Miguel está analizando stock y costos..."):
+                response_stream = chat.send_message(prompt, stream=True)
+            
+            # Streaming normal
             response_placeholder = st.empty()
             full_response = ""
-            
-            # Solicitamos el stream=True para velocidad percibida
-            response_stream = chat.send_message(prompt, stream=True)
             
             for chunk in response_stream:
                 if chunk.text:
                     full_response += chunk.text
-                    # Actualizamos el texto a medida que llega
                     response_placeholder.markdown(full_response + "▌")
             
-            # Texto final limpio
             response_placeholder.markdown(full_response)
             
-            # --- PROCESAMIENTO POSTERIOR (YA SE MOSTRÓ EL TEXTO) ---
-            
-            # 1. Log en segundo plano (No frena la UI)
+            # --- PROCESAMIENTO ---
             log_interaction(prompt, full_response)
             
-            # 2. Análisis para Botón WhatsApp
             WHATSAPP_TAG = "[TEXTO_WHATSAPP]:"
             if WHATSAPP_TAG in full_response:
                 dialogue, wa_part = full_response.split(WHATSAPP_TAG, 1)
                 
-                # Para limpiar visualmente el tag del chat si quedó visible
-                # (Opcional: re-renderizar solo el dialogo limpio)
                 response_placeholder.markdown(dialogue.strip())
                 st.session_state.messages.append({"role": "assistant", "content": dialogue.strip()})
                 
-                # Feedback Descuento
                 if "15%" in dialogue or "MAYORISTA" in dialogue:
                     st.balloons()
                     st.toast('🎉 ¡Tarifa Mayorista (15% OFF) Activada!', icon='💰')
@@ -284,7 +279,6 @@ if prompt := st.chat_input("Ej: 20 chapas para San Jorge..."):
                 wa_encoded = urllib.parse.quote(wa_part.strip())
                 wa_url = f"https://wa.me/5493401527780?text={wa_encoded}"
                 
-                # Botón
                 st.markdown(f"""
                 <a href="{wa_url}" target="_blank" class="final-action-card">
                     🚀 FINALIZAR PEDIDO CON MARTÍN<br>
