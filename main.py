@@ -3,10 +3,10 @@ import pandas as pd
 import google.generativeai as genai
 import urllib.parse
 
-# --- 1. VARIABLES DE NEGOCIO ---
-DOLAR_BNA_REF = 1060.00  # Dólar Venta BNA
+# --- 1. VARIABLES DE NEGOCIO (EL CEREBRO FINANCIERO) ---
+DOLAR_BNA_REF = 1060.00  # Actualizar según cotización BNA Venta
 
-# NODOS LOGÍSTICOS (Lugares donde el camión ya va gratis)
+# LISTA OFICIAL DE NODOS LOGÍSTICOS (ENVÍO GRATIS)
 CIUDADES_GRATIS = """
 EL TREBOL, LOS CARDOS, LAS ROSAS, SAN GENARO, CENTENO, CASAS, CAÑADA ROSQUIN, 
 SAN VICENTE, SAN MARTIN DE LAS ESCOBAS, ANGELICA, SUSANA, RAFAELA, SUNCHALES, 
@@ -15,16 +15,17 @@ SAN JORGE, LAS PETACAS, ZENON PEREYRA, CARLOS PELLEGRINI, LANDETA, MARIA SUSANA,
 PIAMONTE, VILA, SAN FRANCISCO.
 """
 
-# --- 2. CONFIGURACIÓN VISUAL ---
+# --- 2. CONFIGURACIÓN VISUAL Y ESTILOS ---
 st.set_page_config(page_title="Cotizador Pedro Bravin S.A.", page_icon="🏗️", layout="wide")
 
 st.markdown("""
     <style>
+    /* Ocultar elementos nativos */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* HEADER FIJO */
+    /* --- HEADER FIJO (STICKY) --- */
     .fixed-header {
         position: fixed; top: 0; left: 0; width: 100%;
         background-color: #fff3cd; border-bottom: 2px solid #ffeeba;
@@ -39,9 +40,11 @@ st.markdown("""
     }
     .header-btn:hover { background-color: #075e54; }
     .header-text { font-size: 0.9rem; line-height: 1.3; margin-right: 15px; }
+
+    /* Ajuste para que el chat no quede tapado por el header */
     .block-container { padding-top: 85px !important; }
     
-    /* BOTÓN WHATSAPP */
+    /* BOTÓN FINAL DE CIERRE */
     .whatsapp-btn-final {
         display: block; width: 100%; background-color: #25D366; color: white !important;
         text-align: center; padding: 15px; border-radius: 10px; text-decoration: none;
@@ -100,17 +103,17 @@ if raw_data is not None and not raw_data.empty:
 else:
     csv_context = "ERROR: Lista no disponible."
 
-# --- 5. CEREBRO DE VENTAS (LOGÍSTICA IDA Y VUELTA REFORZADA) ---
+# --- 5. CEREBRO DE VENTAS (OPTIMIZADO CON GAMIFICACIÓN) ---
 sys_prompt = f"""
 ROL: Eres Lucho, Ejecutivo Comercial de **Pedro Bravin S.A.** (El Trébol, SF).
-OBJETIVO: Traducir pedidos, definir rol, OPTIMIZAR LOGÍSTICA (Nodos) y cerrar venta.
+OBJETIVO: Traducir pedidos, definir rol, OPTIMIZAR LOGÍSTICA, y **MAXIMIZAR EL TICKET DE VENTA**.
 
 BASE DE DATOS (PRECIOS NETOS):
 ------------------------------------------------------------
 {csv_context}
 ------------------------------------------------------------
 DATOS OPERATIVOS:
-- DÓLAR REF: ${DOLAR_BNA_REF} (BNA Venta).
+- DÓLAR REFERENCIA: ${DOLAR_BNA_REF} (BNA Venta).
 - **ZONA GRATIS (NODOS):** {CIUDADES_GRATIS}
 
 🧠 **PROCESO DE PENSAMIENTO (4 FASES):**
@@ -122,47 +125,55 @@ DATOS OPERATIVOS:
 * **Commodity:** Se RÁPIDO.
 * **Técnico:** Se CONSULTIVO (pregunta uso).
 
-**FASE 3: CALCULADORA LOGÍSTICA INTELIGENTE (IDA Y VUELTA AL NODO)**
+**FASE 3: CALCULADORA LOGÍSTICA INTELIGENTE (NODOS)**
 Pregunta: "¿Para qué localidad es?".
 1.  **¿Está en la lista GRATIS?** -> "¡Envío SIN CARGO!".
-2.  **¿NO está en la lista? (Ej: Esperanza, Gálvez)**
-    * Busca en tu mapa mental la ciudad de la 'ZONA GRATIS' más cercana (El Nodo).
-    * *Ejemplo:* Si pide Esperanza -> El Nodo gratis más cercano es RAFAELA.
-    * Calcula los KM solo de ese tramo (Rafaela <-> Esperanza).
-    * **FÓRMULA OBLIGATORIA:** (KM del tramo x 2) * 0.85 USD * {DOLAR_BNA_REF} = Costo Estimado.
-    * *Explicación al cliente:* "El envío va gratis hasta [Nodo Cercano] y solo te cobramos el redireccionamiento ida y vuelta hasta tu obra ($XXX aprox)."
+2.  **¿NO está en la lista? (Redireccionamiento)**
+    * Busca mentalmente la ciudad de la 'ZONA GRATIS' más cercana al cliente (El Nodo).
+    * *Ejemplo:* Si pide Esperanza -> Nodo más cercano: RAFAELA.
+    * Calcula KM solo de ese tramo (Nodo <-> Cliente).
+    * **FÓRMULA:** (KM del tramo x 2) * 0.85 USD * {DOLAR_BNA_REF} = Costo Estimado.
+    * *Explicación:* "El envío va gratis hasta [Nodo] y solo cobramos el tramo ida y vuelta hasta tu obra ($XXX aprox)."
 
-**FASE 4: CIERRE (Acopio)**
-* **ACOPIO:** "Podés congelar el precio hoy y lo acopiamos por **6 meses** sin cargo."
-* **MAYORISTA:** > $300.000 = **15% OFF**.
+**FASE 4: CIERRE FINANCIERO Y GAMIFICACIÓN (GATILLOS)**
+1.  **CÁLCULO DE TOTALES:** Suma mentalmente el total del pedido.
+2.  **ESTRATEGIA DE DESCUENTO:**
+    * **Si Total < $200.000:** Ofrece acopio y cierre normal.
+    * **Si Total entre $200.000 y $299.999:** ⚠️ ALERTA DE OPORTUNIDAD.
+      * *Di:* "⚠️ **¡Estás muy cerca!** Te faltan solo unos pesos para llegar a los $300.000 y desbloquear el **15% DE DESCUENTO MAYORISTA**. ¿Agregamos algo más (alambre, clavos, discos) para que te salga más barato?"
+    * **Si Total >= $300.000:** 🎉 ÉXITO.
+      * *Di:* "¡Felicitaciones! Accediste a la **TARIFA MAYORISTA (15% OFF)**."
+3.  **ACOPIO:** "Podés congelar el precio hoy y lo acopiamos por **6 meses** sin cargo."
 
 🚨 **REGLAS DE ORO:**
 1.  **STOCK:** Solo confirma lo que ves en lista.
 2.  **PRECIO:** Aclara "(Precio + IVA)".
-3.  **CROSS-SELL:** Ofrece complementos.
+3.  **CROSS-SELL:** Siempre intenta subir la venta si están cerca del descuento.
 
 🚨 **FORMATO SALIDA WHATSAPP:**
 [TEXTO_WHATSAPP]:
 Hola Martín, cliente Web.
-📍 Destino: [Localidad] (Logística: [Gratis / $Monto por Redireccionamiento])
+📍 Destino: [Localidad] (Logística: [Gratis / $Monto Redireccionado])
 📋 Pedido (Acopio 6 meses posible):
 - (COD: [SKU]) [Producto] x [Cant]
-💰 Total Mat. IA: $[Monto]
+💰 Total Mat. IA: $[Monto] ([Aviso de Descuento si aplica])
 ¿Me confirmas final?
 Datos: [Nombre/DNI]
 """
 
 # --- 6. MODELO IA ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "👋 Hola, soy Lucho de **Pedro Bravin S.A.**\n\n¿Qué materiales necesitás? Decime tu localidad para calcular si el envío es gratis."}]
+    st.session_state.messages = [{"role": "assistant", "content": "👋 Hola, soy Lucho de **Pedro Bravin S.A.**\n\n¿Qué materiales necesitás? (Hierros, perfiles, chapas...). Decime tu localidad para ver si tenés envío gratis."}]
 
 if "chat_session" not in st.session_state:
     try:
+        # Intento Principal: Gemini 2.5
         generation_config = {"temperature": 0.2, "max_output_tokens": 8192}
         model = genai.GenerativeModel('gemini-2.5-pro', system_instruction=sys_prompt, generation_config=generation_config)
         st.session_state.chat_session = model.start_chat(history=[])
     except Exception:
         try:
+            # Fallback: Gemini 1.5 Pro
             model = genai.GenerativeModel('gemini-1.5-pro', system_instruction=sys_prompt)
             st.session_state.chat_session = model.start_chat(history=[])
         except Exception:
@@ -173,13 +184,13 @@ for msg in st.session_state.messages:
     avatar = "👷‍♂️" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-if prompt := st.chat_input("Ej: 10 chapas para Esperanza..."):
+if prompt := st.chat_input("Ej: 20 perfiles C para San Jorge..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").markdown(prompt)
 
     try:
         chat = st.session_state.chat_session
-        with st.spinner("Lucho está calculando logística..."):
+        with st.spinner("Lucho está calculando costos y logística..."):
             response = chat.send_message(prompt)
             full_text = response.text
             
