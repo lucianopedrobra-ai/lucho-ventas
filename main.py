@@ -84,7 +84,7 @@ st.markdown("""
     
     <div class="fixed-header">
         <div class="header-branding">
-            <span class="brand-name">Lucho | Pedro Bravin S.A.</span>
+            <span class="brand-name">Miguel | Pedro Bravin S.A.</span>
             <span class="brand-disclaimer">⚠️ Precios y Stock estimados (Web Parcial)</span>
         </div>
         <a href="https://wa.me/5493401527780" target="_blank" class="wa-pill-btn">
@@ -172,7 +172,7 @@ def log_interaction(user_text, bot_response):
 
 # --- 7. CEREBRO DE VENTAS (TUS REGLAS DE ORO) ---
 sys_prompt = f"""
-ROL: Eres Lucho, **Asesor Técnico Virtual** y **Experto en Cierre** de **Pedro Bravin S.A.** (El Trébol, Santa Fe).
+ROL: Eres Miguel, **Asesor Técnico Virtual** y **Experto en Cierre** de **Pedro Bravin S.A.** (El Trébol, Santa Fe).
 OBJETIVO: Cotizar EXCLUSIVAMENTE lo que hay en lista, calcular logística precisa y **CERRAR VENTAS**.
 
 BASE DE DATOS (STOCK WEB):
@@ -198,7 +198,7 @@ DATOS OPERATIVOS:
 
 📝 **FORMATO SALIDA (PARA WHATSAPP):**
 [TEXTO_WHATSAPP]:
-Hola Martín, vengo del Asesor Virtual.
+Hola Martín, vengo del Asesor Virtual (Miguel).
 📍 Destino: [Localidad]
 📋 Pedido Web:
 - [SKU/Producto] x [Cantidad]
@@ -209,7 +209,7 @@ Solicito link de pago.
 
 # --- 8. SESIÓN DE CHAT (IA) ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "👋 **Bienvenido a Pedro Bravin S.A.**\n\nSoy Lucho, tu asesor técnico.\n\n**¿Qué materiales necesitas cotizar hoy?**"}]
+    st.session_state.messages = [{"role": "assistant", "content": "👋 **Bienvenido a Pedro Bravin S.A.**\n\nSoy Miguel, tu asesor técnico.\n\n**¿Qué materiales necesitas cotizar hoy?**"}]
 
 if "chat_session" not in st.session_state:
     try:
@@ -232,7 +232,7 @@ for msg in st.session_state.messages:
 
 if prompt := st.chat_input("Ej: 20 chapas para San Jorge..."):
     # --- PUERTA TRASERA (SOLO PARA VOS) ---
-    if prompt == "#admin-lucho":
+    if prompt == "#admin-miguel":
         st.session_state.admin_mode = True
         st.rerun()
     # --------------------------------------
@@ -242,7 +242,7 @@ if prompt := st.chat_input("Ej: 20 chapas para San Jorge..."):
 
     try:
         chat = st.session_state.chat_session
-        with st.spinner("Analizando stock y calculando descuentos..."):
+        with st.spinner("Miguel está analizando stock y calculando descuentos..."):
             response = chat.send_message(prompt)
             full_text = response.text
             
@@ -294,6 +294,4 @@ if st.session_state.admin_mode:
     else:
         st.info("No hay datos nuevos en esta sesión.")
         
-    if st.button("🔴 Salir del Admin"):
-        st.session_state.admin_mode = False
-        st.rerun()
+    if st.button("🔴 Salir
