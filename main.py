@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import google.generativeai as genai
 import urllib.parse
+import re
 
 # --- 1. VARIABLES DE NEGOCIO ---
 DOLAR_BNA_REF = 1060.00 
@@ -13,7 +14,7 @@ SAN JORGE, LAS PETACAS, ZENON PEREYRA, CARLOS PELLEGRINI, LANDETA, MARIA SUSANA,
 PIAMONTE, VILA, SAN FRANCISCO.
 """
 
-# --- 2. CONFIGURACIÓN VISUAL (REBRANDING TOTAL) ---
+# --- 2. CONFIGURACIÓN VISUAL (PREMIUM) ---
 st.set_page_config(
     page_title="Asesor Técnico | Pedro Bravin S.A.",
     page_icon="🏗️",
@@ -21,38 +22,26 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Inyectamos FontAwesome para los iconos dentro de Streamlit
-st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">', unsafe_allow_html=True)
-
+# Estilos CSS Profesionales
 st.markdown("""
     <style>
-    /* LIMPIEZA INTERFAZ */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* FUENTE GLOBAL */
-    html, body, [class*="css"] {
-        font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
-    }
+    html, body, [class*="css"] { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; }
 
-    /* --- HEADER FLOTANTE MODERNO --- */
+    /* HEADER FLOTANTE */
     .fixed-header {
         position: fixed; top: 0; left: 0; width: 100%;
-        background-color: #ffffff; /* Fondo Blanco Limpio */
-        border-bottom: 1px solid #e0e0e0;
+        background-color: #ffffff; border-bottom: 1px solid #e0e0e0;
         padding: 10px 20px; z-index: 99999;
         display: flex; justify-content: space-between; align-items: center;
         box-shadow: 0 2px 10px rgba(0,0,0,0.05);
     }
+    .brand-name { color: #0f2c59; font-weight: 800; font-size: 0.95rem; text-transform: uppercase; }
+    .brand-disclaimer { color: #666; font-size: 0.75rem; }
     
-    .header-branding {
-        display: flex; flex-direction: column;
-    }
-    .brand-name { color: #0f2c59; font-weight: 800; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.5px; }
-    .brand-disclaimer { color: #666; font-size: 0.75rem; margin-top: 2px; }
-    
-    /* BOTÓN WHATSAPP HEADER (Estilo Pastilla) */
     .wa-pill-btn {
         background-color: #25D366; color: white !important;
         text-decoration: none; padding: 8px 16px; border-radius: 50px;
@@ -61,24 +50,14 @@ st.markdown("""
     }
     .wa-pill-btn:hover { transform: scale(1.05); background-color: #1ebc57; }
 
-    /* ESPACIO PARA EL CHAT */
     .block-container { padding-top: 85px !important; padding-bottom: 40px !important; }
 
-    /* --- CHAT BURBUJAS --- */
-    /* Bot (Lucho) */
-    .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) {
-        background-color: #f8f9fa; border: 1px solid #eee; border-radius: 10px;
-    }
-    .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) .stChatMessageAvatar {
-        background-color: #0f2c59; color: white;
-    }
-    
-    /* Usuario */
-    .stChatMessage[data-testid="stChatMessage"]:nth-child(even) {
-        background-color: #fff;
-    }
+    /* CHAT */
+    .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) { background-color: #f8f9fa; border: 1px solid #eee; border-radius: 10px; }
+    .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) .stChatMessageAvatar { background-color: #0f2c59; color: white; }
+    .stChatMessage[data-testid="stChatMessage"]:nth-child(even) { background-color: #fff; }
 
-    /* BOTÓN FINAL DE CIERRE (TARJETA) */
+    /* TARJETA FINAL DE CIERRE */
     .final-action-card {
         background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
         color: white !important; text-align: center; padding: 18px; 
@@ -87,22 +66,15 @@ st.markdown("""
         box-shadow: 0 10px 20px rgba(37, 211, 102, 0.3);
         transition: transform 0.2s;
     }
-    .final-action-card:hover { transform: translateY(-3px); box-shadow: 0 15px 30px rgba(37, 211, 102, 0.4); }
-
-    /* AVISOS INTERNOS */
-    .alert-box {
-        padding: 12px; border-radius: 8px; margin-bottom: 15px; font-size: 0.9rem;
-        border-left: 4px solid #ff6b00; background-color: #fff8f0; color: #555;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
+    .final-action-card:hover { transform: translateY(-3px); }
     
     @media (max-width: 600px) {
         .fixed-header { padding: 8px 15px; }
-        .brand-disclaimer { font-size: 0.65rem; }
-        .wa-pill-btn span { display: none; } /* En móvil solo icono */
-        .wa-pill-btn { padding: 8px 12px; }
+        .wa-pill-btn span { display: none; }
     }
     </style>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <div class="fixed-header">
         <div class="header-branding">
@@ -147,11 +119,29 @@ if raw_data is not None and not raw_data.empty:
 else:
     csv_context = "ERROR: Base de datos no accesible."
 
-# --- 5. CEREBRO DE VENTAS (Prompt Comercial) ---
+# --- 5. EL CHIVATO (SISTEMA DE LOGS INTERNO) ---
+# Esta función "imprime" en la consola del servidor lo que pasa, para que Pedro pueda leerlo luego.
+def log_interaction(user_text, bot_response):
+    # Detectar montos grandes en la respuesta del bot para marcar oportunidad
+    opportunity = "NORMAL"
+    if "$" in bot_response:
+        try:
+            # Buscamos números grandes en el texto
+            precios = [int(s.replace('.','')) for s in re.findall(r'\$([\d\.]+)', bot_response) if s.replace('.','').isdigit()]
+            if any(p > 300000 for p in precios):
+                opportunity = "🔥 ALTA (MAYORISTA)"
+        except:
+            pass
+            
+    print(f"--- LOG VENTAS ---")
+    print(f"Cliente: {user_text}")
+    print(f"Oportunidad: {opportunity}")
+    print("--------------------")
+
+# --- 6. CEREBRO DE VENTAS (GAMIFICACIÓN + LOGÍSTICA) ---
 sys_prompt = f"""
 ROL: Eres Lucho, **Asesor Técnico Virtual** de **Pedro Bravin S.A.**
-TONO: Profesional, Resolutivo, Experto.
-OBJETIVO: Filtrar dudas técnicas, cotizar logística y cerrar ventas.
+OBJETIVO: Filtrar, cotizar logística precisa y **CERRAR VENTAS** usando psicología.
 
 BASE DE DATOS:
 ------------------------------------------------------------
@@ -161,17 +151,24 @@ OPERACIONES:
 - DÓLAR BNA: ${DOLAR_BNA_REF}
 - ZONA GRATIS: {CIUDADES_GRATIS}
 
-🧠 **ESTRATEGIA DE RESPUESTA:**
+🧠 **ESTRATEGIA DE RESPUESTA (4 PASOS):**
 
-1.  **TRADUCCIÓN:** "Gas" = Epoxi, "Estructural" = Tubo c/costura, "Techo" = Cincalum.
-2.  **LOGÍSTICA:**
-    * Si es **ZONA GRATIS**: ¡Véndelo como beneficio!
-    * Si es **LEJOS**: Calcula el redireccionamiento (KM x 2 x 0.85 USD). Sé transparente.
-3.  **GAMIFICACIÓN DE PRECIOS:**
-    * **< $200k:** Cierre normal.
-    * **$200k - $299k:** ⚠️ "Estás cerca del MAYORISTA. Agrega algo para llegar a $300k y ganar el **15% OFF**".
-    * **> $300k:** "¡Tarifa MAYORISTA activada (15% OFF)!".
-4.  **ACOPIO:** "Congelá precio hoy y guardamos 6 meses gratis."
+1.  **TRADUCCIÓN TÉCNICA:**
+    * "Gas" -> EPOXI. "Estructural" -> Tubo c/costura. "Techo" -> Cincalum.
+
+2.  **CÁLCULO LOGÍSTICO (NODOS):**
+    * Pregunta: "¿Para qué localidad es?".
+    * Si está en ZONA GRATIS -> ¡Véndelo como beneficio!
+    * Si NO está: Busca el nodo gratis más cercano. Calcula KM (ida y vuelta al nodo) x 0.85 USD x Dolar.
+    * *Frase:* "El envío va gratis hasta [Nodo] y solo cobramos el tramo final ($XXX est)."
+
+3.  **GAMIFICACIÓN DE PRECIOS (GATILLOS):**
+    * Calcula el total mentalmente.
+    * **Si Total $200k - $299k:** ⚠️ "Estás cerca del MAYORISTA. Agrega algo para llegar a $300k y ganar el **15% OFF**".
+    * **Si Total > $300k:** 🎉 "¡Felicidades! Desbloqueaste la TARIFA MAYORISTA (15% OFF)".
+
+4.  **CIERRE (ACOPIO):**
+    * "Congelá este precio hoy y te guardamos el material **6 meses** sin cargo."
 
 🚨 **REGLAS:**
 * Si no está en lista: "No figura en web, pero consultame con Martín."
@@ -188,9 +185,9 @@ Solicito confirmación final.
 Datos: [Nombre/DNI]
 """
 
-# --- 6. GESTIÓN DE CHAT ---
+# --- 7. GESTIÓN DE SESIÓN ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "👋 **Bienvenido a Pedro Bravin S.A.**\n\nSoy Lucho, tu asesor técnico. Cotizo materiales y logística en tiempo real.\n\n**¿Qué estás buscando hoy?**"}]
+    st.session_state.messages = [{"role": "assistant", "content": "👋 **Bienvenido a Pedro Bravin S.A.**\n\nSoy Lucho, tu asesor técnico. Cotizo materiales y logística en tiempo real.\n\n**¿Qué estás buscando hoy?** (Ej: 10 chapas, perfiles, mallas...)"}]
 
 if "chat_session" not in st.session_state:
     try:
@@ -204,24 +201,33 @@ if "chat_session" not in st.session_state:
         except Exception:
             st.error("Error de conexión.")
 
-# --- 7. INTERFAZ ---
+# --- 8. INTERFAZ DE CHAT ---
 for msg in st.session_state.messages:
     avatar = "👷‍♂️" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-if prompt := st.chat_input("Ej: 20 chapas para San Jorge..."):
+if prompt := st.chat_input("Escribe tu consulta aquí..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").markdown(prompt)
 
     try:
         chat = st.session_state.chat_session
-        with st.spinner("Analizando stock y logística..."):
+        with st.spinner("Lucho está calculando..."):
             response = chat.send_message(prompt)
             full_text = response.text
+            
+            # EL CHIVATO: Guardamos log en consola
+            log_interaction(prompt, full_text)
             
             WHATSAPP_TAG = "[TEXTO_WHATSAPP]:"
             if WHATSAPP_TAG in full_text:
                 dialogue, wa_part = full_text.split(WHATSAPP_TAG, 1)
+                
+                # --- EFECTOS DE GAMIFICACIÓN ---
+                # Si el bot menciona "Mayorista" o "Descuento", celebramos
+                if "15%" in dialogue or "MAYORISTA" in dialogue or "Mayorista" in dialogue:
+                    st.balloons() # ¡Globos en pantalla!
+                    st.toast('🎉 ¡Tarifa Mayorista Activada!', icon='💰')
                 
                 st.markdown(dialogue.strip())
                 st.session_state.messages.append({"role": "assistant", "content": dialogue.strip()})
@@ -229,10 +235,10 @@ if prompt := st.chat_input("Ej: 20 chapas para San Jorge..."):
                 wa_encoded = urllib.parse.quote(wa_part.strip())
                 wa_url = f"https://wa.me/5493401527780?text={wa_encoded}"
                 
-                # BOTÓN FINAL DE ALTO IMPACTO
+                # CARD FINAL
                 st.markdown(f"""
                 <a href="{wa_url}" target="_blank" class="final-action-card">
-                    <i class="fa-brands fa-whatsapp"></i> CONFIRMAR PEDIDO CON MARTÍN
+                    <i class="fa-brands fa-whatsapp" style="margin-right:8px;"></i> CONFIRMAR PEDIDO CON MARTÍN
                 </a>
                 """, unsafe_allow_html=True)
             else:
@@ -240,4 +246,4 @@ if prompt := st.chat_input("Ej: 20 chapas para San Jorge..."):
                 st.session_state.messages.append({"role": "assistant", "content": full_text})
                 
     except Exception:
-        st.error("Error de conexión. Use el botón superior.")
+        st.error("Error de conexión. Usa el botón superior.")
