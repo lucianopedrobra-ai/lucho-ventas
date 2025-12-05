@@ -9,17 +9,17 @@ import threading
 import time
 
 # ==========================================
-# 1. CONFIGURACIÓN ESTRATÉGICA
+# 1. CONFIGURACIÓN ESTRATÉGICA (BACKEND)
 # ==========================================
-st.set_page_config(
-    page_title="Pedro Bravin S.A.",
-    page_icon="🏗️",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
 
-# --- Variables de Negocio ---
-URL_FORM_GOOGLE = ""
+# --- Analíticas Silenciosas (Google Forms) ---
+# Pega tu link aquí para recibir reportes automáticos sin frenar el chat.
+URL_FORM_GOOGLE = ""  
+ID_CAMPO_CLIENTE = "entry.xxxxxx"
+ID_CAMPO_MONTO = "entry.xxxxxx"
+ID_CAMPO_OPORTUNIDAD = "entry.xxxxxx"
+
+# --- Variables de Negocio (Reglas de Oro) ---
 DOLAR_BNA_REF = 1060.00 
 CIUDADES_GRATIS = """
 EL TREBOL, LOS CARDOS, LAS ROSAS, SAN GENARO, CENTENO, CASAS, CAÑADA ROSQUIN, 
@@ -30,213 +30,245 @@ PIAMONTE, VILA, SAN FRANCISCO.
 """
 
 # ==========================================
-# 2. INTERFAZ VISUAL (SOLUCIÓN SCROLL Y VISIBILIDAD)
+# 2. INTERFAZ VISUAL (UX DE ALTA GAMA)
 # ==========================================
+st.set_page_config(
+    page_title="Asesor Comercial | Pedro Bravin S.A.",
+    page_icon="🏗️",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
 st.markdown("""
     <style>
-    /* RESET GLOBAL */
-    header[data-testid="stHeader"] {visibility: hidden;}
+    /* Limpieza de interfaz */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    
-    /* 1. ANULACIÓN DE FONDO OSCURO Y BASE */
-    .stApp, .main, html, body { 
-        background-color: white !important; 
-    }
-    html, body, [class*="css"] {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
+    header {visibility: hidden;}
+    html, body, [class*="css"] { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; }
 
-    /* 2. HEADER FIJO */
+    /* Header Flotante con Identidad */
     .fixed-header {
-        position: fixed; top: 0; left: 0; width: 100%; height: 55px;
-        background-color: #ffffff; border-bottom: 1px solid #ddd;
-        z-index: 1000; display: flex; justify-content: space-between; align-items: center;
-        padding: 0 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        position: fixed; top: 0; left: 0; width: 100%;
+        background-color: #ffffff; border-bottom: 1px solid #e0e0e0;
+        padding: 10px 20px; z-index: 99999;
+        display: flex; justify-content: space-between; align-items: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
     }
+    .header-branding { display: flex; flex-direction: column; }
+    .brand-name { color: #0f2c59; font-weight: 800; font-size: 0.95rem; text-transform: uppercase; }
+    .brand-disclaimer { color: #666; font-size: 0.75rem; }
     
-    .brand-box { line-height: 1.1; }
-    .brand-name { color: #0f2c59; font-weight: 800; font-size: 14px; text-transform: uppercase; }
-    .brand-sub { color: #666; font-size: 10px; }
-    .wa-btn {
+    /* Botón WhatsApp en Header */
+    .wa-pill-btn {
         background-color: #25D366; color: white !important;
-        padding: 6px 12px; border-radius: 20px;
-        font-weight: 600; font-size: 12px; text-decoration: none;
-        display: flex; align-items: center; gap: 5px;
+        text-decoration: none; padding: 8px 16px; border-radius: 50px;
+        font-weight: 600; font-size: 0.85rem; display: flex; align-items: center; gap: 8px;
+        box-shadow: 0 4px 6px rgba(37, 211, 102, 0.2); transition: transform 0.2s;
     }
+    .wa-pill-btn:hover { transform: scale(1.05); background-color: #1ebc57; }
 
-    /* 3. ESPACIADO CRÍTICO (BUFFER SUPERIOR E INFERIOR) */
-    .block-container {
-        padding-top: 70px !important;
-        padding-bottom: 140px !important; 
-    }
+    .block-container { padding-top: 85px !important; padding-bottom: 40px !important; }
 
-    /* 4. ARREGLO DE INPUT (SOLUCIÓN DE VISIBILIDAD Y BOTÓN) */
-    
-    /* Contenedor principal de la barra de chat (Streamlit Native Footer) */
-    div[data-testid="stChatInput"] {
-        background-color: #ffffff !important;
-        border-top: 1px solid #e0e0e0 !important;
-        /* MUY IMPORTANTE: Quitamos paddings excesivos para que el botón de envío reaparezca */
-        padding-bottom: 10px !important;
-        padding-top: 10px !important;
-        z-index: 999; 
-    }
-    
-    /* El área de texto: Forzamos colores y bordes */
-    textarea[data-testid="stChatInputTextArea"] {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-        caret-color: #000000 !important; 
-        border: 1px solid #cccccc !important;
-        border-radius: 20px !important;
-        /* Aseguramos un tamaño mínimo para que el botón no se monte */
-        min-height: 38px;
-    }
+    /* Estilos de Chat */
+    .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) { background-color: #f8f9fa; border: 1px solid #eee; border-radius: 10px; }
+    .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) .stChatMessageAvatar { background-color: #0f2c59; color: white; }
+    .stChatMessage[data-testid="stChatMessage"]:nth-child(even) { background-color: #fff; }
 
-    /* 5. ESTILOS DE MENSAJES */
-    .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) { 
-        background-color: #f4f6f9; 
-        border-radius: 12px; 
-        padding: 10px; 
-    }
-
-    /* 6. CTA */
-    .cta-container { margin-top: 10px; text-align: center; }
-    .cta-button {
-        display: block;
+    /* TARJETA DE CIERRE DE VENTA (CTA GIGANTE) */
+    .final-action-card {
         background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
-        color: white !important; padding: 12px; border-radius: 10px;
-        text-decoration: none; font-weight: bold;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        color: white !important; text-align: center; padding: 18px; 
+        border-radius: 12px; text-decoration: none; display: block;
+        font-weight: 700; font-size: 1.1rem; margin-top: 20px;
+        box-shadow: 0 10px 20px rgba(37, 211, 102, 0.3);
+        transition: transform 0.2s;
+        border: 2px solid white;
     }
+    .final-action-card:hover { transform: translateY(-3px); box-shadow: 0 15px 25px rgba(37, 211, 102, 0.4); }
+    
+    /* Spinner de carga personalizado */
+    .stSpinner > div { border-top-color: #0f2c59 !important; }
     </style>
-
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <div class="fixed-header">
-        <div class="brand-box">
-            <div class="brand-name">Miguel | Pedro Bravin S.A.</div>
-            <div class="brand-sub">⚠️ Stock y Precios Estimados</div>
+        <div class="header-branding">
+            <span class="brand-name">Miguel | Pedro Bravin S.A.</span>
+            <span class="brand-disclaimer">⚠️ Precios y Stock estimados (Web Parcial)</span>
         </div>
-        <a href="https://wa.me/5493401527780" target="_blank" class="wa-btn">
-            <span>Contactar</span>
+        <a href="https://wa.me/5493401527780" target="_blank" class="wa-pill-btn">
+            <i class="fa-brands fa-whatsapp" style="font-size: 1.2rem;"></i>
+            <span>Hablar con Martín</span>
         </a>
     </div>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     """, unsafe_allow_html=True)
 
-
-# Función JavaScript para forzar el scroll al final
-# Se llama después de que el bot responde.
-def scroll_to_bottom():
-    js = """
-    <script>
-        const chatContainer = parent.document.querySelector('.block-container');
-        if (chatContainer) {
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-    </script>
-    """
-    st.markdown(js, unsafe_allow_html=True)
-
-
 # ==========================================
-# 3. BACKEND & LÓGICA DE BÚSQUEDA
+# 3. SISTEMA TÉCNICO
 # ==========================================
 
-# --- API KEY ---
+# --- Autenticación ---
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
 except Exception:
-    st.error("⚠️ Falta configurar la API Key en Secrets.")
+    st.error("⚠️ Error de API Key. Sistema en mantenimiento.")
     st.stop()
 
-# --- Carga de Datos (Optimizado) ---
+# --- Carga de Datos Optimizada (Sanitización) ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvnarDQ/pub?gid=2029869540&single=true&output=csv"
 
 @st.cache_data(ttl=600)
 def load_data():
     try:
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip', dtype=str)
-        df = df.dropna(how='all', axis=1)
+        # Limpiamos basura para que Gemini lea más rápido
+        df = df.dropna(how='all', axis=1) 
         df = df.dropna(how='all', axis=0)
         df = df.fillna("")
-        df['SEARCH_INDEX'] = df.astype(str).agg(' '.join, axis=1).str.lower()
         return df 
     except Exception:
         return None
 
 raw_data = load_data()
 
-# --- MOTOR DE BÚSQUEDA HÍBRIDO ---
-def buscar_productos_inteligente(consulta, df, limite=50):
-    if df is None or df.empty: return ""
-    palabras = consulta.lower().split()
-    palabras_clave = [p for p in palabras if len(p) > 2]
-    if not palabras_clave: return "" 
-    mask = df['SEARCH_INDEX'].apply(lambda x: any(p in x for p in palabras_clave))
-    resultados = df[mask].head(limite)
-    if resultados.empty: return ""
-    return resultados.drop(columns=['SEARCH_INDEX'], errors='ignore').to_csv(index=False)
+if raw_data is not None and not raw_data.empty:
+    try:
+        csv_context = raw_data.to_csv(index=False) # CSV crudo es más ligero para la IA
+    except Exception:
+        csv_context = raw_data.to_string(index=False)
+else:
+    csv_context = "ERROR: Base de datos no accesible."
 
-# --- Logging (Analíticas) ---
-if "log_data" not in st.session_state: st.session_state.log_data = []
-if "admin_mode" not in st.session_state: st.session_state.admin_mode = False
+# --- Hilo de Métricas en Background (Cero Latencia) ---
+if "log_data" not in st.session_state:
+    st.session_state.log_data = []
+if "admin_mode" not in st.session_state:
+    st.session_state.admin_mode = False
+
+def enviar_a_google_form_background(cliente, monto, oportunidad):
+    """Envía datos a la nube sin congelar la pantalla del usuario"""
+    if URL_FORM_GOOGLE and "docs.google.com" in URL_FORM_GOOGLE:
+        try:
+            payload = {
+                ID_CAMPO_CLIENTE: str(cliente),
+                ID_CAMPO_MONTO: str(monto),
+                ID_CAMPO_OPORTUNIDAD: str(oportunidad)
+            }
+            requests.post(URL_FORM_GOOGLE, data=payload, timeout=3)
+        except:
+            pass # Falla silenciosa garantizada
 
 def log_interaction(user_text, bot_response):
-    try:
-        ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        st.session_state.log_data.append({"Fecha": ts, "Usuario": user_text[:50], "Bot": bot_response[:50]})
-    except: pass
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    opportunity = "NORMAL"
+    monto_estimado = 0
+    
+    # Detector de Montos
+    if "$" in bot_response:
+        try:
+            precios = [int(s.replace('.','')) for s in re.findall(r'\$([\d\.]+)', bot_response) if s.replace('.','').isdigit()]
+            if precios:
+                monto_estimado = max(precios)
+                if monto_estimado > 300000:
+                    opportunity = "🔥 ALTA (MAYORISTA)"
+        except:
+            pass
+
+    st.session_state.log_data.append({"Fecha": timestamp, "Usuario": user_text[:50], "Oportunidad": opportunity, "Monto Max": monto_estimado})
+    
+    # Disparamos el hilo invisible
+    thread = threading.Thread(target=enviar_a_google_form_background, args=(user_text, monto_estimado, opportunity))
+    thread.daemon = True 
+    thread.start()
 
 # ==========================================
-# 4. CEREBRO IA (PROMPT DINÁMICO)
+# 4. CEREBRO DE VENTAS (MIGUEL DEFINITIVO)
 # ==========================================
-sys_prompt_base = f"""
-ROL: Eres Miguel, Asesor Técnico de Pedro Bravin S.A.
-TONO: Profesional, directo y orientado a la venta.
-OBJETIVO: Usar el STOCK ADJUNTO para cotizar y cerrar ventas.
+sys_prompt = f"""
+ROL: Eres Miguel, Asesor Técnico y Experto en Cierre de Pedro Bravin S.A.
+TONO: Profesional, resolutivo y comercialmente agresivo (pero amable).
+OBJETIVO: Cotizar rápido, aplicar lógica logística y CERRAR el deal.
 
-REGLAS DE ORO:
-1. PRECIOS: Los precios del stock son NETOS. Suma siempre "+ IVA".
-2. LOGÍSTICA: Zona gratis: {CIUDADES_GRATIS}. Resto: "Cotizamos envío desde nodo cercano".
-3. DESCUENTOS: Si el total > $300.000 -> Ofrece 15% OFF MAYORISTA.
-4. NO INVENTES: Si el producto no está en el STOCK ADJUNTO que te paso, di "No lo veo en stock rápido, déjame consultarlo con Martín".
+BASE DE DATOS (STOCK REAL):
+------------------------------------------------------------
+{csv_context}
+------------------------------------------------------------
+DATOS: DÓLAR BNA ${DOLAR_BNA_REF} | ZONA GRATIS: {CIUDADES_GRATIS}
 
-FORMATO WHATSAPP (ÚSALO AL FINAL):
+📜 **PROTOCOLOS DE ACTUACIÓN (TU CÓDIGO DE CONDUCTA):**
+
+1.  **PRECIOS E IMPUESTOS:**
+    * Todo precio del CSV es NETO.
+    * **SIEMPRE** responde: "$ [Precio] + IVA".
+
+2.  **LOGÍSTICA INTELIGENTE (El Argumento de Ahorro):**
+    * Si es zona gratis -> "¡Logística Bonificada a tu zona!".
+    * Si es lejos -> "Calculo envío desde nuestro nodo más cercano para que ahorres en flete".
+
+3.  **VENTA CRUZADA (CROSS-SELLING HÍBRIDO):**
+    * *Detecta la necesidad:* (Chapas -> Tornillos/Aislante) | (Perfiles -> Discos/Electrodos).
+    * **CASO A (Está en lista):** "Tengo los tornillos en stock a $X. ¿Los sumo al pedido?".
+    * **CASO B (No está en lista):** "Agrego los complementarios a la nota de pedido para que Martín los cotice a medida".
+
+4.  **ESTRATEGIA DE DESCUENTOS (CIERRE):**
+    * **$200.000 - $299.999:** "Estás muy cerca del descuento MAYORISTA (15% OFF). ¿Agregamos algo más?".
+    * **Mayor a $300.000:** "¡Felicitaciones! **15% OFF MAYORISTA Activado**".
+
+5.  **EL GANCHO FINAL:**
+    * Ofrece siempre: **"Acopio 6 meses gratis"**.
+    * Cierra con pregunta: "¿Te paso el link para congelar el precio?".
+
+FORMATO SALIDA FINAL (PARA EL BOTÓN DE WHATSAPP):
 [TEXTO_WHATSAPP]:
-Hola Martín, vengo del Asesor Virtual.
-📍 Destino: [Ciudad]
-📋 Interés: [Resumen]
-💰 Presupuesto Aprox: $[Monto]
-Solicito contacto.
+Hola Martín, vengo del Asesor Virtual (Miguel).
+📍 Destino: [Localidad]
+📋 Pedido Web:
+- [Item] x [Cant]
+⚠️ A Cotizar Manual (Sugerido IA):
+- [Items complementarios sin precio en web]
+💰 Inversión Aprox: $[Monto] + IVA
+🎁 Beneficios: [Acopio / 15% OFF]
+Solicito link de pago.
 """
 
 # ==========================================
-# 5. CHAT ENGINE
+# 5. MOTOR DE CHAT & RENDERIZADO
 # ==========================================
+
+# Inicialización
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\n\nExperto en materiales de Pedro Bravin S.A.\n\n**¿Qué estás buscando hoy?**"}]
+    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\n\nExperto en materiales de Pedro Bravin S.A.\n\n**¿Qué estás buscando cotizar hoy?**"}]
 
 if "chat_session" not in st.session_state:
     try:
-        model = genai.GenerativeModel('gemini-2.5-pro', system_instruction=sys_prompt_base)
+        # GEMINI 2.5 PRO (NO SE TOCA, MÁXIMA POTENCIA)
+        generation_config = {"temperature": 0.2, "max_output_tokens": 4096}
+        model = genai.GenerativeModel('gemini-2.5-pro', system_instruction=sys_prompt, generation_config=generation_config)
         st.session_state.chat_session = model.start_chat(history=[])
-    except:
+    except Exception:
         try:
-            model = genai.GenerativeModel('gemini-1.5-pro', system_instruction=sys_prompt_base)
+            # Fallback
+            model = genai.GenerativeModel('gemini-1.5-pro', system_instruction=sys_prompt)
             st.session_state.chat_session = model.start_chat(history=[])
-        except: st.error("Error de conexión con la IA.")
+        except Exception:
+            st.error("Error de conexión. Recarga la página.")
 
+# Renderizado de Historial
 for msg in st.session_state.messages:
     avatar = "👷‍♂️" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-if prompt := st.chat_input("Escribe aquí tu consulta..."):
+# Input de Usuario
+if prompt := st.chat_input("Ej: Necesito 20 chapas T101 para San Jorge..."):
     
+    # --- PUERTA TRASERA ADMIN ---
     if prompt == "#admin-miguel":
         st.session_state.admin_mode = True
         st.rerun()
+    # ----------------------------
 
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").markdown(prompt)
@@ -244,68 +276,72 @@ if prompt := st.chat_input("Escribe aquí tu consulta..."):
     try:
         chat = st.session_state.chat_session
         with st.chat_message("assistant", avatar="👷‍♂️"):
-            with st.spinner("Buscando precios..."):
-                
-                stock_encontrado = buscar_productos_inteligente(prompt, raw_data)
-                
-                if stock_encontrado:
-                    mensaje_final = f"""
-                    DATOS DE STOCK ENCONTRADOS (Usa esto para responder):
-                    {stock_encontrado}
-                    PREGUNTA DEL CLIENTE: {prompt}
-                    """
-                else:
-                    mensaje_final = f"""
-                    NO ENCONTRÉ COINCIDENCIAS EXACTAS EN EL CSV.
-                    Responde al cliente pidiendo más detalles o como asesor general.
-                    PREGUNTA: {prompt}
-                    """
-                
-                response_stream = chat.send_message(mensaje_final, stream=True)
             
+            # 1. FEEDBACK VISUAL (Solo dura lo que tarda en pensar)
+            with st.spinner("Miguel está calculando costos y logística..."):
+                try:
+                    response_stream = chat.send_message(prompt, stream=True)
+                except Exception:
+                    st.error("Error de conexión. Intenta de nuevo.")
+                    st.stop()
+
+            # 2. STREAMING DE TEXTO (Efecto escritura)
             response_placeholder = st.empty()
             full_response = ""
+            
             for chunk in response_stream:
                 if chunk.text:
                     full_response += chunk.text
                     response_placeholder.markdown(full_response + "▌")
             
+            # Texto final
             response_placeholder.markdown(full_response)
+            
+            # 3. PROCESAMIENTO POSTERIOR (Background)
             log_interaction(prompt, full_response)
             
-            # --- LLAMADA AL SCRIPT DE SCROLL ---
-            scroll_to_bottom()
-
-            if "[TEXTO_WHATSAPP]:" in full_response:
-                dialogue, wa_part = full_response.split("[TEXTO_WHATSAPP]:", 1)
+            # 4. BOTÓN WHATSAPP INTELIGENTE
+            WHATSAPP_TAG = "[TEXTO_WHATSAPP]:"
+            if WHATSAPP_TAG in full_response:
+                dialogue, wa_part = full_response.split(WHATSAPP_TAG, 1)
                 
+                # Limpiamos el texto para el usuario
                 response_placeholder.markdown(dialogue.strip())
                 st.session_state.messages.append({"role": "assistant", "content": dialogue.strip()})
+                
+                # Globos si hay descuento
+                if "15%" in dialogue or "MAYORISTA" in dialogue:
+                    st.balloons()
+                    st.toast('🎉 ¡Tarifa Mayorista (15% OFF) Activada!', icon='💰')
                 
                 wa_encoded = urllib.parse.quote(wa_part.strip())
                 wa_url = f"https://wa.me/5493401527780?text={wa_encoded}"
                 
                 st.markdown(f"""
-                <div class="cta-container">
-                    <a href="{wa_url}" target="_blank" class="cta-button">
-                        🚀 FINALIZAR PEDIDO EN WHATSAPP
-                    </a>
-                </div>
+                <a href="{wa_url}" target="_blank" class="final-action-card">
+                    🚀 FINALIZAR PEDIDO CON MARTÍN<br>
+                    <span style="font-size:0.8rem; font-weight:400;">Enviar cotización detallada por WhatsApp</span>
+                </a>
                 """, unsafe_allow_html=True)
-                
-                if "15%" in dialogue or "MAYORISTA" in dialogue:
-                    st.toast('🎉 ¡Descuento Mayorista Activado!')
             else:
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
 
     except Exception as e:
-        st.error(f"Ocurrió un error: {e}")
+        st.error(f"Error inesperado: {e}")
 
-# Panel Admin (Opcional)
+# ==========================================
+# 6. PANEL ADMIN OCULTO
+# ==========================================
 if st.session_state.admin_mode:
-    st.write("---")
-    st.write("### Panel Admin")
-    st.dataframe(pd.DataFrame(st.session_state.log_data))
-    if st.button("Salir"):
+    st.markdown("---")
+    st.warning("🔐 ADMIN PANEL (MIGUEL)")
+    if st.session_state.log_data:
+        df_log = pd.DataFrame(st.session_state.log_data)
+        st.dataframe(df_log, use_container_width=True)
+        csv = df_log.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Descargar CSV", csv, "metricas_miguel.csv", "text/csv")
+    else:
+        st.info("Sin datos en esta sesión.")
+    if st.button("🔴 Cerrar Panel"):
         st.session_state.admin_mode = False
         st.rerun()
