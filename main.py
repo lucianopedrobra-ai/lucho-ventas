@@ -29,7 +29,7 @@ PIAMONTE, VILA, SAN FRANCISCO.
 """
 
 # ==========================================
-# 2. INTERFAZ VISUAL (UX DE ALTA GAMA)
+# 2. INTERFAZ VISUAL (SOLUCIÓN MÓVIL)
 # ==========================================
 st.set_page_config(
     page_title="Asesor Comercial | Pedro Bravin S.A.",
@@ -90,15 +90,12 @@ st.markdown("""
     /* Spinner de carga personalizado */
     .stSpinner > div { border-top-color: #0f2c59 !important; }
     
-    /* !!! CORRECCIÓN CRÍTICA FINAL PARA MÓVILES !!! */
-    /* Este fix asegura que el historial de chat nunca sea tapado por el input fijo */
+    /* !!! CORRECCIÓN CRÍTICA FINAL PARA MÓVILES (Definitiva) !!! */
+    /* Apunta al contenedor raíz del historial para forzar espacio de rodaje */
     @media (max-width: 800px) {
+        /* Aumentamos agresivamente el margen inferior para evitar solapamiento */
         .stApp {
-            /* Forzamos un margen inferior extra grande, más seguro que 120px */
-            padding-bottom: 140px !important; 
-        }
-        .stChatInput {
-            height: 70px; /* Altura constante para el input */
+            padding-bottom: 180px !important; /* Más que suficiente para el input y la CTA */
         }
     }
     </style>
