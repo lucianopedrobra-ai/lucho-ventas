@@ -13,7 +13,6 @@ import time
 # ==========================================
 
 # --- Analíticas Silenciosas (Google Forms) ---
-# Pega tu link aquí para recibir reportes automáticos sin frenar el chat.
 URL_FORM_GOOGLE = ""  
 ID_CAMPO_CLIENTE = "entry.xxxxxx"
 ID_CAMPO_MONTO = "entry.xxxxxx"
@@ -30,7 +29,7 @@ PIAMONTE, VILA, SAN FRANCISCO.
 """
 
 # ==========================================
-# 2. INTERFAZ VISUAL (UX DE ALTA GAMA)
+# 2. INTERFAZ VISUAL (CORREGIDA PARA MÓVIL)
 # ==========================================
 st.set_page_config(
     page_title="Asesor Comercial | Pedro Bravin S.A.",
@@ -39,43 +38,72 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# --- INICIO MODIFICACIÓN CSS ---
 st.markdown("""
     <style>
-    /* Limpieza de interfaz */
+    /* 1. RESET Y FUENTES */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     html, body, [class*="css"] { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; }
 
-    /* Header Flotante con Identidad */
+    /* 2. HEADER FLOTANTE (RESPONSIVE) */
     .fixed-header {
         position: fixed; top: 0; left: 0; width: 100%;
         background-color: #ffffff; border-bottom: 1px solid #e0e0e0;
-        padding: 10px 20px; z-index: 99999;
+        padding: 10px 15px; z-index: 999999;
         display: flex; justify-content: space-between; align-items: center;
         box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        height: auto; 
+        min-height: 60px;
     }
+
     .header-branding { display: flex; flex-direction: column; }
     .brand-name { color: #0f2c59; font-weight: 800; font-size: 0.95rem; text-transform: uppercase; }
-    .brand-disclaimer { color: #666; font-size: 0.75rem; }
+    .brand-disclaimer { color: #666; font-size: 0.70rem; }
     
-    /* Botón WhatsApp en Header */
+    /* Botón WhatsApp */
     .wa-pill-btn {
         background-color: #25D366; color: white !important;
-        text-decoration: none; padding: 8px 16px; border-radius: 50px;
-        font-weight: 600; font-size: 0.85rem; display: flex; align-items: center; gap: 8px;
-        box-shadow: 0 4px 6px rgba(37, 211, 102, 0.2); transition: transform 0.2s;
+        text-decoration: none; padding: 6px 12px; border-radius: 50px;
+        font-weight: 600; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;
+        box-shadow: 0 4px 6px rgba(37, 211, 102, 0.2); white-space: nowrap;
+        transition: transform 0.2s;
     }
     .wa-pill-btn:hover { transform: scale(1.05); background-color: #1ebc57; }
 
-    .block-container { padding-top: 85px !important; padding-bottom: 40px !important; }
+    /* 3. CONTENEDOR PRINCIPAL (Padding dinámico) */
+    .block-container { 
+        padding-top: 90px !important; 
+        padding-bottom: 120px !important; 
+    }
 
-    /* Estilos de Chat */
+    /* 4. ESTILOS DE CHAT */
+    .stChatMessage { padding: 1rem !important; }
     .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) { background-color: #f8f9fa; border: 1px solid #eee; border-radius: 10px; }
     .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) .stChatMessageAvatar { background-color: #0f2c59; color: white; }
     .stChatMessage[data-testid="stChatMessage"]:nth-child(even) { background-color: #fff; }
 
-    /* TARJETA DE CIERRE DE VENTA (CTA GIGANTE) */
+    /* 5. FIX CRÍTICO PARA MÓVIL (INPUT Y VISIBILIDAD) */
+    .stChatInput {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        padding: 10px;
+        background: white;
+        z-index: 999990;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+    }
+    
+    /* Forza texto negro sobre fondo claro en el input (evita bugs de modo oscuro) */
+    .stChatInput textarea {
+        background-color: #f0f2f6 !important;
+        color: #000000 !important;
+        border: 1px solid #ccc !important;
+    }
+
+    /* TARJETA DE CIERRE DE VENTA (CTA) */
     .final-action-card {
         background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
         color: white !important; text-align: center; padding: 18px; 
@@ -86,9 +114,27 @@ st.markdown("""
         border: 2px solid white;
     }
     .final-action-card:hover { transform: translateY(-3px); box-shadow: 0 15px 25px rgba(37, 211, 102, 0.4); }
-    
-    /* Spinner de carga personalizado */
+
+    /* Spinner */
     .stSpinner > div { border-top-color: #0f2c59 !important; }
+
+    /* 6. MEDIA QUERIES (SOLO CELULAR) */
+    @media only screen and (max-width: 600px) {
+        .fixed-header { padding: 8px 10px; }
+        .brand-name { font-size: 0.8rem; }
+        .brand-disclaimer { font-size: 0.65rem; }
+        
+        /* Ajuste botón WhatsApp en móvil */
+        .wa-pill-btn { padding: 5px 10px; font-size: 0.75rem; }
+        .wa-pill-btn span { display: none; } /* Oculta el texto largo */
+        .wa-pill-btn::after { content: "WhatsApp"; } /* Pone texto corto */
+        
+        /* Espacio extra abajo para que el teclado no tape el chat */
+        .block-container { 
+            padding-top: 85px !important; 
+            padding-bottom: 150px !important; 
+        }
+    }
     </style>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -104,6 +150,7 @@ st.markdown("""
         </a>
     </div>
     """, unsafe_allow_html=True)
+# --- FIN MODIFICACIÓN CSS ---
 
 # ==========================================
 # 3. SISTEMA TÉCNICO
