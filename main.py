@@ -30,35 +30,29 @@ PIAMONTE, VILA, SAN FRANCISCO.
 """
 
 # ==========================================
-# 2. INTERFAZ VISUAL (MÁXIMA VISIBILIDAD)
+# 2. INTERFAZ VISUAL (MÁXIMA SIMPLIFICACIÓN Y VISIBILIDAD)
 # ==========================================
 st.markdown("""
     <style>
-    /* GLOBAL RESET Y FONDO BLANCO FORZADO */
+    /* RESET GLOBAL */
     header[data-testid="stHeader"] {visibility: hidden;}
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
     /* 1. ANULACIÓN DE FONDO OSCURO EN CONTENEDORES RAÍZ */
-    .stApp { background-color: white !important; }
-    .stApp > header { visibility: hidden; }
-    .main { background-color: white !important; }
-    
-    html, body, [class*="css"] {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    .stApp, .main, html, body { 
+        background-color: white !important; 
     }
 
     /* 2. HEADER FIJO */
     .fixed-header {
-        position: fixed;
-        top: 0; left: 0; width: 100%; height: 55px;
-        background-color: #ffffff;
-        border-bottom: 1px solid #ddd;
-        z-index: 1000000;
+        position: fixed; top: 0; left: 0; width: 100%; height: 55px;
+        background-color: #ffffff; border-bottom: 1px solid #ddd;
+        z-index: 1000; /* Alto, pero no excesivo */
         display: flex; justify-content: space-between; align-items: center;
-        padding: 0 15px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        padding: 0 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
+    
     .brand-box { line-height: 1.1; }
     .brand-name { color: #0f2c59; font-weight: 800; font-size: 14px; text-transform: uppercase; }
     .brand-sub { color: #666; font-size: 10px; }
@@ -72,37 +66,35 @@ st.markdown("""
     /* 3. ESPACIADO CRÍTICO PARA MÓVIL */
     .block-container {
         padding-top: 70px !important;
-        padding-bottom: 140px !important; 
+        padding-bottom: 140px !important; /* Margen de seguridad para el teclado */
     }
 
-    /* 4. ARREGLO DEL INPUT (EL MAYOR REFUERZO DE VISIBILIDAD) */
+    /* 4. ARREGLO DEL INPUT (SOLUCIÓN DE COLOR Y VISIBILIDAD) */
     
-    /* Contenedor principal de la barra de chat (el que Streamlit fija al fondo) */
+    /* Contenedor principal de la barra de chat (Aseguramos el fondo y z-index) */
     div[data-testid="stChatInput"] {
         background-color: #ffffff !important;
         border-top: 1px solid #e0e0e0 !important;
-        padding-bottom: 15px !important;
+        /* Quitamos paddings agresivos para restaurar el botón de envío */
+        padding-bottom: 10px !important;
         padding-top: 10px !important;
-        z-index: 9999999; /* Z-index EXTREMO para garantizar que no haya superposición */
+        z-index: 999; 
     }
     
-    /* El área de texto donde se escribe */
+    /* El área de texto donde se escribe: FORZAMOS COLORES */
     textarea[data-testid="stChatInputTextArea"] {
         background-color: #ffffff !important;
         color: #000000 !important; /* Texto negro forzado */
         caret-color: #000000 !important; /* Cursor negro forzado */
         border: 1px solid #cccccc !important;
         border-radius: 20px !important;
-        /* Aseguramos que el contenido del texto esté sobre el fondo */
-        z-index: 10000000; 
     }
     
-    /* Placeholder visible */
-    textarea[data-testid="stChatInputTextArea"]::placeholder {
-        color: #777777 !important;
-        opacity: 1 !important;
+    /* Restaurar el botón de envío (No hacemos override, solo aseguramos que el icono no esté oculto) */
+    div[data-testid="chat-input-progress"] {
+        background-color: transparent !important;
     }
-
+    
     /* 5. ESTILOS DE MENSAJES */
     .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) { 
         background-color: #f4f6f9; 
@@ -244,7 +236,7 @@ if prompt := st.chat_input("Escribe aquí tu consulta..."):
                 
                 if stock_encontrado:
                     mensaje_final = f"""
-                    DATOS DE STOCK ENCONTRADOS (Usa esto para responder):
+                    DATOS DE STOCK ENCONTRTRADOS (Usa esto para responder):
                     {stock_encontrado}
                     PREGUNTA DEL CLIENTE: {prompt}
                     """
