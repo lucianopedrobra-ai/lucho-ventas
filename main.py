@@ -29,7 +29,7 @@ PIAMONTE, VILA, SAN FRANCISCO.
 """
 
 # ==========================================
-# 2. INTERFAZ VISUAL (SOLUCIÓN MÓVIL)
+# 2. INTERFAZ VISUAL (SOLUCIÓN DEFINITIVA)
 # ==========================================
 st.set_page_config(
     page_title="Asesor Comercial | Pedro Bravin S.A.",
@@ -40,13 +40,13 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-    /* Limpieza de interfaz */
+    /* Limpieza y base */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     html, body, [class*="css"] { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; }
 
-    /* Header Flotante con Identidad */
+    /* Header Flotante */
     .fixed-header {
         position: fixed; top: 0; left: 0; width: 100%;
         background-color: #ffffff; border-bottom: 1px solid #e0e0e0;
@@ -70,12 +70,10 @@ st.markdown("""
     /* Padding principal para evitar que el contenido se oculte bajo el header */
     .block-container { padding-top: 85px !important; padding-bottom: 40px !important; }
 
-    /* Estilos de Chat */
+    /* Estilos de Chat y CTA */
     .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) { background-color: #f8f9fa; border: 1px solid #eee; border-radius: 10px; }
     .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) .stChatMessageAvatar { background-color: #0f2c59; color: white; }
-    .stChatMessage[data-testid="stChatMessage"]:nth-child(even) { background-color: #fff; }
-
-    /* TARJETA DE CIERRE DE VENTA (CTA GIGANTE) */
+    
     .final-action-card {
         background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
         color: white !important; text-align: center; padding: 18px; 
@@ -85,17 +83,18 @@ st.markdown("""
         transition: transform 0.2s;
         border: 2px solid white;
     }
-    .final-action-card:hover { transform: translateY(-3px); box-shadow: 0 15px 25px rgba(37, 211, 102, 0.4); }
-    
-    /* Spinner de carga personalizado */
-    .stSpinner > div { border-top-color: #0f2c59 !important; }
-    
-    /* !!! CORRECCIÓN CRÍTICA FINAL PARA MÓVILES (Definitiva) !!! */
-    /* Apunta al contenedor raíz del historial para forzar espacio de rodaje */
+
+    /* !!! SOLUCIÓN FINAL MÓVIL !!! */
+    /* Target al contenedor principal y aseguramos un margen ENORME para no chocar con el input fijo */
     @media (max-width: 800px) {
-        /* Aumentamos agresivamente el margen inferior para evitar solapamiento */
         .stApp {
-            padding-bottom: 180px !important; /* Más que suficiente para el input y la CTA */
+            /* Asegura que la parte inferior de la conversación tenga un espacio de seguridad */
+            padding-bottom: 200px !important; 
+        }
+        /* Mueve el input de chat más abajo, aunque Streamlit ya lo hace, es una capa de seguridad extra */
+        div[data-testid="stChatInput"] {
+            bottom: 0px !important;
+            height: 70px;
         }
     }
     </style>
@@ -249,7 +248,7 @@ if "messages" not in st.session_state:
 
 if "chat_session" not in st.session_state:
     try:
-        # GEMINI 2.5 PRO (NO SE TOCA, MÁXIMA POTENCIA)
+        # GEMINI 2.5 PRO (MÁXIMA POTENCIA)
         generation_config = {"temperature": 0.2, "max_output_tokens": 4096}
         model = genai.GenerativeModel('gemini-2.5-pro', system_instruction=sys_prompt, generation_config=generation_config)
         st.session_state.chat_session = model.start_chat(history=[])
