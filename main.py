@@ -14,7 +14,7 @@ SAN JORGE, LAS PETACAS, ZENON PEREYRA, CARLOS PELLEGRINI, LANDETA, MARIA SUSANA,
 PIAMONTE, VILA, SAN FRANCISCO.
 """
 
-# --- 2. CONFIGURACIÓN VISUAL (PREMIUM) ---
+# --- 2. CONFIGURACIÓN VISUAL ---
 st.set_page_config(
     page_title="Asesor Técnico | Pedro Bravin S.A.",
     page_icon="🏗️",
@@ -22,16 +22,14 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Estilos CSS Profesionales
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    
     html, body, [class*="css"] { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; }
 
-    /* HEADER FLOTANTE */
+    /* HEADER */
     .fixed-header {
         position: fixed; top: 0; left: 0; width: 100%;
         background-color: #ffffff; border-bottom: 1px solid #e0e0e0;
@@ -57,7 +55,7 @@ st.markdown("""
     .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) .stChatMessageAvatar { background-color: #0f2c59; color: white; }
     .stChatMessage[data-testid="stChatMessage"]:nth-child(even) { background-color: #fff; }
 
-    /* TARJETA FINAL DE CIERRE */
+    /* TARJETA FINAL */
     .final-action-card {
         background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
         color: white !important; text-align: center; padding: 18px; 
@@ -117,77 +115,71 @@ if raw_data is not None and not raw_data.empty:
     except ImportError:
         csv_context = raw_data.to_string(index=False)
 else:
-    csv_context = "ERROR: Base de datos no accesible."
+    csv_context = "ERROR CRÍTICO: Base de datos no accesible."
 
-# --- 5. EL CHIVATO (SISTEMA DE LOGS INTERNO) ---
-# Esta función "imprime" en la consola del servidor lo que pasa, para que Pedro pueda leerlo luego.
+# --- 5. LOGS ---
 def log_interaction(user_text, bot_response):
-    # Detectar montos grandes en la respuesta del bot para marcar oportunidad
     opportunity = "NORMAL"
     if "$" in bot_response:
         try:
-            # Buscamos números grandes en el texto
             precios = [int(s.replace('.','')) for s in re.findall(r'\$([\d\.]+)', bot_response) if s.replace('.','').isdigit()]
             if any(p > 300000 for p in precios):
                 opportunity = "🔥 ALTA (MAYORISTA)"
         except:
             pass
-            
-    print(f"--- LOG VENTAS ---")
-    print(f"Cliente: {user_text}")
-    print(f"Oportunidad: {opportunity}")
-    print("--------------------")
+    print(f"LOG: {user_text} | Oportunidad: {opportunity}")
 
-# --- 6. CEREBRO DE VENTAS (GAMIFICACIÓN + LOGÍSTICA) ---
+# --- 6. CEREBRO DE VENTAS (HÍBRIDO CSV + SUGERENCIAS MANUALES) ---
 sys_prompt = f"""
 ROL: Eres Lucho, **Asesor Técnico Virtual** de **Pedro Bravin S.A.**
-OBJETIVO: Filtrar, cotizar logística precisa y **CERRAR VENTAS** usando psicología.
+OBJETIVO: Vender lo que hay en stock y generar "leads" de lo que falta para que Martín lo cierre.
 
-BASE DE DATOS:
+BASE DE DATOS (INVENTARIO WEB):
 ------------------------------------------------------------
 {csv_context}
 ------------------------------------------------------------
-OPERACIONES:
+DATOS OPERATIVOS:
 - DÓLAR BNA: ${DOLAR_BNA_REF}
 - ZONA GRATIS: {CIUDADES_GRATIS}
 
-🧠 **ESTRATEGIA DE RESPUESTA (4 PASOS):**
+🔒 **PROTOCOLOS DE SEGURIDAD E HIBRIDACIÓN:**
+1.  **SI EL PRODUCTO ESTÁ EN CSV:**
+    * Cotiza precio exacto + IVA. Confirma stock.
 
-1.  **TRADUCCIÓN TÉCNICA:**
-    * "Gas" -> EPOXI. "Estructural" -> Tubo c/costura. "Techo" -> Cincalum.
+2.  **SI EL PRODUCTO/ACCESORIO NO ESTÁ EN CSV (Venta Cruzada Híbrida):**
+    * **NO INVENTES PRECIO.**
+    * **PERO OFRÉCELO IGUAL:** Di: "No tengo el precio de los [Producto] cargado en la web, pero **te los agrego al pedido para que Martín te los cotice manual**".
+    * **EN EL TICKET DE WHATSAPP:** Debes listar ese producto con la nota "(A cotizar por Martín)".
 
-2.  **CÁLCULO LOGÍSTICO (NODOS):**
-    * Pregunta: "¿Para qué localidad es?".
-    * Si está en ZONA GRATIS -> ¡Véndelo como beneficio!
-    * Si NO está: Busca el nodo gratis más cercano. Calcula KM (ida y vuelta al nodo) x 0.85 USD x Dolar.
-    * *Frase:* "El envío va gratis hasta [Nodo] y solo cobramos el tramo final ($XXX est)."
+🧠 **ESTRATEGIA COMERCIAL:**
+1.  **LOGÍSTICA INTELIGENTE:**
+    * ZONA GRATIS -> ¡Véndelo como beneficio!
+    * NO GRATIS -> Calcula KM ida y vuelta al nodo más cercano x 0.85 USD x Dolar.
 
-3.  **GAMIFICACIÓN DE PRECIOS (GATILLOS):**
-    * Calcula el total mentalmente.
-    * **Si Total $200k - $299k:** ⚠️ "Estás cerca del MAYORISTA. Agrega algo para llegar a $300k y ganar el **15% OFF**".
-    * **Si Total > $300k:** 🎉 "¡Felicidades! Desbloqueaste la TARIFA MAYORISTA (15% OFF)".
+2.  **GAMIFICACIÓN:**
+    * **$200k - $299k:** ⚠️ "Estás cerca del MAYORISTA. Agregá algo para llegar a $300k y ganar el **15% OFF**".
+    * **> $300k:** 🎉 "¡Tarifa MAYORISTA activada (15% OFF)!".
 
-4.  **CIERRE (ACOPIO):**
-    * "Congelá este precio hoy y te guardamos el material **6 meses** sin cargo."
+3.  **VENTA CRUZADA AGRESIVA (Alerta para Martín):**
+    * Si vendes Chapas -> Sugiere Tornillos/Cumbreras. (Si no están en CSV, agrégalos como "A cotizar").
+    * Si vendes Perfiles -> Sugiere Discos/Electrodos.
 
-🚨 **REGLAS:**
-* Si no está en lista: "No figura en web, pero consultame con Martín."
-* Precios siempre **MAS IVA**.
-
-📝 **FORMATO SALIDA:**
+📝 **FORMATO SALIDA WHATSAPP (OBLIGATORIO):**
 [TEXTO_WHATSAPP]:
 Hola Martín, vengo del Asesor Virtual.
 📍 Destino: [Localidad]
-📋 Pedido:
+📋 Pedido Web (Con precios):
 - (COD: [SKU]) [Producto] x [Cant]
-💰 Inversión Est. IA: $[Monto] ([Nota])
+⚠️ **Items a Cotizar Manual (Sugeridos):**
+- [Producto sin precio en web] x [Cant]
+💰 Total Parcial IA: $[Monto] ([Nota])
 Solicito confirmación final.
 Datos: [Nombre/DNI]
 """
 
 # --- 7. GESTIÓN DE SESIÓN ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "👋 **Bienvenido a Pedro Bravin S.A.**\n\nSoy Lucho, tu asesor técnico. Cotizo materiales y logística en tiempo real.\n\n**¿Qué estás buscando hoy?** (Ej: 10 chapas, perfiles, mallas...)"}]
+    st.session_state.messages = [{"role": "assistant", "content": "👋 **Bienvenido a Pedro Bravin S.A.**\n\nSoy Lucho, tu asesor técnico.\n\n**¿Qué materiales necesitas cotizar hoy?**"}]
 
 if "chat_session" not in st.session_state:
     try:
@@ -201,33 +193,30 @@ if "chat_session" not in st.session_state:
         except Exception:
             st.error("Error de conexión.")
 
-# --- 8. INTERFAZ DE CHAT ---
+# --- 8. INTERFAZ ---
 for msg in st.session_state.messages:
     avatar = "👷‍♂️" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-if prompt := st.chat_input("Escribe tu consulta aquí..."):
+if prompt := st.chat_input("Ej: 20 chapas para San Jorge..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").markdown(prompt)
 
     try:
         chat = st.session_state.chat_session
-        with st.spinner("Lucho está calculando..."):
+        with st.spinner("Verificando stock real y costos..."):
             response = chat.send_message(prompt)
             full_text = response.text
             
-            # EL CHIVATO: Guardamos log en consola
             log_interaction(prompt, full_text)
             
             WHATSAPP_TAG = "[TEXTO_WHATSAPP]:"
             if WHATSAPP_TAG in full_text:
                 dialogue, wa_part = full_text.split(WHATSAPP_TAG, 1)
                 
-                # --- EFECTOS DE GAMIFICACIÓN ---
-                # Si el bot menciona "Mayorista" o "Descuento", celebramos
-                if "15%" in dialogue or "MAYORISTA" in dialogue or "Mayorista" in dialogue:
-                    st.balloons() # ¡Globos en pantalla!
-                    st.toast('🎉 ¡Tarifa Mayorista Activada!', icon='💰')
+                if "15%" in dialogue or "MAYORISTA" in dialogue:
+                    st.balloons()
+                    st.toast('🎉 ¡Ahorro Mayorista Detectado!', icon='💰')
                 
                 st.markdown(dialogue.strip())
                 st.session_state.messages.append({"role": "assistant", "content": dialogue.strip()})
@@ -235,7 +224,6 @@ if prompt := st.chat_input("Escribe tu consulta aquí..."):
                 wa_encoded = urllib.parse.quote(wa_part.strip())
                 wa_url = f"https://wa.me/5493401527780?text={wa_encoded}"
                 
-                # CARD FINAL
                 st.markdown(f"""
                 <a href="{wa_url}" target="_blank" class="final-action-card">
                     <i class="fa-brands fa-whatsapp" style="margin-right:8px;"></i> CONFIRMAR PEDIDO CON MARTÍN
@@ -246,4 +234,4 @@ if prompt := st.chat_input("Escribe tu consulta aquí..."):
                 st.session_state.messages.append({"role": "assistant", "content": full_text})
                 
     except Exception:
-        st.error("Error de conexión. Usa el botón superior.")
+        st.error("Error de conexión. Use el botón superior.")
