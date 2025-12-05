@@ -3,7 +3,7 @@ import pandas as pd
 import google.generativeai as genai
 import urllib.parse
 
-# --- 1. CONFIGURACIÓN VISUAL ---
+# --- 1. CONFIGURACIÓN VISUAL Y ESTILOS ---
 st.set_page_config(page_title="Cotizador Pedro Bravin S.A.", page_icon="🏗️", layout="wide")
 
 st.markdown("""
@@ -12,9 +12,54 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    .block-container {padding-top: 1rem;}
     
-    /* BOTÓN FINAL (VERDE WHATSAPP - GRANDE) */
+    /* --- HEADER FIJO (STICKY) --- */
+    /* Esto crea la barra superior que se mueve con la pantalla */
+    .fixed-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        background-color: #fff3cd; /* Amarillo suave alerta */
+        border-bottom: 2px solid #ffeeba;
+        color: #856404;
+        padding: 10px 20px;
+        z-index: 99999;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        font-family: sans-serif;
+    }
+    
+    /* Botón Martín dentro del Header */
+    .header-btn {
+        background-color: #128c7e;
+        color: white !important;
+        text-decoration: none;
+        padding: 8px 15px;
+        border-radius: 5px;
+        font-weight: bold;
+        font-size: 0.9rem;
+        white-space: nowrap;
+        transition: background 0.3s;
+    }
+    .header-btn:hover { background-color: #075e54; }
+    
+    /* Texto del aviso */
+    .header-text {
+        font-size: 0.9rem;
+        line-height: 1.3;
+        margin-right: 15px;
+    }
+
+    /* --- AJUSTE DE CUERPO --- */
+    /* Empujamos el chat hacia abajo para que no quede tapado por el header */
+    .block-container {
+        padding-top: 85px !important;
+    }
+    
+    /* --- BOTÓN FINAL (VERDE WHATSAPP - GRANDE) --- */
     .whatsapp-btn-final {
         display: block; width: 100%; 
         background-color: #25D366; color: white !important;
@@ -25,18 +70,27 @@ st.markdown("""
     }
     .whatsapp-btn-final:hover { transform: scale(1.02); background-color: #1ebc57; }
     
-    /* BOTÓN SUPERIOR (CONTACTO DIRECTO A MARTÍN) */
-    .martin-btn-top {
-        display: inline-flex; align-items: center; justify-content: center; width: 100%;
-        background-color: #128c7e; color: white !important;
-        padding: 8px; border-radius: 6px; text-decoration: none;
-        font-weight: 600; font-size: 0.9rem; margin-bottom: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .martin-btn-top:hover { background-color: #075e54; }
-    
+    /* Avatar del Chat */
     .stChatMessage .stChatMessageAvatar {background-color: #003366; color: white;}
+    
+    /* Ajuste para móviles */
+    @media (max-width: 600px) {
+        .fixed-header { flex-direction: column; gap: 8px; text-align: center; padding: 10px; }
+        .block-container { padding-top: 110px !important; }
+        .header-text { margin-right: 0; font-size: 0.8rem; }
+        .header-btn { width: 100%; padding: 6px; }
+    }
     </style>
+    
+    <div class="fixed-header">
+        <div class="header-text">
+            🤖 <strong>IA:</strong> Precios/Stock estimados. <strong>Lista Web Parcial (Consultar otros).</strong><br>
+            Cotización final sujeta a revisión por Martín.
+        </div>
+        <a href="https://wa.me/5493401527780" target="_blank" class="header-btn">
+            💬 Hablar con Martín
+        </a>
+    </div>
     """, unsafe_allow_html=True)
 
 # --- 2. AUTENTICACIÓN ---
@@ -47,7 +101,7 @@ except Exception:
     st.error("⚠️ Error de sistema. Por favor usa el botón de WhatsApp directo.")
     st.stop()
 
-# --- 3. CARGA DE DATOS (URL CONFIRMADA) ---
+# --- 3. CARGA DE DATOS ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvnarDQ/pub?gid=2029869540&single=true&output=csv"
 
 @st.cache_data(ttl=600)
@@ -71,19 +125,7 @@ if raw_data is not None and not raw_data.empty:
 else:
     csv_context = "ERROR: Lista no disponible. Derivar a vendedor humano."
 
-# --- 4. ZONA FIJA SUPERIOR (AVISO + MARTÍN) ---
-with st.container():
-    col_aviso, col_btn = st.columns([0.7, 0.3])
-    with col_aviso:
-        st.warning("🤖 **IA:** Precios y stock estimados. Sujeto a revisión final por Martín.", icon="⚠️")
-    with col_btn:
-        st.markdown("""
-        <a href="https://wa.me/5493401527780" target="_blank" class="martin-btn-top">
-            💬 Hablar con Martín
-        </a>
-        """, unsafe_allow_html=True)
-
-# --- 5. CEREBRO DE VENTAS (FUSIÓN TOTAL: TRADUCTOR + ROLES + ESTRATEGIA) ---
+# --- 4. CEREBRO DE VENTAS (MISMAS REGLAS CONFIRMADAS) ---
 sys_prompt = f"""
 ROL: Eres Lucho, Experto en Aceros de **Pedro Bravin S.A.**
 OBJETIVO: Interpretar pedidos técnicos, verificar stock y cerrar ventas en WhatsApp.
@@ -113,7 +155,7 @@ Una vez identificado el producto, actúa según su tipo:
     * ACCIÓN: Antes de dar precio, valida el uso. "¿Para qué luz de techo es?" "¿Qué espesor de chapa (14, 16, 18) buscás?". Asesora y luego vende.
 
 🚨 **REGLAS COMERCIALES BLINDADAS:**
-1.  **STOCK:** Solo confirmas lo que está en el CSV. Si no hay, ofrece alternativa o di "Consultar a Martín".
+1.  **STOCK:** Solo confirmas lo que está en el CSV. Si no hay, di: **"No lo veo en la lista web, pero consultame con Martín que seguro lo conseguimos"**.
 2.  **PRECIO:** Siempre aclara **"(Precio + IVA, sujeto a confirmación)"**.
 3.  **DESCUENTOS:** Compra > $300.000 = **15% OFF**.
 4.  **CROSS-SELL:** Hierros -> Ofrece Alambre/Clavos. Perfiles -> Ofrece Electrodos.
@@ -128,25 +170,23 @@ Total Estimado IA: $[Monto]
 Datos: [Nombre/DNI]
 """
 
-# --- 6. GESTIÓN DE MODELOS (GEMINI 2.5 CON FALLBACK) ---
+# --- 5. GESTIÓN DE MODELOS ---
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "👋 Hola, soy Lucho. ¿Qué materiales necesitas? (Ej: Caño gas, malla del 6, perfiles...)"}]
 
 if "chat_session" not in st.session_state:
     try:
-        # Intento Principal: Gemini 2.5 (Mejor lógica)
         generation_config = {"temperature": 0.2, "max_output_tokens": 8192}
         model = genai.GenerativeModel('gemini-2.5-pro', system_instruction=sys_prompt, generation_config=generation_config)
         st.session_state.chat_session = model.start_chat(history=[])
     except Exception:
         try:
-            # Respaldo: Gemini 1.5 Pro
             model = genai.GenerativeModel('gemini-1.5-pro', system_instruction=sys_prompt)
             st.session_state.chat_session = model.start_chat(history=[])
         except Exception:
             st.error("Error de conexión IA. Por favor habla con Martín.")
 
-# --- 7. INTERFAZ DE CHAT ---
+# --- 6. INTERFAZ DE CHAT ---
 for msg in st.session_state.messages:
     avatar = "👷‍♂️" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
@@ -161,7 +201,6 @@ if prompt := st.chat_input("Escribe tu consulta aquí..."):
             response = chat.send_message(prompt)
             full_text = response.text
             
-            # Lógica de detección de cierre
             WHATSAPP_TAG = "[TEXTO_WHATSAPP]:"
             if WHATSAPP_TAG in full_text:
                 dialogue, wa_part = full_text.split(WHATSAPP_TAG, 1)
