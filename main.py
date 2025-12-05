@@ -3,18 +3,18 @@ import pandas as pd
 import google.generativeai as genai
 import urllib.parse
 
-# --- 1. CONFIGURACIÓN VISUAL Y ESTILOS ---
+# --- 1. CONFIGURACIÓN VISUAL ---
 st.set_page_config(page_title="Cotizador Pedro Bravin S.A.", page_icon="🏗️", layout="wide")
 
 st.markdown("""
     <style>
-    /* Ocultar elementos nativos de Streamlit */
+    /* Ocultar elementos nativos */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     .block-container {padding-top: 1rem;}
     
-    /* ESTILO BOTÓN FINAL (VERDE WHATSAPP - GRANDE) */
+    /* BOTÓN FINAL (VERDE WHATSAPP - GRANDE) */
     .whatsapp-btn-final {
         display: block; width: 100%; 
         background-color: #25D366; color: white !important;
@@ -25,7 +25,7 @@ st.markdown("""
     }
     .whatsapp-btn-final:hover { transform: scale(1.02); background-color: #1ebc57; }
     
-    /* ESTILO BOTÓN SUPERIOR (CONTACTO DIRECTO - DISCRETO) */
+    /* BOTÓN SUPERIOR (CONTACTO DIRECTO A MARTÍN) */
     .martin-btn-top {
         display: inline-flex; align-items: center; justify-content: center; width: 100%;
         background-color: #128c7e; color: white !important;
@@ -35,7 +35,6 @@ st.markdown("""
     }
     .martin-btn-top:hover { background-color: #075e54; }
     
-    /* AVATAR DEL CHAT */
     .stChatMessage .stChatMessageAvatar {background-color: #003366; color: white;}
     </style>
     """, unsafe_allow_html=True)
@@ -45,10 +44,10 @@ try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
 except Exception:
-    st.error("⚠️ Error de sistema. Por favor contacta a Martín directamente.")
+    st.error("⚠️ Error de sistema. Por favor usa el botón de WhatsApp directo.")
     st.stop()
 
-# --- 3. CARGA DE DATOS (INVENTARIO CONFIRMADO) ---
+# --- 3. CARGA DE DATOS (URL CONFIRMADA) ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvnarDQ/pub?gid=2029869540&single=true&output=csv"
 
 @st.cache_data(ttl=600)
@@ -63,126 +62,124 @@ def load_data():
 
 raw_data = load_data()
 
-# Preparación del contexto para la IA
+# Preparar contexto CSV
 if raw_data is not None and not raw_data.empty:
     try:
         csv_context = raw_data.to_markdown(index=False)
     except ImportError:
         csv_context = raw_data.to_string(index=False)
 else:
-    csv_context = "ADVERTENCIA CRÍTICA: La lista de precios no está disponible. Pide al cliente que contacte a Martín."
+    csv_context = "ERROR: Lista no disponible. Derivar a vendedor humano."
 
-# --- 4. ZONA FIJA SUPERIOR (SEGURIDAD Y CONTACTO) ---
+# --- 4. ZONA FIJA SUPERIOR (AVISO + MARTÍN) ---
 with st.container():
     col_aviso, col_btn = st.columns([0.7, 0.3])
-    
     with col_aviso:
-        st.warning("🤖 **AVISO IA:** Precios y stock son estimados. Cotización final sujeta a confirmación por el vendedor.", icon="⚠️")
-    
+        st.warning("🤖 **IA:** Precios y stock estimados. Sujeto a revisión final por Martín.", icon="⚠️")
     with col_btn:
-        # Enlace directo al WhatsApp de Martín (Salida de emergencia)
         st.markdown("""
         <a href="https://wa.me/5493401527780" target="_blank" class="martin-btn-top">
             💬 Hablar con Martín
         </a>
         """, unsafe_allow_html=True)
 
-# --- 5. CEREBRO DE VENTAS (FUSIÓN DE ESTRATEGIAS) ---
+# --- 5. CEREBRO DE VENTAS (FUSIÓN TOTAL: TRADUCTOR + ROLES + ESTRATEGIA) ---
 sys_prompt = f"""
-ROL: Eres Lucho, Asistente Virtual Especialista de **Pedro Bravin S.A.**
-OBJETIVO: Asesorar técnicamente, cotizar y derivar el cierre a WhatsApp.
+ROL: Eres Lucho, Experto en Aceros de **Pedro Bravin S.A.**
+OBJETIVO: Interpretar pedidos técnicos, verificar stock y cerrar ventas en WhatsApp.
 
-BASE DE DATOS (PRECIOS NETOS + STOCK):
+BASE DE DATOS (PRECIOS NETOS + STOCK REAL):
 ------------------------------------------------------------
 {csv_context}
 ------------------------------------------------------------
 
-🧠 **CEREBRO DUAL (TU LÓGICA DE ATENCIÓN):**
+🧠 **FASE 1: TRADUCTOR SIDERÚRGICO (ARGENTINA)**
+Traduce el lenguaje coloquial del cliente a tu CSV:
+* "Caño de Gas" -> Busca **"EPOXI"**.
+* "Caño de Agua" -> Busca **"Galvanizado"** o **"Polipropileno"**.
+* "Hierro del [4.2/6/8/10]" -> Busca Barras **ADN 420** del diámetro correspondiente.
+* "Malla del 6" -> Busca Malla **15x15 Ø6 (Q188)**.
+* "Chapa de Techo" -> Busca **"Cincalum"** (Acannalada/Trapezoidal).
+* "Chapa Negra" -> Busca **"Laminada Caliente"**.
 
-1.  **SI PIDEN COMMODITIES (Hierro, Malla, Clavos):**
-    * MODO: "Despachante Rápido".
-    * ACCIÓN: Confirma stock ("✅ Hay stock"), calcula precio total y cierra.
-    * MALLAS: Si piden m2, calcula optimización (Mini vs Maxi) para menos desperdicio.
+🧠 **FASE 2: ESTRATEGIA DE VENTA (EL ROL)**
+Una vez identificado el producto, actúa según su tipo:
+* **SI ES COMMODITY (Hierros, Mallas, Clavos, Caños Standard):**
+    * MODO: **"Despachante Rápido"**.
+    * ACCIÓN: Confirma stock ("✅ Hay stock"), da precio total y pide cerrar. ¡No des vueltas!
+    * *Tip Mallas:* Si piden m2, calcula optimización (Mini vs Maxi) para reducir desperdicio.
+* **SI ES TÉCNICO (Perfiles C/U, Chapas Especiales, Galpones):**
+    * MODO: **"Ingeniero Consultivo"**.
+    * ACCIÓN: Antes de dar precio, valida el uso. "¿Para qué luz de techo es?" "¿Qué espesor de chapa (14, 16, 18) buscás?". Asesora y luego vende.
 
-2.  **SI PIDEN TÉCNICOS (Perfiles, Chapas, Galpones):**
-    * MODO: "Consultor Técnico".
-    * ACCIÓN: Pregunta el uso (techo/entrepiso/luz) antes de dar precio para asegurar que lleven lo correcto.
-    * CROSS-SELL: Ofrece siempre complementos (electrodos, discos).
+🚨 **REGLAS COMERCIALES BLINDADAS:**
+1.  **STOCK:** Solo confirmas lo que está en el CSV. Si no hay, ofrece alternativa o di "Consultar a Martín".
+2.  **PRECIO:** Siempre aclara **"(Precio + IVA, sujeto a confirmación)"**.
+3.  **DESCUENTOS:** Compra > $300.000 = **15% OFF**.
+4.  **CROSS-SELL:** Hierros -> Ofrece Alambre/Clavos. Perfiles -> Ofrece Electrodos.
 
-🚨 **REGLAS DE ORO (OBLIGATORIAS):**
-* **STOCK:** Solo vendes lo que ves en la lista. Si no está, ofrece alternativa.
-* **PRECIO:** Siempre aclara: **"(Precio + IVA, sujeto a confirmación)"**.
-* **DESCUENTO:** Si la suma > $300.000, aplica 15% OFF y celébralo.
-* **ALAMBRE/CLAVOS:** Véndelos por KG (ofrece 1kg promedio).
-
-📝 **FORMATO DE SALIDA (SOLO AL CONFIRMAR/CERRAR):**
+📝 **FORMATO SALIDA WHATSAPP (OBLIGATORIO):**
 [TEXTO_WHATSAPP]:
 Hola Martín, soy cliente Web.
-Cotización Pendiente de Revisión:
-- (COD: [SKU]) [Producto] x [Cant]
+Cotización (A revisar):
+- (COD: [SKU]) [Producto Detectado] x [Cant]
 Total Estimado IA: $[Monto]
-¿Me confirmas stock y precio final?
+¿Me confirmas disponibilidad?
 Datos: [Nombre/DNI]
 """
 
-# --- 6. GESTIÓN DE MODELOS (REDUNDANCIA 2.5 -> 1.5) ---
+# --- 6. GESTIÓN DE MODELOS (GEMINI 2.5 CON FALLBACK) ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "👋 Hola, soy Lucho. Estoy conectado al inventario.\n\n¿Qué materiales necesitas cotizar hoy?"}]
+    st.session_state.messages = [{"role": "assistant", "content": "👋 Hola, soy Lucho. ¿Qué materiales necesitas? (Ej: Caño gas, malla del 6, perfiles...)"}]
 
 if "chat_session" not in st.session_state:
     try:
-        # INTENTO 1: Gemini 2.5 (Potencia máxima para contexto largo)
+        # Intento Principal: Gemini 2.5 (Mejor lógica)
         generation_config = {"temperature": 0.2, "max_output_tokens": 8192}
         model = genai.GenerativeModel('gemini-2.5-pro', system_instruction=sys_prompt, generation_config=generation_config)
         st.session_state.chat_session = model.start_chat(history=[])
     except Exception:
         try:
-            # INTENTO 2: Fallback a Gemini 1.5 Pro (Estabilidad)
+            # Respaldo: Gemini 1.5 Pro
             model = genai.GenerativeModel('gemini-1.5-pro', system_instruction=sys_prompt)
             st.session_state.chat_session = model.start_chat(history=[])
         except Exception:
-            st.error("Error de conexión. Por favor usa el botón de 'Hablar con Martín'.")
+            st.error("Error de conexión IA. Por favor habla con Martín.")
 
 # --- 7. INTERFAZ DE CHAT ---
-# Renderizar historial
 for msg in st.session_state.messages:
     avatar = "👷‍♂️" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-# Capturar entrada usuario
-if prompt := st.chat_input("Escribe aquí (Ej: Necesito 100m2 de malla)..."):
+if prompt := st.chat_input("Escribe tu consulta aquí..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").markdown(prompt)
 
     try:
         chat = st.session_state.chat_session
-        with st.spinner("Consultando precios y stock..."):
+        with st.spinner("Lucho está calculando..."):
             response = chat.send_message(prompt)
             full_text = response.text
             
-            # DETECCIÓN DE CIERRE (TAG WHATSAPP)
+            # Lógica de detección de cierre
             WHATSAPP_TAG = "[TEXTO_WHATSAPP]:"
             if WHATSAPP_TAG in full_text:
                 dialogue, wa_part = full_text.split(WHATSAPP_TAG, 1)
                 
-                # Mostrar respuesta verbal
                 st.markdown(dialogue.strip())
                 st.session_state.messages.append({"role": "assistant", "content": dialogue.strip()})
                 
-                # Preparar Link WhatsApp
                 wa_encoded = urllib.parse.quote(wa_part.strip())
                 wa_url = f"https://wa.me/5493401527780?text={wa_encoded}"
                 
-                # Mostrar Botón de Cierre
                 st.markdown(f"""
                 <a href="{wa_url}" target="_blank" class="whatsapp-btn-final">
-                👉 CONFIRMAR PEDIDO CON MARTÍN
+                👉 CONFIRMAR CON MARTÍN
                 </a>
                 """, unsafe_allow_html=True)
             else:
-                # Respuesta normal
                 st.markdown(full_text)
                 st.session_state.messages.append({"role": "assistant", "content": full_text})
                 
-    except Exception as e:
-        st.error("Hubo un error de conexión. Presiona el botón verde de arriba para hablar con Martín.")
+    except Exception:
+        st.error("Error de conexión. Usa el botón superior para contactar a Martín.")
