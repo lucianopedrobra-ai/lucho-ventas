@@ -19,7 +19,7 @@ st.set_page_config(
 )
 
 # --- Variables de Negocio ---
-URL_FORM_GOOGLE = ""  # Pega tu link aquí si lo tienes
+URL_FORM_GOOGLE = ""
 DOLAR_BNA_REF = 1060.00 
 CIUDADES_GRATIS = """
 EL TREBOL, LOS CARDOS, LAS ROSAS, SAN GENARO, CENTENO, CASAS, CAÑADA ROSQUIN, 
@@ -30,37 +30,38 @@ PIAMONTE, VILA, SAN FRANCISCO.
 """
 
 # ==========================================
-# 2. INTERFAZ VISUAL (SOLUCIÓN MÓVIL Y VISIBILIDAD DE TEXTO)
+# 2. INTERFAZ VISUAL (MÁXIMA VISIBILIDAD)
 # ==========================================
 st.markdown("""
     <style>
-    /* RESET GLOBAL */
+    /* GLOBAL RESET Y FONDO BLANCO FORZADO */
     header[data-testid="stHeader"] {visibility: hidden;}
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* FUENTES Y BASE */
+    /* 1. ANULACIÓN DE FONDO OSCURO EN CONTENEDORES RAÍZ */
+    .stApp { background-color: white !important; }
+    .stApp > header { visibility: hidden; }
+    .main { background-color: white !important; }
+    
     html, body, [class*="css"] {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
-    /* 1. HEADER FIJO SIMPLIFICADO */
+    /* 2. HEADER FIJO */
     .fixed-header {
         position: fixed;
         top: 0; left: 0; width: 100%; height: 55px;
         background-color: #ffffff;
         border-bottom: 1px solid #ddd;
-        z-index: 1000000; /* Z-Index Aún más alto para asegurar */
+        z-index: 1000000;
         display: flex; justify-content: space-between; align-items: center;
         padding: 0 15px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
-    
     .brand-box { line-height: 1.1; }
     .brand-name { color: #0f2c59; font-weight: 800; font-size: 14px; text-transform: uppercase; }
     .brand-sub { color: #666; font-size: 10px; }
-
-    /* Botón WhatsApp Compacto */
     .wa-btn {
         background-color: #25D366; color: white !important;
         padding: 6px 12px; border-radius: 20px;
@@ -68,41 +69,32 @@ st.markdown("""
         display: flex; align-items: center; gap: 5px;
     }
 
-    /* 2. ESPACIADO CRÍTICO PARA MÓVIL (PADDING) */
+    /* 3. ESPACIADO CRÍTICO PARA MÓVIL */
     .block-container {
         padding-top: 70px !important;
         padding-bottom: 140px !important; 
     }
 
-    /* 3. ESTILO DE MENSAJES */
-    .stChatMessage { background-color: transparent; }
-    .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) { 
-        background-color: #f4f6f9; 
-        border-radius: 12px; 
-        padding: 10px; 
-    }
-
-    /* 4. ARREGLO DEL INPUT (SOLUCIÓN CRÍTICA DE VISIBILIDAD) */
+    /* 4. ARREGLO DEL INPUT (EL MAYOR REFUERZO DE VISIBILIDAD) */
     
-    /* Contenedor del Input (Streamlit Native Footer) */
+    /* Contenedor principal de la barra de chat (el que Streamlit fija al fondo) */
     div[data-testid="stChatInput"] {
         background-color: #ffffff !important;
         border-top: 1px solid #e0e0e0 !important;
-        padding-bottom: 15px !important; 
+        padding-bottom: 15px !important;
         padding-top: 10px !important;
-        /* Aseguramos que el input esté por encima de cualquier otra cosa */
-        z-index: 999999; 
+        z-index: 9999999; /* Z-index EXTREMO para garantizar que no haya superposición */
     }
     
     /* El área de texto donde se escribe */
     textarea[data-testid="stChatInputTextArea"] {
-        /* *** REFUERZO DE COLOR *** */
         background-color: #ffffff !important;
         color: #000000 !important; /* Texto negro forzado */
         caret-color: #000000 !important; /* Cursor negro forzado */
         border: 1px solid #cccccc !important;
         border-radius: 20px !important;
-        /* *** FIN REFUERZO *** */
+        /* Aseguramos que el contenido del texto esté sobre el fondo */
+        z-index: 10000000; 
     }
     
     /* Placeholder visible */
@@ -111,14 +103,21 @@ st.markdown("""
         opacity: 1 !important;
     }
 
-    /* 5. TARJETA DE CIERRE (CTA) */
+    /* 5. ESTILOS DE MENSAJES */
+    .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) { 
+        background-color: #f4f6f9; 
+        border-radius: 12px; 
+        padding: 10px; 
+    }
+
+    /* 6. CTA */
     .cta-container { margin-top: 10px; text-align: center; }
     .cta-button {
         display: block;
         background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
         color: white !important; padding: 12px; border-radius: 10px;
         text-decoration: none; font-weight: bold;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     </style>
 
@@ -166,20 +165,12 @@ raw_data = load_data()
 # --- MOTOR DE BÚSQUEDA HÍBRIDO ---
 def buscar_productos_inteligente(consulta, df, limite=50):
     if df is None or df.empty: return ""
-    
     palabras = consulta.lower().split()
     palabras_clave = [p for p in palabras if len(p) > 2]
-    
-    if not palabras_clave:
-        return "" 
-    
+    if not palabras_clave: return "" 
     mask = df['SEARCH_INDEX'].apply(lambda x: any(p in x for p in palabras_clave))
-    
     resultados = df[mask].head(limite)
-    
-    if resultados.empty:
-        return ""
-    
+    if resultados.empty: return ""
     return resultados.drop(columns=['SEARCH_INDEX'], errors='ignore').to_csv(index=False)
 
 # --- Logging (Analíticas) ---
