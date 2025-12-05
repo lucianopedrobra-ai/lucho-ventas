@@ -83,15 +83,18 @@ st.markdown("""
         transition: transform 0.2s;
         border: 2px solid white;
     }
-
-    /* !!! SOLUCIÓN FINAL MÓVIL !!! */
-    /* Target al contenedor principal y aseguramos un margen ENORME para no chocar con el input fijo */
-    @media (max-width: 800px) {
+    .final-action-card:hover { transform: translateY(-3px); box-shadow: 0 15px 25px rgba(37, 211, 102, 0.4); }
+    
+    /* Spinner de carga personalizado */
+    .stSpinner > div { border-top-color: #0f2c59 !important; }
+    
+    /* !!! SOLUCIÓN FINAL MÓVIL (MUY AGRESIVA) !!! */
+    @media (max-width: 992px) { /* Aumentamos el alcance para tablets y móviles */
         .stApp {
-            /* Asegura que la parte inferior de la conversación tenga un espacio de seguridad */
+            /* 200px es un margen de seguridad extrema para el chat input + teclado virtual */
             padding-bottom: 200px !important; 
         }
-        /* Mueve el input de chat más abajo, aunque Streamlit ya lo hace, es una capa de seguridad extra */
+        /* Aseguramos que el input se mantenga en el fondo */
         div[data-testid="stChatInput"] {
             bottom: 0px !important;
             height: 70px;
