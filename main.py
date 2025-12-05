@@ -13,7 +13,6 @@ import time
 # ==========================================
 
 # --- Analíticas Silenciosas (Google Forms) ---
-# Pega tu link aquí para recibir reportes automáticos sin frenar el chat.
 URL_FORM_GOOGLE = ""  
 ID_CAMPO_CLIENTE = "entry.xxxxxx"
 ID_CAMPO_MONTO = "entry.xxxxxx"
@@ -68,6 +67,7 @@ st.markdown("""
     }
     .wa-pill-btn:hover { transform: scale(1.05); background-color: #1ebc57; }
 
+    /* Padding principal para evitar que el contenido se oculte bajo el header */
     .block-container { padding-top: 85px !important; padding-bottom: 40px !important; }
 
     /* Estilos de Chat */
@@ -89,6 +89,17 @@ st.markdown("""
     
     /* Spinner de carga personalizado */
     .stSpinner > div { border-top-color: #0f2c59 !important; }
+    
+    /* !!! CORRECCIÓN CRÍTICA PARA MÓVILES !!! */
+    @media (max-width: 600px) {
+        /* Asegura que el historial de chat no quede oculto bajo la barra de input fijo. */
+        .stApp {
+            padding-bottom: 120px !important; /* Más margen para que quepan mensajes y el botón de chat */
+        }
+        .stChatInput {
+            height: 70px; /* Altura constante para el input */
+        }
+    }
     </style>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -124,7 +135,6 @@ SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTUG5PPo2kN1HkP2FY1
 def load_data():
     try:
         df = pd.read_csv(SHEET_URL, encoding='utf-8', on_bad_lines='skip', dtype=str)
-        # Limpiamos basura para que Gemini lea más rápido
         df = df.dropna(how='all', axis=1) 
         df = df.dropna(how='all', axis=0)
         df = df.fillna("")
@@ -136,20 +146,19 @@ raw_data = load_data()
 
 if raw_data is not None and not raw_data.empty:
     try:
-        csv_context = raw_data.to_csv(index=False) # CSV crudo es más ligero para la IA
+        csv_context = raw_data.to_csv(index=False)
     except Exception:
         csv_context = raw_data.to_string(index=False)
 else:
     csv_context = "ERROR: Base de datos no accesible."
 
-# --- Hilo de Métricas en Background (Cero Latencia) ---
+# --- Hilo de Métricas en Background ---
 if "log_data" not in st.session_state:
     st.session_state.log_data = []
 if "admin_mode" not in st.session_state:
     st.session_state.admin_mode = False
 
 def enviar_a_google_form_background(cliente, monto, oportunidad):
-    """Envía datos a la nube sin congelar la pantalla del usuario"""
     if URL_FORM_GOOGLE and "docs.google.com" in URL_FORM_GOOGLE:
         try:
             payload = {
@@ -159,14 +168,13 @@ def enviar_a_google_form_background(cliente, monto, oportunidad):
             }
             requests.post(URL_FORM_GOOGLE, data=payload, timeout=3)
         except:
-            pass # Falla silenciosa garantizada
+            pass 
 
 def log_interaction(user_text, bot_response):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     opportunity = "NORMAL"
     monto_estimado = 0
     
-    # Detector de Montos
     if "$" in bot_response:
         try:
             precios = [int(s.replace('.','')) for s in re.findall(r'\$([\d\.]+)', bot_response) if s.replace('.','').isdigit()]
@@ -179,7 +187,6 @@ def log_interaction(user_text, bot_response):
 
     st.session_state.log_data.append({"Fecha": timestamp, "Usuario": user_text[:50], "Oportunidad": opportunity, "Monto Max": monto_estimado})
     
-    # Disparamos el hilo invisible
     thread = threading.Thread(target=enviar_a_google_form_background, args=(user_text, monto_estimado, opportunity))
     thread.daemon = True 
     thread.start()
@@ -250,7 +257,6 @@ if "chat_session" not in st.session_state:
         st.session_state.chat_session = model.start_chat(history=[])
     except Exception:
         try:
-            # Fallback
             model = genai.GenerativeModel('gemini-1.5-pro', system_instruction=sys_prompt)
             st.session_state.chat_session = model.start_chat(history=[])
         except Exception:
@@ -277,7 +283,7 @@ if prompt := st.chat_input("Ej: Necesito 20 chapas T101 para San Jorge..."):
         chat = st.session_state.chat_session
         with st.chat_message("assistant", avatar="👷‍♂️"):
             
-            # 1. FEEDBACK VISUAL (Solo dura lo que tarda en pensar)
+            # 1. FEEDBACK VISUAL
             with st.spinner("Miguel está calculando costos y logística..."):
                 try:
                     response_stream = chat.send_message(prompt, stream=True)
@@ -285,7 +291,7 @@ if prompt := st.chat_input("Ej: Necesito 20 chapas T101 para San Jorge..."):
                     st.error("Error de conexión. Intenta de nuevo.")
                     st.stop()
 
-            # 2. STREAMING DE TEXTO (Efecto escritura)
+            # 2. STREAMING DE TEXTO
             response_placeholder = st.empty()
             full_response = ""
             
@@ -294,10 +300,9 @@ if prompt := st.chat_input("Ej: Necesito 20 chapas T101 para San Jorge..."):
                     full_response += chunk.text
                     response_placeholder.markdown(full_response + "▌")
             
-            # Texto final
             response_placeholder.markdown(full_response)
             
-            # 3. PROCESAMIENTO POSTERIOR (Background)
+            # 3. PROCESAMIENTO POSTERIOR
             log_interaction(prompt, full_response)
             
             # 4. BOTÓN WHATSAPP INTELIGENTE
@@ -305,11 +310,9 @@ if prompt := st.chat_input("Ej: Necesito 20 chapas T101 para San Jorge..."):
             if WHATSAPP_TAG in full_response:
                 dialogue, wa_part = full_response.split(WHATSAPP_TAG, 1)
                 
-                # Limpiamos el texto para el usuario
                 response_placeholder.markdown(dialogue.strip())
                 st.session_state.messages.append({"role": "assistant", "content": dialogue.strip()})
                 
-                # Globos si hay descuento
                 if "15%" in dialogue or "MAYORISTA" in dialogue:
                     st.balloons()
                     st.toast('🎉 ¡Tarifa Mayorista (15% OFF) Activada!', icon='💰')
