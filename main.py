@@ -10,7 +10,7 @@ import time
 import random
 
 # ==========================================
-# 1. CONFIGURACIÓN TÉCNICA
+# 1. CONFIGURACIÓN INNEGOCIABLE
 # ==========================================
 st.set_page_config(
     page_title="Pedro Bravin S.A. | Cotizador",
@@ -22,18 +22,8 @@ st.set_page_config(
 # --- VARIABLES DE NEGOCIO ---
 DOLAR_BNA_REF = 1060.00
 
-# --- LA ESCALERA DE VALOR (VISUAL) ---
-# Esta es la meta visual general, pero Miguel tendrá reglas especiales para Chapas/Perfiles
-NIVELES = [
-    # Nivel Base: Mejorado al 5% para que sea atractivo de entrada
-    {"techo": 500000,  "desc": 5,  "next_desc": 10, "nombre": "INICIAL", "label_desc": "5% CONTADO", "color": "#78909c"}, 
-    {"techo": 1500000, "desc": 10, "next_desc": 15, "nombre": "OBRA", "label_desc": "10% OFF", "color": "#ffa726"}, 
-    {"techo": 3000000, "desc": 15, "next_desc": 18, "nombre": "CONSTRUCTOR", "label_desc": "15% OFF", "color": "#d50000"}, 
-    {"techo": float('inf'), "desc": 18, "next_desc": 18, "nombre": "PARTNER", "label_desc": "18% MAX", "color": "#6200ea"} 
-]
-
 # --- INFRAESTRUCTURA DE DATOS ---
-URL_FORM_GOOGLE = ""  # 🔴 PEGAR LINK DE GOOGLE FORMS
+URL_FORM_GOOGLE = ""  # 🔴 TU LINK DE GOOGLE FORMS
 ID_CAMPO_CLIENTE = "entry.xxxxxx"
 ID_CAMPO_MONTO = "entry.xxxxxx"
 ID_CAMPO_OPORTUNIDAD = "entry.xxxxxx"
@@ -47,21 +37,28 @@ PIAMONTE, VILA, SAN FRANCISCO.
 """
 
 FRASES_FOMO = [
-    "🔥 Chapas T101: Precio especial por cierre de lote.",
-    "⚠️ Hierro Construcción: Stock con alta rotación hoy.",
-    "👀 Perfiles C: 3 clientes están consultando stock ahora.",
-    "📉 Dólar BNA estable: Aprovechá para congelar precio.",
-    "🚚 Logística: Armado de reparto para zona centro."
+    "🔥 Chapas: Quedan pocas unidades del lote.",
+    "⚠️ Hierro: Alta rotación hoy.",
+    "👀 3 Constructores están cotizando ahora.",
+    "📉 Dólar estable: Buen momento para acopiar.",
+    "🚚 Logística: Armado de reparto en proceso."
 ]
 
 # ==========================================
-# 2. MOTOR DE BACKEND
+# 2. MOTOR DE BACKEND & ESTADO
 # ==========================================
+
+# Inicialización de Estados
 if "log_data" not in st.session_state: st.session_state.log_data = []
 if "admin_mode" not in st.session_state: st.session_state.admin_mode = False
 if "monto_acumulado" not in st.session_state: st.session_state.monto_acumulado = 0.0
+# Nuevo: Estado para forzar el nivel visual de la barra si es producto competitivo
+if "nivel_forzado" not in st.session_state: st.session_state.nivel_forzado = 0 
+# Nuevo: Estado para que el botón de compra no desaparezca
+if "link_compra_activo" not in st.session_state: st.session_state.link_compra_activo = None
+
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "🏗️ **Bienvenido a Pedro Bravin S.A.**\n\nSoy Miguel. Tengo **tarifas especiales** en Chapas, Perfiles y Hierros.\n¿Qué materiales cotizamos?"}]
+    st.session_state.messages = [{"role": "assistant", "content": "🏗️ **Hola.** Cotizo directo de fábrica.\n¿Qué materiales necesitás?"}]
 
 def enviar_a_google_form_background(cliente, monto, oportunidad):
     if URL_FORM_GOOGLE and "docs.google.com" in URL_FORM_GOOGLE:
@@ -73,8 +70,8 @@ def enviar_a_google_form_background(cliente, monto, oportunidad):
 def log_interaction(user_text, bot_response, monto_detectado):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     opportunity = "BAJA"
-    if monto_detectado > 1500000: opportunity = "🔥 ALTA (CONSTRUCTOR)"
-    elif monto_detectado > 500000: opportunity = "MEDIA (OBRA)"
+    if monto_detectado > 1500000: opportunity = "🔥 ALTA"
+    elif monto_detectado > 500000: opportunity = "MEDIA"
     
     st.session_state.log_data.append({"Fecha": timestamp, "Usuario": user_text[:50], "Oportunidad": opportunity, "Monto": monto_detectado})
     
@@ -82,42 +79,73 @@ def log_interaction(user_text, bot_response, monto_detectado):
     thread.daemon = True
     thread.start()
 
-def extraer_monto(texto):
+def extraer_datos_respuesta(texto):
+    """Extrae precio y etiqueta de nivel forzado"""
+    # Extraer Monto
     patrones = re.findall(r'\$\s?([\d\.]+)', texto)
     montos = [int(p.replace('.', '')) for p in patrones if p.replace('.', '').isdigit()]
-    return max(montos) if montos else 0
-
-def obtener_nivel_actual(monto):
-    for nivel in NIVELES:
-        if monto < nivel["techo"]: return nivel
-    return NIVELES[-1]
+    monto_max = max(montos) if montos else 0
+    
+    # Extraer Nivel Forzado (Tag oculto [LEVEL:15])
+    nivel_tag = re.search(r'\[LEVEL:(\d+)\]', texto)
+    nivel_detectado = int(nivel_tag.group(1)) if nivel_tag else 0
+    
+    return monto_max, nivel_detectado
 
 # ==========================================
-# 3. INTERFAZ VISUAL (BARRA DINÁMICA)
+# 3. LÓGICA DE LA BARRA (SINCRONIZADA)
 # ==========================================
-nivel_actual = obtener_nivel_actual(st.session_state.monto_acumulado)
-meta = nivel_actual["techo"]
-label_descuento = nivel_actual["label_desc"]
-siguiente_descuento = nivel_actual["next_desc"]
-color_barra = nivel_actual["color"]
 
-base_nivel_anterior = 0
-for i, n in enumerate(NIVELES):
-    if n == nivel_actual and i > 0:
-        base_nivel_anterior = NIVELES[i-1]["techo"]
-        break
+# Definimos niveles base
+NIVELES = [
+    {"techo": 500000, "desc": 5, "nombre": "INICIAL", "color": "#78909c"}, 
+    {"techo": 1500000, "desc": 10, "nombre": "OBRA", "color": "#ffa726"}, 
+    {"techo": 3000000, "desc": 15, "nombre": "CONSTRUCTOR", "color": "#d50000"}, 
+    {"techo": float('inf'), "desc": 18, "nombre": "PARTNER", "color": "#6200ea"} 
+]
 
-if meta == float('inf'):
-    porcentaje = 100
-    texto_meta = "🏆 ¡MEJOR PRECIO DEL MERCADO!"
-    falta = 0
+# 1. Determinamos el % de descuento real a mostrar
+descuento_visual = 5 # Base
+color_barra = "#78909c"
+texto_meta = "Iniciando..."
+porcentaje_barra = 0
+
+# Si Miguel detectó producto competitivo, manda el nivel forzado
+if st.session_state.nivel_forzado > 0:
+    descuento_visual = st.session_state.nivel_forzado
+    # Asignar color según el forzado
+    if descuento_visual >= 18: color_barra = "#6200ea"
+    elif descuento_visual >= 15: color_barra = "#d50000"
+    elif descuento_visual >= 10: color_barra = "#ffa726"
+    porcentaje_barra = 100 # Barra llena porque es un beneficio especial
+    texto_meta = "🔥 ¡BENEFICIO COMPETITIVO ACTIVADO!"
+
 else:
-    rango = meta - base_nivel_anterior
-    progreso_en_rango = st.session_state.monto_acumulado - base_nivel_anterior
-    porcentaje = min(max(progreso_en_rango / rango, 0), 1) * 100
-    falta = meta - st.session_state.monto_acumulado
-    texto_meta = f"Faltan ${falta:,.0f} para {siguiente_descuento}% OFF"
+    # Si no hay forzado, usa la lógica de montos acumulados
+    monto = st.session_state.monto_acumulado
+    for i, nivel in enumerate(NIVELES):
+        if monto < nivel["techo"]:
+            descuento_visual = nivel["desc"]
+            color_barra = nivel["color"]
+            # Calcular progreso hacia el siguiente nivel
+            base = NIVELES[i-1]["techo"] if i > 0 else 0
+            rango = nivel["techo"] - base
+            progreso = monto - base
+            porcentaje_barra = min(max(progreso / rango, 0), 1) * 100
+            falta = nivel["techo"] - monto
+            
+            # Ver cual es el siguiente salto
+            prox_desc = NIVELES[i+1]["desc"] if i < len(NIVELES)-1 else 18
+            texto_meta = f"Faltan ${falta:,.0f} para {prox_desc}% OFF"
+            break
+    
+    if monto >= 3000000:
+        descuento_visual = 18
+        color_barra = "#6200ea"
+        porcentaje_barra = 100
+        texto_meta = "🏆 SOCIO PARTNER"
 
+# Renderizado CSS de la Barra
 st.markdown(f"""
     <style>
     #MainMenu, footer, header {{visibility: hidden;}}
@@ -135,7 +163,6 @@ st.markdown(f"""
     }}
     .legal-text {{ color: #ffeb3b; font-weight: 600; font-size: 0.7rem; }}
     
-    /* BARRA DE PROGRESO */
     .game-zone {{ padding: 10px 20px; background: #fafafa; border-bottom: 1px solid #eee; }}
     .level-info {{ display: flex; justify-content: space-between; margin-bottom: 5px; align-items: center; }}
     .current-badge {{ 
@@ -145,7 +172,7 @@ st.markdown(f"""
     .next-target {{ color: {color_barra}; font-weight: 800; font-size: 0.9rem; }}
     .custom-progress-bg {{ width: 100%; height: 14px; background: #e0e0e0; border-radius: 10px; overflow: hidden; }}
     .custom-progress-fill {{
-        height: 100%; width: {porcentaje}%; 
+        height: 100%; width: {porcentaje_barra}%; 
         background: linear-gradient(90deg, {color_barra} 0%, {color_barra} 100%); 
         transition: width 0.6s ease-in-out;
         box-shadow: 0 0 10px {color_barra};
@@ -183,7 +210,7 @@ st.markdown(f"""
         </div>
         <div class="game-zone">
             <div class="level-info">
-                <span class="current-badge">TU NIVEL: {label_descuento}</span>
+                <span class="current-badge">TU DESCUENTO: {descuento_visual}%</span>
                 <span class="next-target">{texto_meta}</span>
             </div>
             <div class="custom-progress-bg">
@@ -199,7 +226,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 4. CEREBRO IA (CON UPGRADE COMPETITIVO)
+# 4. CEREBRO IA (CON STRICT GUARDRAILS)
 # ==========================================
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
@@ -220,37 +247,40 @@ def load_data():
 csv_context = load_data()
 
 sys_prompt = f"""
-ROL: Eres Miguel, el Asesor Estrella de Pedro Bravin S.A.
+ROL: Eres Miguel, un cotizador automático de materiales de construcción.
 BASE DE DATOS: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
 
-🔥 **PROTOCOLOS DE DESCUENTO:**
+⛔ GUARDRAILS (REGLAS DE SEGURIDAD):
+1. SI EL USUARIO PREGUNTA COSAS PERSONALES, DE PROGRAMACIÓN, CLIMA O POLÍTICA -> RESPONDE: "Soy Miguel, experto en acero. Solo cotizo materiales para tu obra."
+2. NO MENCIONES A "MARTÍN" EN EL TEXTO. Martín es solo para el botón final.
+3. NO SALUDES CON TEXTOS LARGOS.
 
-1.  **PRODUCTOS ESTRELLA (COMPETITIVOS):**
-    * Si piden **CHAPAS DE TECHO**, **PERFILES C** o **HIERRO DE CONSTRUCCIÓN**:
-    * ⚡ **UPGRADE AUTOMÁTICO:** Sé MUY agresivo. Ignora los niveles bajos.
-    * Ofrece descuentos fuertes (10% al 15%) desde el inicio para ganar la venta.
-    * *Argumento:* "En chapas y perfiles tengo el mejor precio de la zona garantizado".
+💰 REGLAS DE DESCUENTO:
+1. **COMPETITIVOS (Chapas Techo, Perfiles, Hierro Const.):**
+   - APLICA 15% AUTOMÁTICO.
+   - AGREGA AL FINAL DEL TEXTO LA ETIQUETA OCULTA: [LEVEL:15]
+2. **RESTO:**
+   - < $500k: 5% (Pago Contado). [LEVEL:5]
+   - > $1.5M: 10%. [LEVEL:10]
+   - > $3M: 15%. [LEVEL:15]
 
-2.  **PRODUCTOS ESTÁNDAR (ESCALA GENERAL):**
-    * **$0 - $500k:** Ofrece **5% OFF (Pago Contado)**.
-    * **$500k - $1.5M:** 10% OFF.
-    * **$1.5M - $3M:** 15% OFF.
-    * **+$3M:** 18% OFF (Partner).
+📝 FORMATO DE RESPUESTA (EXTREMADAMENTE BREVE):
+- Usa Bullet points.
+- Max 30 palabras.
+- Estructura:
+  ✅ Stock: [SI/NO/BAJO]
+  💲 Precio: $[Monto] + IVA
+  🚚 Flete: [Bonificado/A cotizar]
+  ❓ Cierre: "¿Cerramos?"
 
-3.  **TÁCTICA DE CIERRE:**
-    * **Precio:** Siempre di "$ Precio + IVA".
-    * **Escasez:** "Queda poco stock de este lote".
-    * **Logística:** Si es zona gratis, grítalo: "¡Flete BONIFICADO!".
-
-FORMATO SALIDA WHATSAPP:
+FORMATO WHATSAPP FINAL (SOLO SI EL CLIENTE MUESTRA INTENCIÓN DE COMPRA):
 [TEXTO_WHATSAPP]:
 Hola Martín, CONGELAR STOCK.
-📦 Pedido: [Items]
-📍 Localidad: [Ciudad]
-💰 Total Aprox: $[Monto] + IVA
-💎 Descuento Aplicado: [{label_descuento} o 'ESPECIAL COMPETITIVO']
-Link de pago por favor.
+📦 Items: [Resumen]
+📍 Zona: [Ciudad]
+💰 Total: $[Monto] + IVA
+💎 Descuento: [X%]
 """
 
 if "chat_session" not in st.session_state:
@@ -263,18 +293,27 @@ if "chat_session" not in st.session_state:
 # 5. CHAT Y PROCESAMIENTO
 # ==========================================
 
-# Renderizado Historial
+# 1. Renderizar Historial
 for msg in st.session_state.messages:
     avatar = "👷‍♂️" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-# Input Usuario
-if prompt := st.chat_input("Ej: 20 Chapas C25 y Perfiles C..."):
+# 2. Renderizar Botón de Compra PERSISTENTE
+if st.session_state.link_compra_activo:
+    st.markdown(f"""
+    <a href="{st.session_state.link_compra_activo}" target="_blank" class="closing-card">
+        🔥 FINALIZAR CON MARTÍN <br>
+        <span style="font-size:0.9rem; font-weight:400; opacity:0.9;">Click aquí para congelar precio</span>
+    </a>
+    """, unsafe_allow_html=True)
+
+# 3. Input Usuario
+if prompt := st.chat_input("Ej: 20 Chapas C25 y Perfiles..."):
     if prompt == "#admin-miguel":
         st.session_state.admin_mode = not st.session_state.admin_mode
         st.rerun()
 
-    if random.random() > 0.6:
+    if random.random() > 0.7:
         st.toast(random.choice(FRASES_FOMO), icon='🔥')
 
     st.session_state.messages.append({"role": "user", "content": prompt})
@@ -283,34 +322,39 @@ if prompt := st.chat_input("Ej: 20 Chapas C25 y Perfiles C..."):
     try:
         chat = st.session_state.chat_session
         with st.chat_message("assistant", avatar="👷‍♂️"):
-            with st.spinner("⚡ Analizando descuentos especiales..."):
+            with st.spinner("⚡ Cotizando..."):
                 response = chat.send_message(prompt)
                 full_text = response.text
                 
-                nuevo_monto = extraer_monto(full_text)
+                # Análisis Inteligente
+                nuevo_monto, nivel_detectado = extraer_datos_respuesta(full_text)
+                
+                # Actualizar estados
                 if nuevo_monto > 0: st.session_state.monto_acumulado = nuevo_monto
+                if nivel_detectado > 0: st.session_state.nivel_forzado = nivel_detectado
                 
                 log_interaction(prompt, full_text, nuevo_monto)
 
-                if st.session_state.monto_acumulado > 1000000:
-                    st.balloons() # Solo festeja ventas grandes
-                    st.toast("🚀 ¡PRECIO MAYORISTA DETECTADO!", icon="💰")
-
+                # Procesar Link de WhatsApp y limpiarlo del texto visible
+                display_text = full_text
                 if "[TEXTO_WHATSAPP]:" in full_text:
-                    display, wa_msg = full_text.split("[TEXTO_WHATSAPP]:", 1)
-                    st.markdown(display)
-                    st.session_state.messages.append({"role": "assistant", "content": display})
+                    parts = full_text.split("[TEXTO_WHATSAPP]:", 1)
+                    display_text = parts[0].strip()
+                    wa_msg = parts[1].strip()
                     
-                    wa_url = f"https://wa.me/5493401527780?text={urllib.parse.quote(wa_msg.strip())}"
-                    st.markdown(f"""
-                    <a href="{wa_url}" target="_blank" class="closing-card">
-                        🔥 ASEGURAR PRECIO Y STOCK <br>
-                        <span style="font-size:0.9rem; font-weight:400; opacity:0.9;">Antes del cambio de lista</span>
-                    </a>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown(full_text)
-                    st.session_state.messages.append({"role": "assistant", "content": full_text})
+                    # Guardar link en sesión para que sea persistente
+                    wa_url = f"https://wa.me/5493401527780?text={urllib.parse.quote(wa_msg)}"
+                    st.session_state.link_compra_activo = wa_url
+                    
+                    # Feedback visual de éxito
+                    st.balloons()
+                    st.toast("✅ COTIZACIÓN LISTA PARA MARTÍN", icon="🚀")
+
+                # Limpiar etiquetas internas del texto visible [LEVEL:XX]
+                display_text = re.sub(r'\[LEVEL:\d+\]', '', display_text)
+                
+                st.markdown(display_text)
+                st.session_state.messages.append({"role": "assistant", "content": display_text})
                 
                 time.sleep(0.5)
                 st.rerun()
