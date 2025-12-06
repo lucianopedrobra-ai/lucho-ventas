@@ -22,7 +22,7 @@ st.set_page_config(
 )
 
 # ==========================================
-# 2. MOTOR INVISIBLE (DÓLAR)
+# 2. MOTOR INVISIBLE
 # ==========================================
 @st.cache_data(ttl=3600)
 def obtener_dolar_bna():
@@ -63,7 +63,7 @@ CIUDADES_GRATIS = [
     "PIAMONTE", "VILA", "SAN FRANCISCO"
 ]
 
-TOASTS_EXITO = ["🛒 Calculando...", "🔥 Precio OK", "✅ Agregado", "🏗️ Listo"]
+TOASTS_EXITO = ["🛒 Calculando peso...", "🔥 Precio x Barra OK", "✅ Agregado al pedido", "🏗️ Carga Lista"]
 
 # ==========================================
 # 3. ESTADO
@@ -77,7 +77,7 @@ if "expiry_time" not in st.session_state:
     st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
 
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Pasame tu lista y te armo el presupuesto final."}]
+    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. **¡APURATE!** Tenés precio congelado por 10 minutos."}]
 
 # ==========================================
 # 4. BACKEND
@@ -120,6 +120,7 @@ def parsear_ordenes_bot(texto):
     return items_nuevos
 
 def calcular_negocio():
+    # Timer Check
     now = datetime.datetime.now()
     tiempo_restante = st.session_state.expiry_time - now
     segundos_restantes = int(tiempo_restante.total_seconds())
@@ -160,7 +161,7 @@ def generar_link_wa(total):
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 5. UI: HEADER CON RELOJ (CORREGIDO)
+# 5. UI: HEADER CON RELOJ (RENDERIZADO OK)
 # ==========================================
 subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer, reloj_python = calcular_negocio()
 porcentaje_barra = 100
@@ -171,7 +172,6 @@ display_iva = "+IVA" if subtotal > 0 else ""
 display_badge = nombre_nivel if subtotal > 0 else "⚡ AHORRÁ YA"
 subtext_badge = f"Ahorro extra: {desc_actual}%" if (oferta_viva and subtotal > 0) else "OFERTA POR TIEMPO LIMITADO"
 
-# HTML HEADER (Variable {reloj_python} corregida)
 header_html = f"""
     <style>
     .block-container {{ padding-top: 175px !important; padding-bottom: 60px !important; }}
@@ -232,45 +232,38 @@ header_html = f"""
     </script>
 """
 
-# RENDERIZADO DEL HEADER CORRECTO
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA (REGLAS MATEMÁTICAS OK)
+# 6. CEREBRO IA (MODO LOBO: PRESIÓN TOTAL)
 # ==========================================
 try: genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 except: st.error("Falta API KEY")
 
+# PASAMOS EL TIEMPO RESTANTE AL CEREBRO
+minutos_restantes = seg_restantes // 60
+
 sys_prompt = f"""
-ROL: Miguel, vendedor técnico experto en aceros.
+ROL: Miguel, vendedor experto de Pedro Bravin S.A. (MODO CIERRE AGRESIVO)
 DB: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
+TIEMPO RESTANTE OFERTA: {minutos_restantes} MINUTOS.
 # DATO INTERNO: DOLAR = {DOLAR_BNA}
 
-🧮 **REGLAS MATEMÁTICAS INMUTABLES (PRECIOS SIDERÚRGICOS):**
-*El precio en CSV es BASE. Si es Dólares, multiplicá por {DOLAR_BNA}.*
+🧮 **REGLAS MATEMÁTICAS INMUTABLES:**
+Los precios CSV pueden ser en Dólares. Multiplica por {DOLAR_BNA} para PESOS.
+1. IPN/UPN/PERFIL C (12m): `(Peso_metro * 12) * Precio_CSV * {DOLAR_BNA}`
+2. ANGULOS/PLANCHUELAS (6m): `Peso_Total_Barra * Precio_CSV * {DOLAR_BNA}`
+3. CAÑOS (6.40m): `(Peso_metro * 6.40) * Precio_CSV * {DOLAR_BNA}`
+4. TUBOS ESTRUCTURALES (6m): `Precio_CSV * {DOLAR_BNA}`
+5. FLETE: Lejos = `(KM * 2 * {COSTO_FLETE_USD} * {DOLAR_BNA})`.
 
-1. **IPN / UPN / PERFIL C (Largo 12m):**
-   - CSV: Precio por KILO ($/KG).
-   - Descripción: Peso por METRO.
-   - 🧮 FÓRMULA BARRA: `(Peso_por_metro * 12) * Precio_CSV_Kilo * {DOLAR_BNA}`
-
-2. **ÁNGULOS / PLANCHUELAS / HIERRO T / REDONDOS / CUADRADOS (Largo 6m):**
-   - CSV: Precio por KILO ($/KG).
-   - Descripción: **PESO TOTAL DE LA BARRA** (Kg/Barra).
-   - 🧮 FÓRMULA BARRA: `Peso_Total_Barra * Precio_CSV_Kilo * {DOLAR_BNA}`
-
-3. **CAÑOS (Epoxi, Galv, Sched, Mec) (Largo 6.40m):**
-   - CSV: Precio por KILO ($/KG).
-   - Descripción: Peso por METRO.
-   - 🧮 FÓRMULA BARRA: `(Peso_por_metro * 6.40) * Precio_CSV_Kilo * {DOLAR_BNA}`
-
-4. **TUBOS ESTRUCTURALES (Largo 6m):**
-   - CSV: Precio por BARRA ($/Unidad).
-   - 🧮 FÓRMULA BARRA: `Precio_CSV_Unidad * {DOLAR_BNA}`
-
-5. **FLETE:**
-   - Lejos: `(KM * 2 * {COSTO_FLETE_USD} * {DOLAR_BNA})`.
+💀 **MODO CIERRE (FOMO EXTREMO):**
+No seas pasivo. Usa el tiempo restante para presionar.
+- "Te quedan solo {minutos_restantes} minutos para congelar este precio".
+- "El stock de esto vuela. ¿Te lo reservo ya?".
+- "Mañana aumenta la lista. Aprovechá el 3% extra ahora".
+- **SIEMPRE TERMINA CON PREGUNTA DE CIERRE:** "¿Te lo facturo?", "¿Sale camión?", "¿Cerramos?".
 
 SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_PESOS_BARRA:TIPO]
 """
@@ -279,7 +272,7 @@ if "chat_session" not in st.session_state:
     st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
 
 def procesar_vision(img):
-    return st.session_state.chat_session.send_message(["Analiza lista. APLICA FÓRMULAS MATEMÁTICAS DE PESO. Genera comandos [ADD...] con precio final de barra.", img]).text
+    return st.session_state.chat_session.send_message(["Analiza lista. MODO LOBO ACTIVADO. Genera comandos [ADD...] y PRESIONA LA VENTA.", img]).text
 
 # ==========================================
 # 7. INTERFAZ TABS
@@ -322,7 +315,9 @@ with tab1:
         with st.chat_message("assistant", avatar="👷‍♂️"):
             with st.spinner("Cotizando..."):
                 try:
-                    response = st.session_state.chat_session.send_message(prompt)
+                    # Inyectar el tiempo restante en el prompt del usuario para que Miguel sepa cuánto falta
+                    mensaje_con_contexto = f"{prompt} (Quedan {minutos_restantes} minutos de oferta. PRESIONA EL CIERRE)."
+                    response = st.session_state.chat_session.send_message(mensaje_con_contexto)
                     full_text = response.text
                     news = parsear_ordenes_bot(full_text)
                     display = re.sub(r'\[ADD:.*?\]', '', full_text)
