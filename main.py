@@ -250,18 +250,26 @@ if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\n\nExperto en materiales de Pedro Bravin S.A.\n\n**¿Qué estás buscando cotizar hoy?**"}]
 
 if "chat_session" not in st.session_state:
+    
+    model_initialized = False
+    
+    # 1. Intento con GEMINI 2.5 PRO (Máxima potencia)
     try:
-        # GEMINI 2.5 PRO (MÁXIMA POTENCIA)
         generation_config = {"temperature": 0.2, "max_output_tokens": 4096}
         model = genai.GenerativeModel('gemini-2.5-pro', system_instruction=sys_prompt, generation_config=generation_config)
         st.session_state.chat_session = model.start_chat(history=[])
+        model_initialized = True
     except Exception:
+        # 2. Fallback a GEMINI 2.5 FLASH (Recomendado para estabilidad y velocidad)
         try:
-            # Fallback
-            model = genai.GenerativeModel('gemini-1.5-pro', system_instruction=sys_prompt)
+            model = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt)
             st.session_state.chat_session = model.start_chat(history=[])
-        except Exception:
-            st.error("Error de conexión. Recarga la página.")
+            model_initialized = True
+        except Exception as e:
+            # 3. Fallo total
+            st.error(f"❌ Error de Conexión y Fallback: El asistente IA no pudo iniciar. Revisa la API Key. ({e})")
+            st.session_state.chat_session = None 
+            model_initialized = False
 
 # Renderizado de Historial
 for msg in st.session_state.messages:
@@ -276,6 +284,14 @@ if prompt := st.chat_input("Ej: Necesito 20 chapas T101 para San Jorge..."):
         st.session_state.admin_mode = True
         st.rerun()
     # ----------------------------
+    
+    # Bloqueamos la respuesta si la sesión del chat falló
+    if st.session_state.chat_session is None:
+        st.error("No se puede enviar el mensaje. El asistente IA falló al iniciar.")
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.chat_message("user").markdown(prompt)
+        st.stop()
+
 
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").markdown(prompt)
