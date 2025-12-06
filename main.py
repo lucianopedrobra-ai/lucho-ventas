@@ -54,13 +54,13 @@ FRASES_FOMO = [
 if "cart" not in st.session_state: st.session_state.cart = []
 if "log_data" not in st.session_state: st.session_state.log_data = []
 if "admin_mode" not in st.session_state: st.session_state.admin_mode = False
-# Estado para controlar que la foto no se procese dos veces
+# Control de foto procesada
 if "last_processed_file" not in st.session_state: st.session_state.last_processed_file = None
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Escribí tu pedido o subí una foto de la lista."}]
 
 # ==========================================
-# 3. BACKEND (LÓGICA)
+# 3. BACKEND
 # ==========================================
 @st.cache_data(ttl=600)
 def load_data():
@@ -87,7 +87,6 @@ def log_interaction(user_text, monto):
 
 def parsear_ordenes_bot(texto):
     items_nuevos = []
-    # Regex robusta
     for cant, prod, precio, tipo in re.findall(r'\[ADD:([\d\.]+):([^:]+):([\d\.]+):([^\]]+)\]', texto):
         item = {
             "cantidad": float(cant), 
@@ -174,54 +173,49 @@ ZONA GRATIS: {CIUDADES_GRATIS}
 4. **LOGÍSTICA:** Gratis en Zona. Resto Estimado. Retiros en Planta.
 5. **DISCLAIMER:** Cotización estimada.
 
-INSTRUCCIONES:
+INSTRUCCIONES DE SALIDA:
 - Analiza TEXTO o IMAGEN.
 - Identifica productos y cantidades.
 - Aplica reglas técnicas (si piden metros de caño, calcula barras).
-- SALIDA: [ADD:CANTIDAD:PRODUCTO:PRECIO:TIPO]
+- **IMPORTANTE:** Siempre responde con una frase confirmando la lectura (Ej: "Leí tu lista, cargué X productos"). Luego pon los comandos.
+- SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO:TIPO]
 """
 
 if "chat_session" not in st.session_state:
     st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
 
 def procesar_vision(img):
-    return st.session_state.chat_session.send_message(["Analiza lista. APLICA REGLAS. Genera [ADD...]. SOLO CONFIRMA.", img]).text
+    # Prompt ajustado para forzar que hable
+    return st.session_state.chat_session.send_message(["Analiza lista. Genera comandos [ADD...] y escribe un breve texto confirmando qué entendiste (Ej: 'Procesé tu lista con éxito').", img]).text
 
 # ==========================================
-# 6. INTERFAZ TABS (SOLO TEXTO Y FOTO AUTOMÁTICA)
+# 6. INTERFAZ TABS
 # ==========================================
 tab1, tab2 = st.tabs(["💬 COTIZAR", f"🛒 MI PEDIDO ({len(st.session_state.cart)})"])
 
 with tab1:
-    # --- INPUT FOTO AUTOMÁTICA ---
+    # --- FOTO AUTOMÁTICA ---
     with st.expander("📷 **Subir Foto de Lista**", expanded=False):
         img_val = st.file_uploader("", type=["jpg","png","jpeg"], label_visibility="collapsed")
         
-        # LOGICA DE AUTO-PROCESAMIENTO
         if img_val is not None:
-            # Chequeamos si es un archivo nuevo comparando nombre y tamaño
             file_id = f"{img_val.name}_{img_val.size}"
-            
             if st.session_state.last_processed_file != file_id:
-                # Es una foto nueva -> PROCESAMOS
-                with st.spinner("👀 Analizando lista automáticamente..."):
+                with st.spinner("👀 Miguel está leyendo tu foto..."):
                     full_text = procesar_vision(Image.open(img_val))
                     news = parsear_ordenes_bot(full_text)
                     st.session_state.messages.append({"role": "assistant", "content": full_text})
-                    
-                    # Guardamos ID para no re-procesar en el próximo rerun
                     st.session_state.last_processed_file = file_id
-                    
                     log_interaction("FOTO AUTO", total_final)
                     st.rerun()
 
-    # --- HISTORIAL CHAT ---
+    # --- HISTORIAL ---
     for m in st.session_state.messages:
         if m["role"] != "system":
             clean = re.sub(r'\[ADD:.*?\]', '', m["content"]).strip()
             if clean: st.chat_message(m["role"], avatar="👷‍♂️" if m["role"]=="assistant" else "👤").markdown(clean)
 
-    # --- INPUT TEXTO PRINCIPAL ---
+    # --- INPUT TEXTO ---
     if prompt := st.chat_input("Escribí tu pedido acá..."):
         if prompt == "#admin-miguel": st.session_state.admin_mode = not st.session_state.admin_mode; st.rerun()
         if random.random() > 0.7: st.toast(random.choice(FRASES_FOMO), icon='🔥')
@@ -258,7 +252,7 @@ with tab2:
             <div style="background:white; border:1px solid #ddd; border-radius:10px; padding:10px; margin-bottom:8px;">
                 <div style="font-weight:bold;">{item['cantidad']}x {item['producto']}</div>
                 <div style="display:flex; justify-content:space-between; color:#555;">
-                    <span>Unit: ${item['precio_unit']:,.0f}</span>
+                    <span>C/U: ${item['precio_unit']:,.0f}</span>
                     <span style="font-weight:bold; color:#0f2c59;">${item['subtotal']:,.0f}</span>
                 </div>
             </div>
