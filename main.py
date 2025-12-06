@@ -15,7 +15,7 @@ from PIL import Image
 # ==========================================
 st.set_page_config(
     page_title="Pedro Bravin S.A.",
-    page_icon="🔥",
+    page_icon="💣", # Icono de bomba para urgencia
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -31,6 +31,9 @@ ID_CAMPO_CLIENTE = "entry.xxxxxx"
 ID_CAMPO_MONTO = "entry.xxxxxx"
 ID_CAMPO_OPORTUNIDAD = "entry.xxxxxx"
 
+# TIEMPO LIMITE EN MINUTOS PARA EL 3% EXTRA
+MINUTOS_OFERTA = 10 
+
 CIUDADES_GRATIS = [
     "EL TREBOL", "LOS CARDOS", "LAS ROSAS", "SAN GENARO", "CENTENO", "CASAS", 
     "CAÑADA ROSQUIN", "SAN VICENTE", "SAN MARTIN DE LAS ESCOBAS", "ANGELICA", 
@@ -40,17 +43,22 @@ CIUDADES_GRATIS = [
     "PIAMONTE", "VILA", "SAN FRANCISCO"
 ]
 
-TOASTS_EXITO = ["🛒 Agregado con éxito", "🔥 3% Extra Aplicado", "✅ Stock Reservado", "🏗️ Material Cargado"]
+TOASTS_EXITO = ["🛒 Agregado", "🔥 ¡Apurate!", "✅ Stock Reservado", "⏳ El tiempo corre"]
 
 # ==========================================
-# 2. ESTADO
+# 2. ESTADO (INCLUYE TIMER)
 # ==========================================
 if "cart" not in st.session_state: st.session_state.cart = []
 if "log_data" not in st.session_state: st.session_state.log_data = []
 if "admin_mode" not in st.session_state: st.session_state.admin_mode = False
 if "last_processed_file" not in st.session_state: st.session_state.last_processed_file = None
+
+# --- LÓGICA DEL TIMER ---
+if "expiry_time" not in st.session_state:
+    st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
+
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Pasame tu lista y aplicamos el descuento contado."}]
+    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. ¡Tenés 10 minutos de precios congelados!"}]
 
 # ==========================================
 # 3. BACKEND
@@ -80,7 +88,6 @@ def log_interaction(user_text, monto):
 
 def parsear_ordenes_bot(texto):
     items_nuevos = []
-    # Regex robusta
     for cant, prod, precio, tipo in re.findall(r'\[ADD:([\d\.]+):([^:]+):([\d\.]+):([^\]]+)\]', texto):
         item = {
             "cantidad": float(cant), 
@@ -94,42 +101,62 @@ def parsear_ordenes_bot(texto):
     return items_nuevos
 
 def calcular_negocio():
-    bruto = sum(i['subtotal'] for i in st.session_state.cart)
-    desc = 3; color = "#546e7a"; nivel = "INICIAL"; siguiente_meta = 1500000
+    # 1. CHEQUEAR TIMER
+    now = datetime.datetime.now()
+    tiempo_restante = st.session_state.expiry_time - now
+    segundos_restantes = int(tiempo_restante.total_seconds())
     
-    # 1. PRODUCTOS GANCHO (15% PISO)
+    oferta_activa = segundos_restantes > 0
+    
+    # Formato visual del reloj MM:SS
+    if oferta_activa:
+        mins, secs = divmod(segundos_restantes, 60)
+        reloj_str = f"{mins:02d}:{secs:02d}"
+        color_reloj = "#2e7d32" if mins > 2 else "#d32f2f" # Verde si hay tiempo, Rojo si falta poco
+    else:
+        reloj_str = "00:00"
+        color_reloj = "#b0bec5" # Gris muerto
+
+    bruto = sum(i['subtotal'] for i in st.session_state.cart)
+    desc = 0 # Base 0 si se venció
+    color = "#546e7a"; nivel = "PRECIO LISTA (EXPIRÓ)"; siguiente_meta = 1500000
+    
+    # 2. CALCULAR DESCUENTOS SOLO SI OFERTA ACTIVA
     tiene_gancho = any(x['tipo'] in ['CHAPA', 'PERFIL', 'HIERRO', 'CAÑO'] for x in st.session_state.cart)
     
-    # 2. ESCALAS + BONUS CONTADO INTEGRADO
-    if bruto > 5000000:
-        desc = 18; nivel = "👑 PARTNER MAX"; color = "#6200ea"; siguiente_meta = 0
-    elif bruto > 3000000:
-        desc = 15; nivel = "🏗️ CONSTRUCTOR"; color = "#d32f2f"; siguiente_meta = 5000000
-    elif bruto > 1500000:
-        if tiene_gancho: 
-            desc = 15; nivel = "🔥 MAYORISTA (GANCHO)"; color = "#d32f2f"; siguiente_meta = 5000000
+    if oferta_activa:
+        if bruto > 5000000:
+            desc = 18; nivel = "👑 PARTNER MAX (18%)"; color = "#6200ea"; siguiente_meta = 0
+        elif bruto > 3000000:
+            desc = 15; nivel = "🏗️ CONSTRUCTOR (15%)"; color = "#d32f2f"; siguiente_meta = 5000000
+        elif bruto > 1500000:
+            if tiene_gancho: 
+                desc = 15; nivel = "🔥 MAYORISTA (15%)"; color = "#d32f2f"; siguiente_meta = 5000000
+            else:
+                desc = 10; nivel = "🏢 OBRA (10%)"; color = "#f57c00"; siguiente_meta = 3000000
         else:
-            desc = 10; nivel = "🏢 OBRA"; color = "#f57c00"; siguiente_meta = 3000000
+            # BASE CON EL 3% EXTRA
+            if tiene_gancho:
+                desc = 15; nivel = "🔥 MAYORISTA (15%)"; color = "#d32f2f"; siguiente_meta = 5000000
+            else:
+                desc = 3; nivel = "⚡ 3% EXTRA CONTADO"; color = "#2e7d32"; siguiente_meta = 1500000
     else:
-        # BASE (3% Contado)
-        if tiene_gancho:
-            desc = 15; nivel = "🔥 MAYORISTA (GANCHO)"; color = "#d32f2f"; siguiente_meta = 5000000
-        else:
-            # Aquí el 3% es el gancho explícito
-            desc = 3; nivel = "⚡ PROMO CONTADO"; color = "#2e7d32"; siguiente_meta = 1500000
+        # Si expiró, se pierden los beneficios base, salvo los muy grandes que se mantienen por volumen puro
+        if bruto > 5000000: desc = 15; nivel = "PARTNER (SIN BONUS)"; color = "#6200ea"
+        else: desc = 0; nivel = "⚠️ OFERTA CADUCADA"; color = "#455a64"
 
     neto = bruto * (1 - (desc/100))
-    return bruto, neto, desc, color, nivel, siguiente_meta
+    return bruto, neto, desc, color, nivel, siguiente_meta, reloj_str, oferta_activa, color_reloj
 
 def generar_link_wa(total):
-    txt = "Hola Martín, quiero cerrar YA con el descuento contado:\n" + "\n".join([f"▪ {i['cantidad']}x {i['producto']}" for i in st.session_state.cart])
-    txt += f"\n💰 TOTAL FINAL: ${total:,.0f} + IVA\n(Incluye bonificación 3% extra contado)"
+    txt = "Hola Martín, confirmar pedido URGENTE:\n" + "\n".join([f"▪ {i['cantidad']}x {i['producto']}" for i in st.session_state.cart])
+    txt += f"\n💰 TOTAL FINAL: ${total:,.0f} + IVA"
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 4. UI: HEADER AGRESIVO
+# 4. UI: HEADER CON TIMER "TEMU STYLE"
 # ==========================================
-subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta = calcular_negocio()
+subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, reloj, oferta_viva, color_timer = calcular_negocio()
 porcentaje_barra = 100
 if prox_meta > 0: porcentaje_barra = min((subtotal / prox_meta) * 100, 100)
 
@@ -155,20 +182,20 @@ st.markdown(f"""
     .cart-summary {{ padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; }}
     .price-tag {{ font-size: 1.5rem; font-weight: 900; color: #333; }}
     
-    /* Etiqueta de Descuento Pulsante */
     .badge {{ 
         background: {color_barra}; color: white; padding: 4px 12px; 
         border-radius: 4px; font-size: 0.75rem; font-weight: 900; text-transform: uppercase; 
         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }}
     
-    .extra-discount {{
-        color: #2e7d32; font-weight: bold; font-size: 0.65rem; margin-top: 2px;
-        display: flex; align-items: center; gap: 4px;
+    /* RELOJ DE LA MUERTE */
+    .timer-box {{
+        color: {color_timer}; font-weight: 900; font-size: 0.8rem;
+        background: #fff; padding: 2px 8px; border-radius: 4px; margin-left: 5px;
+        animation: { 'blink 1s infinite' if not oferta_viva or reloj.startswith('00') else 'none' };
     }}
     
-    .warning-text {{ color: #ffd700; font-weight: bold; font-size: 0.7rem; animation: pulse 2s infinite; }}
-    @keyframes pulse {{ 0% {{ opacity: 0.7; }} 50% {{ opacity: 1; }} 100% {{ opacity: 0.7; }} }}
+    @keyframes blink {{ 0% {{ opacity: 1; }} 50% {{ opacity: 0.5; }} 100% {{ opacity: 1; }} }}
     
     .progress-container {{ width: 100%; height: 6px; background: #eee; position: absolute; bottom: 0; }}
     .progress-bar {{ height: 100%; width: {porcentaje_barra}%; background: {color_barra}; transition: width 0.8s ease-out; }}
@@ -177,13 +204,13 @@ st.markdown(f"""
     <div class="fixed-header">
         <div class="top-strip">
             <span>🔥 PEDRO BRAVIN S.A.</span>
-            <span class="warning-text">⚠️ PRECIOS ESTIMADOS IA</span>
+            <span>⏱️ EXPIRA EN: <span class="timer-box">{reloj}</span></span>
         </div>
         <div class="cart-summary">
             <div>
-                <span class="badge">{nombre_nivel} {desc_actual}% OFF</span>
-                <div class="extra-discount">
-                    <i class="fa-solid fa-check"></i> INCLUYE 3% EXTRA CONTADO
+                <span class="badge">{nombre_nivel}</span>
+                <div style="font-size:0.65rem; color:#666; margin-top:3px;">
+                    {f"Ahorro extra aplicado: {desc_actual}%" if oferta_viva else "DESCUENTO PERDIDO"}
                 </div>
             </div>
             <div class="price-tag">${total_final:,.0f} <span style="font-size:0.7rem; color:#666; font-weight:400;">+IVA</span></div>
@@ -194,7 +221,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 5. CEREBRO IA (VENTA AGRESIVA)
+# 5. CEREBRO IA
 # ==========================================
 try: genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 except: st.error("Falta API KEY")
@@ -208,18 +235,14 @@ ZONA GRATIS: {CIUDADES_GRATIS}
 1. **LARGOS:** 12m (Perfiles/Hierro), 6.40m (Caños Epoxi/Galv), 6m (Resto).
 2. **UNIDADES:** KG (Clavos), UNIDAD (Mallas), ROLLO (Agro).
 3. **CHAPAS:** Acanalada=COD4, T101=COD6, Sin corte=METRO.
-4. **PESOS:** Número al final de descripción es PESO (KG).
-5. **LOGÍSTICA:** Gratis en Zona. Resto Estimado. Retiro en Planta.
-6. **DISCLAIMER:** Cotización estimada.
+4. **LOGÍSTICA:** Gratis en Zona. Resto Estimado. Retiro en Planta.
 
-🧨 **ESTRATEGIA DE CIERRE (3% EXTRA):**
-- Tu objetivo es que cierren YA.
-- USA SIEMPRE ESTE ARGUMENTO: **"Te apliqué el 3% EXTRA por pago contado para congelar el precio."**
-- Si piden cotización, dales el precio y recuérdales el beneficio de contado.
+🧨 **ESTRATEGIA URGENCIA (TIMER ACTIVO):**
+- Dile al cliente que **APROVECHE EL 3% EXTRA ANTES DE QUE EL RELOJ LLEGUE A CERO.**
+- Si el cliente duda, usa el tiempo: "Quedan pocos minutos para mantener este precio".
 
 🕵️‍♂️ PROTOCOLO AMBIGÜEDAD:
 - Si falta variante (Negro/Galv) -> PREGUNTAR.
-- Si piden "Antióxido", busca exacto y ofrece opciones.
 
 SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO:TIPO]
 """
@@ -228,7 +251,7 @@ if "chat_session" not in st.session_state:
     st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
 
 def procesar_vision(img):
-    return st.session_state.chat_session.send_message(["Analiza lista. Si hay ambigüedad, PREGUNTA. Si está claro, genera comandos [ADD...] y usa el argumento del 3% Extra Contado.", img]).text
+    return st.session_state.chat_session.send_message(["Analiza lista. Usa urgencia del timer. Genera comandos [ADD...] y confirma.", img]).text
 
 # ==========================================
 # 6. INTERFAZ TABS
@@ -236,17 +259,25 @@ def procesar_vision(img):
 tab1, tab2 = st.tabs(["💬 COTIZAR", f"🛒 MI PEDIDO ({len(st.session_state.cart)})"])
 
 with tab1:
+    # SI EXPIRÓ, MOSTRAR BOTÓN DE RESCATE
+    if not oferta_viva:
+        st.error("⚠️ ¡SE TE ACABÓ EL TIEMPO! PERDISTE EL DESCUENTO.")
+        if st.button("🔄 SOLICITAR PRÓRROGA (REACTIVAR 3%)", type="primary", use_container_width=True):
+            st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
+            st.toast("✅ ¡Salvado! Tiempo reiniciado.", icon="😅")
+            st.rerun()
+
     with st.expander("📷 **Subir Foto de Lista**", expanded=False):
         img_val = st.file_uploader("", type=["jpg","png","jpeg"], label_visibility="collapsed")
         if img_val is not None:
             file_id = f"{img_val.name}_{img_val.size}"
             if st.session_state.last_processed_file != file_id:
-                with st.spinner("👀 Analizando para aplicar descuento..."):
+                with st.spinner("👀 Analizando..."):
                     full_text = procesar_vision(Image.open(img_val))
                     news = parsear_ordenes_bot(full_text)
                     st.session_state.messages.append({"role": "assistant", "content": full_text})
                     st.session_state.last_processed_file = file_id
-                    if news: st.toast("🔥 3% Extra Aplicado", icon='💰')
+                    if news: st.toast("🔥 Productos Cargados!", icon='🛒')
                     log_interaction("FOTO AUTO", total_final)
                     st.rerun()
 
@@ -262,7 +293,7 @@ with tab1:
         st.chat_message("user").markdown(prompt)
 
         with st.chat_message("assistant", avatar="👷‍♂️"):
-            with st.spinner("Calculando mejor oferta..."):
+            with st.spinner("Cotizando..."):
                 try:
                     response = st.session_state.chat_session.send_message(prompt)
                     full_text = response.text
@@ -271,11 +302,11 @@ with tab1:
                     st.markdown(display)
                     
                     if news:
-                        st.toast("🔥 3% Extra Aplicado", icon='💰')
+                        st.toast(random.choice(TOASTS_EXITO), icon='🛒')
                         st.markdown(f"""
                         <div style="background:#e8f5e9; padding:10px; border-radius:10px; border:1px solid #25D366; margin-top:5px;">
-                            <strong>✅ {len(news)} items con precio contado.</strong><br>
-                            <span style="font-size:0.85rem">💰 Total: ${total_final:,.0f} | 👇 Finalizá en 'MI PEDIDO'</span>
+                            <strong>✅ {len(news)} items agregados.</strong><br>
+                            <span style="font-size:0.85rem">💰 Total: ${total_final:,.0f} | ⏳ Quedan {reloj} min</span>
                         </div>
                         """, unsafe_allow_html=True)
                         if desc_actual >= 15 and len(st.session_state.cart) > 1: st.balloons()
@@ -285,10 +316,10 @@ with tab1:
                     if news: time.sleep(1.5); st.rerun()
                 except Exception as e: st.error(f"Error: {e}")
 
-# --- PESTAÑA CARRITO EDITABLE ---
+# --- PESTAÑA CARRITO ---
 with tab2:
     if not st.session_state.cart:
-        st.info("Carrito vacío. ¡Aprovechá el 3% extra hoy!")
+        st.info("Carrito vacío. ¡Aprovechá el 3% extra antes de que termine el tiempo!")
     else:
         st.markdown(f"### 📋 Confirmar Pedido ({len(st.session_state.cart)} items)")
         
@@ -314,16 +345,18 @@ with tab2:
         col_res1.write("Subtotal Lista:")
         col_res2.write(f"${subtotal:,.0f}")
         
-        if desc_actual > 0:
-            col_res1.markdown(f"**Bonificación {desc_actual}%:**")
+        if oferta_viva and desc_actual > 0:
+            col_res1.markdown(f"**Beneficio {nombre_nivel}:**")
             col_res2.markdown(f"**-${subtotal * (desc_actual/100):,.0f}**")
+        elif not oferta_viva:
+            st.warning("⚠️ DESCUENTO EXPIRADO. SOLICITÁ PRÓRROGA EN LA PESTAÑA 'COTIZAR'.")
             
         st.markdown(f"""
         <div style="background:{color_barra}; color:white; padding:20px; border-radius:15px; text-align:center; margin-top:15px; box-shadow: 0 4px 15px {color_barra}66; border: 2px solid #fff;">
             <div style="font-size:0.8rem; opacity:0.9;">TOTAL FINAL CONTADO (+IVA)</div>
             <div style="font-size:2.2rem; font-weight:900;">${total_final:,.0f}</div>
             <div style="font-size:0.8rem; margin-top:5px; background:rgba(0,0,0,0.2); padding:4px 10px; border-radius:10px; display:inline-block;">
-                ⚡ INCLUYE 3% EXTRA YA APLICADO
+                { '⚡ 3% EXTRA APLICADO' if oferta_viva else '❌ PRECIO LISTA SIN DESCUENTO' }
             </div>
         </div>
         """, unsafe_allow_html=True)
