@@ -33,7 +33,9 @@ COSTO_FLETE_USD = 0.85
 CONDICION_PAGO = "Contado/Transferencia"
 SHEET_ID = "2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvnarDQ"
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/e/{SHEET_ID}/pub?gid=2029869540&single=true&output=csv"
-URL_FORM_GOOGLE = "" # 🔴 PEGAR LINK
+
+# 🔴 PEGAR TU LINK DE GOOGLE FORM AQUI
+URL_FORM_GOOGLE = "" 
 ID_CAMPO_CLIENTE = "entry.xxxxxx"
 ID_CAMPO_MONTO = "entry.xxxxxx"
 ID_CAMPO_OPORTUNIDAD = "entry.xxxxxx"
@@ -76,7 +78,14 @@ csv_context = load_data()
 
 def enviar_a_google_form_background(cliente, monto, oportunidad):
     if URL_FORM_GOOGLE:
-        try: requests.post(URL_FORM_GOOGLE, data={ID_CAMPO_CLIENTE: str(cliente), ID_CAMPO_MONTO: str(monto), ID_CAMPO_OPORTUNIDAD: str(oportunidad)}, timeout=1); except: pass
+        try: 
+            requests.post(URL_FORM_GOOGLE, data={
+                ID_CAMPO_CLIENTE: str(cliente), 
+                ID_CAMPO_MONTO: str(monto), 
+                ID_CAMPO_OPORTUNIDAD: str(oportunidad)
+            }, timeout=1)
+        except: 
+            pass
 
 def log_interaction(user_text, monto):
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -86,8 +95,18 @@ def log_interaction(user_text, monto):
 
 def parsear_ordenes_bot(texto):
     items_nuevos = []
-    for cant, prod, precio, tipo in re.findall(r'\[ADD:([\d\.]+):([^:]+):([\d\.]+):([^\]]+)\]', texto):
-        item = {"cantidad": float(cant), "producto": prod.strip(), "precio_unit": float(precio), "subtotal": float(cant)*float(precio), "tipo": tipo.strip().upper()}
+    # Corrección Regex para detectar números decimales mejor
+    patron = r'\[ADD:([\d\.]+):([^:]+):([\d\.]+):([^\]]+)\]'
+    coincidencias = re.findall(patron, texto)
+    
+    for cant, prod, precio, tipo in coincidencias:
+        item = {
+            "cantidad": float(cant), 
+            "producto": prod.strip(), 
+            "precio_unit": float(precio), 
+            "subtotal": float(cant)*float(precio), 
+            "tipo": tipo.strip().upper()
+        }
         st.session_state.cart.append(item)
         items_nuevos.append(item)
     return items_nuevos
@@ -95,10 +114,14 @@ def parsear_ordenes_bot(texto):
 def calcular_negocio():
     bruto = sum(i['subtotal'] for i in st.session_state.cart)
     desc = 3; color = "#546e7a"; nivel = "INICIAL"
+    
+    # 1. Regla Gancho
     if any(x['tipo'] in ['CHAPA', 'PERFIL', 'HIERRO', 'CAÑO'] for x in st.session_state.cart):
         desc = 15; nivel = "🔥 MAYORISTA"; color = "#d32f2f"
+    # 2. Regla Volumen
     elif bruto > 3000000: desc = 15; nivel = "👑 PARTNER"; color = "#6200ea"
     elif bruto > 1500000: desc = 10; nivel = "🏗️ OBRA"; color = "#f57c00"
+    
     return bruto, bruto*(1-(desc/100)), desc, color, nivel
 
 def generar_link_wa(total):
@@ -110,7 +133,7 @@ def generar_link_wa(total):
 # 4. UI: HEADER FIJO + TABS
 # ==========================================
 subtotal, total_final, desc_actual, color_barra, nombre_nivel = calcular_negocio()
-pct_barra = min(total_final / 3000000 * 100, 100)
+pct_barra = min(total_final / 3000000 * 100, 100) if total_final < 3000000 else 100
 
 st.markdown(f"""
     <style>
@@ -256,7 +279,7 @@ with tab2:
                 <div style="font-weight:bold;">{item['cantidad']}x {item['producto']}</div>
                 <div style="display:flex; justify-content:space-between; color:#555;">
                     <span>Unit: ${item['precio_unit']:,.0f}</span>
-                    <span style="font-weight:bold; color:#0f2c59;">${item['subtotal']:,.0f}</span>
+                    <span style="font-weight:bold; color:#0f2c59; font-size:1.1rem;">${item['subtotal']:,.0f}</span>
                 </div>
             </div>
             """, unsafe_allow_html=True)
