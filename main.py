@@ -54,7 +54,6 @@ FRASES_FOMO = [
 if "cart" not in st.session_state: st.session_state.cart = []
 if "log_data" not in st.session_state: st.session_state.log_data = []
 if "admin_mode" not in st.session_state: st.session_state.admin_mode = False
-# Control de foto procesada
 if "last_processed_file" not in st.session_state: st.session_state.last_processed_file = None
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Escribí tu pedido o subí una foto de la lista."}]
@@ -156,37 +155,50 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 5. CEREBRO IA (REGLAS BLINDADAS)
+# 5. CEREBRO IA (LÓGICA CORREGIDA)
 # ==========================================
 try: genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 except: st.error("Falta API KEY")
 
+# 🧠 AQUI ESTÁ EL CAMBIO CLAVE EN LA INSTRUCCIÓN
 sys_prompt = f"""
 ROL: Miguel, vendedor Pedro Bravin S.A.
 DB: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
 
 📜 REGLAS INMUTABLES (DO NOT TOUCH):
-1. **LARGOS:** 12m (Perfiles/Hierro), 6.40m (Caños Epoxi/Galv), 6m (Resto).
-2. **UNIDADES:** KG (Clavos/Alambre), UNIDAD (Mallas), ROLLO (Agro).
+1. **LARGOS COMERCIALES:**
+   - 12.00m: Perfiles C, Hierro Const, Lisos AL 220, UPN/IPN (>=80).
+   - 6.40m: Caños (Epoxi, Galv, Sched, Mecánico).
+   - 6.00m: Tubos Estructurales, Ángulos, Planchuelas, UPN/IPN (<80).
+2. **UNIDADES DE VENTA:** Clavos/Alambre=KG. Planchuelas/Mallas=UNIDAD. Alambres Agro=ROLLO.
 3. **CHAPAS:** Acanalada=COD4, T101=COD6, Sin corte=METRO.
-4. **LOGÍSTICA:** Gratis en Zona. Resto Estimado. Retiros en Planta.
-5. **DISCLAIMER:** Cotización estimada.
+4. **INTERPRETACIÓN DEL CSV (PESOS):**
+   - El número al final de la descripción es el **PESO (KG)**.
+   - Tubos Estructurales: Peso por BARRA de 6m.
+   - Perfiles/Caños: Peso por METRO.
+5. **LOGÍSTICA:** Gratis en Zona. Resto Estimado. Retiro en Planta.
+6. **DISCLAIMER:** Cotización estimada.
 
-INSTRUCCIONES DE SALIDA:
-- Analiza TEXTO o IMAGEN.
-- Identifica productos y cantidades.
-- Aplica reglas técnicas (si piden metros de caño, calcula barras).
-- **IMPORTANTE:** Siempre responde con una frase confirmando la lectura (Ej: "Leí tu lista, cargué X productos"). Luego pon los comandos.
-- SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO:TIPO]
+🎯 INSTRUCCIONES DE RESPUESTA (CRÍTICO):
+1. **LO QUE SÍ ESTÁ:** Genera SIEMPRE los comandos `[ADD:...]` para los productos que encuentres en la DB. **NO LOS OMITAS** aunque haya otros que falten.
+2. **LO QUE NO ESTÁ:** Si hay items de la lista que no están en la DB, agrégalos en el texto visible como: "⚠️ No coticé: [Lista]".
+3. **CONFIRMACIÓN:** Empieza diciendo "Procesé tu lista. Cargué lo disponible."
+
+SALIDA OBLIGATORIA:
+[Texto visible con advertencias si hay faltantes]
+[ADD:CANTIDAD:PRODUCTO:PRECIO:TIPO]
+[ADD:CANTIDAD:PRODUCTO:PRECIO:TIPO]
+...
 """
 
 if "chat_session" not in st.session_state:
     st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
 
 def procesar_vision(img):
-    # Prompt ajustado para forzar que hable
-    return st.session_state.chat_session.send_message(["Analiza lista. Genera comandos [ADD...] y escribe un breve texto confirmando qué entendiste (Ej: 'Procesé tu lista con éxito').", img]).text
+    # Prompt reforzado para la imagen
+    prompt_vision = "Analiza la imagen. Identifica TODOS los productos. Para los que existan en DB, genera comandos [ADD...]. Para los que no, avísame en texto. NO DEJES DE GENERAR LOS ADD DE LO QUE SÍ HAY."
+    return st.session_state.chat_session.send_message([prompt_vision, img]).text
 
 # ==========================================
 # 6. INTERFAZ TABS
