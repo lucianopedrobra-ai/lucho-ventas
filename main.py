@@ -10,6 +10,13 @@ import time
 import random
 from PIL import Image
 
+# INTENTO DE IMPORTAR MICROFONO (Si falla, la app sigue funcionando)
+try:
+    from streamlit_mic_recorder import speech_to_text
+    MIC_AVAILABLE = True
+except ImportError:
+    MIC_AVAILABLE = False
+
 # ==========================================
 # 1. CONFIGURACIÓN E INFRAESTRUCTURA
 # ==========================================
@@ -17,7 +24,7 @@ st.set_page_config(
     page_title="Pedro Bravin S.A.",
     page_icon="🏗️",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded" # Expandido para ver el botón eliminar
 )
 
 # --- VARIABLES DE NEGOCIO (ANCHOR POINTS) ---
@@ -29,8 +36,8 @@ CONDICION_PAGO = "Contado/Transferencia"
 SHEET_ID = "2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvnarDQ"
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/e/{SHEET_ID}/pub?gid=2029869540&single=true&output=csv"
 
-# --- LOGS GOOGLE FORMS (CONFIGURAR AQUI) ---
-URL_FORM_GOOGLE = "" # 🔴 PEGAR TU LINK DE GOOGLE FORM AQUI
+# --- LOGS GOOGLE FORMS ---
+URL_FORM_GOOGLE = "" # 🔴 PEGAR TU LINK AQUI
 ID_CAMPO_CLIENTE = "entry.xxxxxx"
 ID_CAMPO_MONTO = "entry.xxxxxx"
 ID_CAMPO_OPORTUNIDAD = "entry.xxxxxx"
@@ -60,7 +67,7 @@ if "cart" not in st.session_state: st.session_state.cart = []
 if "log_data" not in st.session_state: st.session_state.log_data = []
 if "admin_mode" not in st.session_state: st.session_state.admin_mode = False
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Pasame tu lista escrita o subí una foto."}]
+    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Hablame, escribí o subí foto."}]
 
 # ==========================================
 # 3. BACKEND (LÓGICA PYTHON PURA)
@@ -68,7 +75,6 @@ if "messages" not in st.session_state:
 @st.cache_data(ttl=600)
 def load_data():
     try:
-        # Carga la base de datos real
         df = pd.read_csv(SHEET_URL, dtype=str).fillna("")
         return df.to_csv(index=False)
     except Exception as e: return "Error DB: " + str(e)
@@ -115,7 +121,7 @@ def parsear_ordenes_bot(texto_respuesta):
         }
         st.session_state.cart.append(item)
         items_agregados.append(item)
-    return bool(coincidencias) # Retorna True si agregó algo
+    return items_agregados # Retorna la lista de lo nuevo
 
 def calcular_negocio():
     bruto = sum(item['subtotal'] for item in st.session_state.cart)
@@ -123,12 +129,10 @@ def calcular_negocio():
     color = "#546e7a" # Gris azulado profesional
     texto_nivel = "INICIAL"
     
-    # 1. REGLA: Productos Gancho (Competitivo) -> 15% OFF Directo
     tiene_gancho = any(x['tipo'] in ['CHAPA', 'PERFIL', 'HIERRO', 'CAÑO'] for x in st.session_state.cart)
     
     if tiene_gancho:
         descuento = 15; texto_nivel = "🔥 MAYORISTA"; color = "#d32f2f" # Rojo
-    # 2. REGLA: Escala por Volumen
     elif bruto > 3000000:
         descuento = 15; texto_nivel = "👑 PARTNER"; color = "#6200ea" # Violeta
     elif bruto > 1500000:
@@ -217,26 +221,32 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 5. SIDEBAR (DETALLE DEL CARRO)
+# 5. SIDEBAR (CARRITO CON BOTON ELIMINAR)
 # ==========================================
 with st.sidebar:
     st.header(f"🛒 CARRITO ({len(st.session_state.cart)})")
     if not st.session_state.cart:
-        st.caption("Tu acopio está vacío.")
+        st.info("Tu acopio está vacío.")
     else:
+        # AQUI ESTA LA FUNCION DE ELIMINAR MANUALMENTE
         for i, item in enumerate(st.session_state.cart):
-            col1, col2 = st.columns([4, 1])
-            with col1:
-                st.markdown(f"**{item['cantidad']}x** {item['producto']}")
-                st.caption(f"${item['subtotal']:,.0f}")
-            with col2:
-                if st.button("❌", key=f"del_{i}"):
-                    st.session_state.cart.pop(i)
-                    st.rerun()
+            st.markdown(f"""
+            <div style="background:#f0f2f6; padding:10px; border-radius:8px; margin-bottom:5px;">
+                <div style="font-weight:bold;">{item['cantidad']}x {item['producto']}</div>
+                <div style="display:flex; justify-content:space-between;">
+                    <span style="color:#666;">${item['subtotal']:,.0f}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            # El botón de eliminar nativo de Streamlit
+            if st.button("🗑️ Eliminar item", key=f"del_{i}"):
+                st.session_state.cart.pop(i)
+                st.rerun()
+                
         st.divider()
         st.metric("TOTAL A PAGAR (+IVA)", f"${total_final:,.0f}")
         st.caption(f"✅ Descuento: {desc_actual}%")
-        if st.button("🗑️ Vaciar Todo"):
+        if st.button("🗑️ VACIAR TODO EL PEDIDO"):
             st.session_state.cart = []; st.rerun()
 
 # ==========================================
@@ -277,8 +287,8 @@ ZONA GRATIS: {CIUDADES_GRATIS}
    - Acopio: 6 Meses (Aclarar "conversable").
 
 INSTRUCCIONES DE SALIDA:
-- Sé breve y vendedor ("Te agregué X. ¿Te cargo Y?").
-- CROSS-SELL: Si llevan chapa, ofrece tornillos/aislante. Si llevan perfil, ofrece electrodos.
+- Sé breve.
+- CROSS-SELL: Si llevan chapa, ofrece tornillos/aislante.
 - Si piden metros de algo que viene en barras, calcula las barras y aclara: "Te calculé X barras de Y metros".
 - FORMATO COMANDO: [ADD:CANTIDAD:PRODUCTO:PRECIO:TIPO]
 """
@@ -290,23 +300,34 @@ def procesar_vision(img):
     return st.session_state.chat_session.send_message(["Analiza lista. APLICA REGLAS INMUTABLES (Largos 6/6.40/12m y Códigos). Genera [ADD...]. SOLO CONFIRMA.", img]).text
 
 # ==========================================
-# 7. INTERFAZ PRINCIPAL (CHAT + UPLOAD)
+# 7. INTERFAZ PRINCIPAL (CHAT + UPLOAD + MIC)
 # ==========================================
 
-# Zona de Carga Rápida (Estilo App)
-with st.expander("📷 **¿Tenés una lista? Subí la foto acá**", expanded=False):
-    uploaded_file = st.file_uploader("", type=["jpg", "png", "jpeg"], label_visibility="collapsed")
-    if uploaded_file:
-        if st.button("⚡ PROCESAR FOTO AHORA", type="primary", use_container_width=True):
-            with st.spinner("Analizando y cotizando..."):
-                image = Image.open(uploaded_file)
-                full_text = procesar_vision(image)
-                if parsear_ordenes_bot(full_text):
-                    st.session_state.messages.append({"role": "assistant", "content": full_text})
-                    log_interaction("FOTO SUBIDA", total_final)
-                    st.rerun()
+# 1. CONTROLES SUPERIORES (FOTO + MIC)
+c1, c2 = st.columns([1, 1])
 
-# Historial
+with c1:
+    with st.expander("📷 **SUBIR FOTO**", expanded=False):
+        uploaded_file = st.file_uploader("", type=["jpg", "png", "jpeg"], label_visibility="collapsed")
+        if uploaded_file:
+            if st.button("⚡ PROCESAR", type="primary"):
+                with st.spinner("Analizando..."):
+                    image = Image.open(uploaded_file)
+                    full_text = procesar_vision(image)
+                    if parsear_ordenes_bot(full_text):
+                        st.session_state.messages.append({"role": "assistant", "content": full_text})
+                        log_interaction("FOTO SUBIDA", total_final)
+                        st.rerun()
+with c2:
+    # 🎤 BOTÓN DE MICRÓFONO
+    if MIC_AVAILABLE:
+        st.write("🎤 **HABLAR**")
+        audio_text = speech_to_text(language='es', start_prompt="🔴 GRABAR", stop_prompt="⏹️ LISTO", just_once=True, key='mic')
+    else:
+        st.warning("Instalar: pip install streamlit-mic-recorder")
+        audio_text = None
+
+# Historial de Chat
 for msg in st.session_state.messages:
     if msg["role"] != "system":
         content_clean = re.sub(r'\[ADD:.*?\]', '', msg["content"])
@@ -314,8 +335,14 @@ for msg in st.session_state.messages:
             avatar = "👷‍♂️" if msg["role"] == "assistant" else "👤"
             st.chat_message(msg["role"], avatar=avatar).markdown(content_clean)
 
-# Input
-if prompt := st.chat_input("Escribí tu pedido (Ej: 10 perfiles y chapas)"):
+# LÓGICA DE INPUT (TEXTO O AUDIO)
+prompt = None
+if audio_text:
+    prompt = audio_text # Si vino del mic
+elif user_input := st.chat_input("Escribí tu pedido..."):
+    prompt = user_input # Si vino del teclado
+
+if prompt:
     if prompt == "#admin-miguel": st.session_state.admin_mode = not st.session_state.admin_mode; st.rerun()
     if random.random() > 0.7: st.toast(random.choice(FRASES_FOMO), icon='🔥')
 
@@ -327,17 +354,39 @@ if prompt := st.chat_input("Escribí tu pedido (Ej: 10 perfiles y chapas)"):
             try:
                 response = st.session_state.chat_session.send_message(prompt)
                 full_text = response.text
-                items_agregados = parsear_ordenes_bot(full_text)
+                
+                # Procesamos y obtenemos los items nuevos
+                items_nuevos = parsear_ordenes_bot(full_text)
                 
                 display_text = re.sub(r'\[ADD:.*?\]', '', full_text)
                 st.markdown(display_text)
+                
+                # --- AQUÍ ESTÁ EL DETALLE QUE PEDISTE (TICKET EN EL CHAT) ---
+                if items_nuevos:
+                    st.markdown("---")
+                    st.markdown("📝 **DETALLE DE LO AGREGADO:**")
+                    # Creamos un DF bonito para mostrar solo lo nuevo
+                    df_ticket = pd.DataFrame(items_nuevos)
+                    st.dataframe(
+                        df_ticket[['cantidad', 'producto', 'precio_unit']], 
+                        hide_index=True,
+                        column_config={
+                            "precio_unit": st.column_config.NumberColumn("Precio Unit.", format="$%d")
+                        }
+                    )
+                    st.markdown("---")
+                # -------------------------------------------------------------
+                
                 st.session_state.messages.append({"role": "assistant", "content": full_text})
                 
-                # Logueo con el total actualizado
+                # Logueo
                 total_nuevo = sum(i['subtotal'] for i in st.session_state.cart) * (1 - (desc_actual/100))
                 log_interaction(prompt, total_nuevo)
                 
-                if items_agregados: st.rerun() # Refresca para actualizar Sidebar y Barra
+                # Recargamos para actualizar Carrito y Header
+                if items_nuevos:
+                    time.sleep(1) # Le damos un segundito para que lea
+                    st.rerun() 
             except Exception as e: st.error(f"Error: {e}")
 
 if st.session_state.admin_mode:
