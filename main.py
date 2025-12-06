@@ -10,21 +10,31 @@ import time
 import random
 
 # ==========================================
-# 1. CONFIGURACIÓN DEL NEGOCIO (ESTRATÉGICA)
+# 1. CONFIGURACIÓN VISUAL INICIAL
+# ==========================================
+st.set_page_config(
+    page_title="Pedro Bravin S.A.", 
+    page_icon="🏗️", 
+    layout="wide", 
+    initial_sidebar_state="collapsed"
+)
+
+# ==========================================
+# 2. VARIABLES DE NEGOCIO Y BACKEND
 # ==========================================
 
-# --- Analíticas (RECUPERADO) ---
-# Pon aquí tus links reales de Google Forms
-URL_FORM_GOOGLE = "" 
+# --- Analíticas Silenciosas (Google Forms) ---
+URL_FORM_GOOGLE = "" # Poner URL real aquí
 ID_CAMPO_CLIENTE = "entry.xxxxxx"
 ID_CAMPO_MONTO = "entry.xxxxxx"
 ID_CAMPO_OPORTUNIDAD = "entry.xxxxxx"
 
-# --- Variables de Venta ---
-DOLAR_BNA_REF = 1060.00
+# --- Reglas de Venta ---
 MONTO_OBJETIVO_MAYORISTA = 300000  # Meta para el 15% OFF
+# (El Dólar BNA se mantiene interno si lo necesitas, pero oculto al usuario)
+DOLAR_BNA_REF = 1060.00 
 
-# --- Lista Completa de Logística (RECUPERADO) ---
+# --- Logística (Lista Completa) ---
 CIUDADES_GRATIS = """
 EL TREBOL, LOS CARDOS, LAS ROSAS, SAN GENARO, CENTENO, CASAS, CAÑADA ROSQUIN,
 SAN VICENTE, SAN MARTIN DE LAS ESCOBAS, ANGELICA, SUSANA, RAFAELA, SUNCHALES,
@@ -33,20 +43,20 @@ SAN JORGE, LAS PETACAS, ZENON PEREYRA, CARLOS PELLEGRINI, LANDETA, MARIA SUSANA,
 PIAMONTE, VILA, SAN FRANCISCO.
 """
 
-# --- Frases FOMO (Miedo a perderse algo) ---
+# --- Frases FOMO (Social Proof) ---
 FRASES_FOMO = [
     "🔥 Un cliente de Rafaela acaba de pedir este material.",
-    "⚠️ Stock crítico: Quedan pocas unidades en galpón 2.",
+    "⚠️ Stock crítico: Quedan pocas unidades en galpón.",
     "👀 3 personas están cotizando esto ahora mismo.",
-    "⚡ El precio del dólar podría actualizarse en 1 hora.",
-    "🚚 Camión saliendo para zona sur esta tarde."
+    "🚚 Camión saliendo para zona sur esta tarde.",
+    "⚡ Precios sujetos a modificación sin previo aviso."
 ]
 
 # ==========================================
-# 2. FUNCIONES DE FONDO (BACKEND)
+# 3. FUNCIONES TÉCNICAS
 # ==========================================
 
-# Hilo de Métricas en Background (RECUPERADO)
+# --- Logger a Google Forms ---
 if "log_data" not in st.session_state:
     st.session_state.log_data = []
 if "admin_mode" not in st.session_state:
@@ -61,8 +71,7 @@ def enviar_a_google_form_background(cliente, monto, oportunidad):
                 ID_CAMPO_OPORTUNIDAD: str(oportunidad)
             }
             requests.post(URL_FORM_GOOGLE, data=payload, timeout=3)
-        except:
-            pass 
+        except: pass 
 
 def log_interaction(user_text, bot_response, monto_detectado):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -80,13 +89,13 @@ def log_interaction(user_text, bot_response, monto_detectado):
         "Monto": monto_detectado
     })
     
-    # Enviar al form en un hilo separado para no trabar el chat
     thread = threading.Thread(target=enviar_a_google_form_background, args=(user_text, monto_detectado, opportunity))
     thread.daemon = True 
     thread.start()
 
+# --- Extractor de Precios para la Barra ---
 def extraer_monto(texto):
-    """Extrae el precio más alto mencionado en el texto para la barra de progreso"""
+    # Busca precios en el texto generado para actualizar la barra
     patrones = re.findall(r'\$\s?([\d\.]+)', texto)
     montos = []
     for p in patrones:
@@ -97,28 +106,55 @@ def extraer_monto(texto):
         return max(montos)
     return 0
 
-# ==========================================
-# 3. INTERFAZ VISUAL (ESTILO TEMU)
-# ==========================================
-st.set_page_config(page_title="Pedro Bravin S.A.", page_icon="🏗️", layout="wide", initial_sidebar_state="collapsed")
+# --- Carga de Datos ---
+try:
+    API_KEY = st.secrets["GOOGLE_API_KEY"]
+    genai.configure(api_key=API_KEY)
+except:
+    st.error("⚠️ Error Crítico: API Key no configurada.")
+    st.stop()
 
+SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvnarDQ/pub?gid=2029869540&single=true&output=csv"
+
+@st.cache_data(ttl=300)
+def load_data():
+    try:
+        df = pd.read_csv(SHEET_URL, dtype=str).fillna("")
+        return df.to_csv(index=False)
+    except: return ""
+
+csv_context = load_data()
+
+# ==========================================
+# 4. INTERFAZ Y ESTILOS (CSS)
+# ==========================================
 st.markdown("""
     <style>
     #MainMenu, footer, header {visibility: hidden;}
-    .block-container { padding-top: 130px !important; padding-bottom: 120px !important; }
+    .block-container { padding-top: 135px !important; padding-bottom: 120px !important; }
     
-    /* Header Fijo con Barra de Progreso */
+    /* Header Fijo */
     .fixed-header {
         position: fixed; top: 0; left: 0; width: 100%; background: #ffffff;
         border-bottom: 1px solid #e0e0e0; z-index: 99999;
         box-shadow: 0 4px 20px rgba(0,0,0,0.1);
     }
     
+    /* Barra Superior Marca + DISCLAIMER */
     .top-bar {
         padding: 10px 20px; display: flex; justify-content: space-between; align-items: center;
         background: #0f2c59; color: white;
     }
     
+    /* Estilo del Disclaimer */
+    .legal-warning {
+        font-size: 0.75rem; 
+        color: #fff176; /* Amarillo suave */
+        font-weight: 500;
+        letter-spacing: 0.5px;
+    }
+    
+    /* Contenedor Barra Progreso */
     .progress-container {
         padding: 10px 20px; background: #fff5e6;
     }
@@ -127,7 +163,7 @@ st.markdown("""
         display: flex; justify-content: space-between;
     }
     
-    /* Color de la barra de carga (Naranja agresivo) */
+    /* Gradiente Naranja Agresivo */
     .stProgress > div > div > div > div {
         background-image: linear-gradient(to right, #ff9800, #ff5722) !important;
     }
@@ -163,49 +199,25 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 4. SISTEMA TÉCNICO & DATOS
+# 5. RENDERIZADO DEL HEADER (LÓGICA TEMU)
 # ==========================================
-try:
-    API_KEY = st.secrets["GOOGLE_API_KEY"]
-    genai.configure(api_key=API_KEY)
-except:
-    st.error("⚠️ Error API Key. Revisa secrets.")
-    st.stop()
-
-SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvnarDQ/pub?gid=2029869540&single=true&output=csv"
-
-@st.cache_data(ttl=300)
-def load_data():
-    try:
-        df = pd.read_csv(SHEET_URL, dtype=str).fillna("")
-        return df.to_csv(index=False)
-    except: return ""
-
-csv_context = load_data()
-
-# Estado Inicial
-if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "⚡ **¡Bienvenido!**\n\nSoy Miguel. El stock está volátil hoy. ¿Qué necesitás cotizar?"}]
 if "monto_acumulado" not in st.session_state:
     st.session_state.monto_acumulado = 0.0
 
-# ==========================================
-# 5. RENDERIZADO CABECERA (LÓGICA TEMU)
-# ==========================================
 porcentaje = min(st.session_state.monto_acumulado / MONTO_OBJETIVO_MAYORISTA, 1.0)
 falta = max(MONTO_OBJETIVO_MAYORISTA - st.session_state.monto_acumulado, 0)
 
-# HTML inyectado
+# HTML con el Disclaimer restaurado
 html_header = f"""
 <div class="fixed-header">
     <div class="top-bar">
-        <span><i class="fa-solid fa-bolt"></i> PEDRO BRAVIN S.A. | VENTA ONLINE</span>
-        <span style="font-size: 0.8rem; opacity: 0.9;">Dólar: ${DOLAR_BNA_REF}</span>
+        <span><i class="fa-solid fa-bolt"></i> PEDRO BRAVIN S.A.</span>
+        <span class="legal-warning">⚠️ Precios y Stock estimados (Web Parcial)</span>
     </div>
     <div class="progress-container">
         <div class="progress-label">
             <span>🚀 TARIFA MAYORISTA (15% OFF)</span>
-            <span>{'🎉 ¡OBJETIVO LOGRADO!' if falta == 0 else f'Faltan ${falta:,.0f} para activar dcto.'}</span>
+            <span>{'🎉 ¡OBJETIVO LOGRADO!' if falta == 0 else f'Faltan ${falta:,.0f}'}</span>
         </div>
     </div>
 </div>
@@ -214,35 +226,38 @@ st.markdown(html_header, unsafe_allow_html=True)
 st.progress(porcentaje)
 
 # ==========================================
-# 6. CEREBRO IA (MIGUEL + REGLAS RECUPERADAS)
+# 6. CEREBRO IA (MIGUEL - EL CERRADOR)
 # ==========================================
 sys_prompt = f"""
-ROL: Eres Miguel, Asesor Técnico y Vendedor Agresivo de Pedro Bravin S.A.
+ROL: Eres Miguel, Asesor Técnico y Vendedor de Pedro Bravin S.A.
 BASE DE DATOS: {csv_context}
-VARIABLES: DÓLAR BNA ${DOLAR_BNA_REF}
 ZONA GRATIS: {CIUDADES_GRATIS}
 
-OBJETIVO: VENDER RÁPIDO. USAR ESCALERA DE VALOR PARA LLEGAR A ${MONTO_OBJETIVO_MAYORISTA}.
+OBJETIVO: Responder rápido, conciso y cerrar ventas.
 
-📜 REGLAS OBLIGATORIAS:
-1. **PRECIO:** Siempre extrae del CSV y di "$ PRECIO + IVA".
-2. **LOGÍSTICA:**
-   - Si la ciudad está en ZONA GRATIS -> "¡Flete BONIFICADO a tu localidad! (Ahorrás $$$)".
-   - Si NO está -> "Calculo el envío más económico desde planta".
-3. **UP-SELLING (La Barra):**
-   - Siempre calcula mentalmente cuánto falta para ${MONTO_OBJETIVO_MAYORISTA}.
-   - Di: "Estás a $X de desbloquear el PRECIO MAYORISTA (-15%). ¿Agregamos discos o tornillos?".
-4. **URGENCIA:** Usa frases cortas. "Stock bajo", "Precio por hoy".
+📜 PROTOCOLO DE RESPUESTA:
+1. **PRECIOS:** Siempre extrae del CSV y agrega "+ IVA".
+2. **DISCLAIMER:** Si el producto no está exacto en CSV, aclara que es "A cotizar por Martín".
+3. **LOGÍSTICA:**
+   - Si la ciudad está en ZONA GRATIS -> "¡Logística BONIFICADA!".
+   - Si no -> "Busco el flete más conveniente desde planta".
+4. **EFECTO BARRA DE PROGRESO:**
+   - Si el total es < {MONTO_OBJETIVO_MAYORISTA}, dile cuánto falta para el DESCUENTO MAYORISTA.
+   - Usa listas (bullets) para que sea fácil de leer.
 
-FORMATO SALIDA FINAL (PARA WHATSAPP):
+FORMATO SALIDA BOTÓN WHATSAPP:
 [TEXTO_WHATSAPP]:
-Hola Martín, quiero CONGELAR PRECIO YA.
+Hola Martín, quiero CONGELAR PRECIO.
 📦 Pedido: [Resumen]
-📍 Destino: [Ciudad detectada]
-💰 Total Aprox: $[Monto] + IVA
-🎁 Estado Mayorista: [{'✅ ACTIVADO' if st.session_state.monto_acumulado >= MONTO_OBJETIVO_MAYORISTA else '❌ Falta poco'}]
-Enviame link de pago.
+📍 Destino: [Ciudad]
+💰 Aprox: $[Monto] + IVA
+🎁 Descuento Mayorista: [{'✅ SÍ' if st.session_state.monto_acumulado >= MONTO_OBJETIVO_MAYORISTA else '❌ Aún no'}]
+Solicito link de pago.
 """
+
+# Inicialización Chat
+if "messages" not in st.session_state:
+    st.session_state.messages = [{"role": "assistant", "content": "⚡ **Sistema Online.**\n\n¿Qué materiales necesitás cotizar hoy?"}]
 
 try:
     if "chat_session" not in st.session_state or st.session_state.chat_session is None:
@@ -251,25 +266,25 @@ try:
 except: pass
 
 # ==========================================
-# 7. CHAT Y LÓGICA DE EVENTOS
+# 7. INTERACCIÓN Y RENDERIZADO
 # ==========================================
 
-# Panel Admin (RECUPERADO)
-if prompt := st.chat_input("Ej: 20 chapas, Perfil C, Hierro del 8..."):
+# Panel Admin Backdoor
+if prompt := st.chat_input("Escribe tu consulta aquí..."):
     if prompt == "#admin-miguel":
         st.session_state.admin_mode = not st.session_state.admin_mode
         st.rerun()
 
-# Mostrar Historial
+# Historial
 for msg in st.session_state.messages:
     avatar = "👷‍♂️" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-# Si hay input del usuario (procesamiento)
+# Procesamiento
 if prompt and prompt != "#admin-miguel":
     
-    # 1. Social Proof (Globito Temu)
-    if random.random() > 0.6:
+    # 1. Globito FOMO (Probabilidad 60%)
+    if random.random() > 0.4:
         st.toast(random.choice(FRASES_FOMO), icon='🔥')
 
     st.session_state.messages.append({"role": "user", "content": prompt})
@@ -278,24 +293,24 @@ if prompt and prompt != "#admin-miguel":
     try:
         chat = st.session_state.chat_session
         with st.chat_message("assistant", avatar="👷‍♂️"):
-            with st.spinner("⚡ Verificando stock y bonificaciones..."):
+            with st.spinner("⚡ Consultando stock en tiempo real..."):
                 response = chat.send_message(prompt)
                 full_text = response.text
                 
-                # Detectar precio para la barra
+                # Actualizar Barra
                 nuevo_monto = extraer_monto(full_text)
                 if nuevo_monto > 0:
-                    st.session_state.monto_acumulado = nuevo_monto # Opcional: += si quieres sumar items
+                    st.session_state.monto_acumulado = nuevo_monto 
                 
-                # Registrar Log (RECUPERADO)
+                # Logger
                 log_interaction(prompt, full_text, nuevo_monto)
 
-                # Efectos visuales de éxito
+                # Efectos
                 if st.session_state.monto_acumulado >= MONTO_OBJETIVO_MAYORISTA:
                     st.balloons()
-                    st.toast("🎉 ¡PRECIO MAYORISTA DESBLOQUEADO!", icon="💰")
+                    st.toast("🎉 ¡PRECIO MAYORISTA ALCANZADO!", icon="💰")
 
-                # Renderizar respuesta
+                # Respuesta + Botón WhatsApp
                 if "[TEXTO_WHATSAPP]:" in full_text:
                     display_text, wa_text = full_text.split("[TEXTO_WHATSAPP]:", 1)
                     st.markdown(display_text)
@@ -305,32 +320,32 @@ if prompt and prompt != "#admin-miguel":
                     
                     st.markdown(f"""
                     <a href="{wa_url}" target="_blank" class="final-action-card">
-                        🔥 CONGELAR PRECIO Y STOCK <br>
-                        <span style="font-size:0.9rem;">Hablar con Martín ahora</span>
+                        🔥 CONGELAR PRECIO AHORA <br>
+                        <span style="font-size:0.9rem;">Hablar con Martín antes del aumento</span>
                     </a>
                     """, unsafe_allow_html=True)
                 else:
                     st.markdown(full_text)
                     st.session_state.messages.append({"role": "assistant", "content": full_text})
                 
-                # Forzar actualización de barra visual
+                # Rerun para que la barra de arriba salte visualmente
                 time.sleep(0.5)
                 st.rerun()
 
     except Exception as e:
-        st.error(f"Error: {e}")
+        st.error(f"Error de conexión: {e}")
 
-# Botón WhatsApp Flotante
+# Botón Flotante
 st.markdown("""
 <a href="https://wa.me/5493401527780" class="wa-float" target="_blank">
     <i class="fa-brands fa-whatsapp"></i>
 </a>
 """, unsafe_allow_html=True)
 
-# Panel Admin Visual
+# Panel Admin
 if st.session_state.admin_mode:
-    with st.expander("🔐 PANEL ADMIN (Datos de Sesión)"):
+    with st.expander("🔐 PANEL ADMIN - PEDRO BRAVIN S.A."):
         st.write(st.session_state.log_data)
-        if st.button("Descargar Logs CSV"):
+        if st.session_state.log_data:
             df_logs = pd.DataFrame(st.session_state.log_data)
-            st.download_button("Descargar", df_logs.to_csv(), "logs.csv")
+            st.download_button("Descargar CSV", df_logs.to_csv(), "ventas_miguel.csv")
