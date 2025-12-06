@@ -13,23 +13,31 @@ import random
 # 1. CONFIGURACIÓN TÉCNICA
 # ==========================================
 st.set_page_config(
-    page_title="Pedro Bravin S.A. | Stock Vivo",
-    page_icon="⚡",
+    page_title="Pedro Bravin S.A. | Cotizador",
+    page_icon="🏗️",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 # --- VARIABLES DE NEGOCIO ---
 DOLAR_BNA_REF = 1060.00
-MONTO_OBJETIVO_MAYORISTA = 300000  
+
+# --- LA ESCALERA DE VALOR (VISUAL) ---
+# Esta es la meta visual general, pero Miguel tendrá reglas especiales para Chapas/Perfiles
+NIVELES = [
+    # Nivel Base: Mejorado al 5% para que sea atractivo de entrada
+    {"techo": 500000,  "desc": 5,  "next_desc": 10, "nombre": "INICIAL", "label_desc": "5% CONTADO", "color": "#78909c"}, 
+    {"techo": 1500000, "desc": 10, "next_desc": 15, "nombre": "OBRA", "label_desc": "10% OFF", "color": "#ffa726"}, 
+    {"techo": 3000000, "desc": 15, "next_desc": 18, "nombre": "CONSTRUCTOR", "label_desc": "15% OFF", "color": "#d50000"}, 
+    {"techo": float('inf'), "desc": 18, "next_desc": 18, "nombre": "PARTNER", "label_desc": "18% MAX", "color": "#6200ea"} 
+]
 
 # --- INFRAESTRUCTURA DE DATOS ---
-URL_FORM_GOOGLE = ""  # 🔴 TU LINK DE GOOGLE FORMS
+URL_FORM_GOOGLE = ""  # 🔴 PEGAR LINK DE GOOGLE FORMS
 ID_CAMPO_CLIENTE = "entry.xxxxxx"
 ID_CAMPO_MONTO = "entry.xxxxxx"
 ID_CAMPO_OPORTUNIDAD = "entry.xxxxxx"
 
-# --- LISTA DE LOGÍSTICA ---
 CIUDADES_GRATIS = """
 EL TREBOL, LOS CARDOS, LAS ROSAS, SAN GENARO, CENTENO, CASAS, CAÑADA ROSQUIN,
 SAN VICENTE, SAN MARTIN DE LAS ESCOBAS, ANGELICA, SUSANA, RAFAELA, SUNCHALES,
@@ -38,25 +46,22 @@ SAN JORGE, LAS PETACAS, ZENON PEREYRA, CARLOS PELLEGRINI, LANDETA, MARIA SUSANA,
 PIAMONTE, VILA, SAN FRANCISCO.
 """
 
-# --- GATILLOS PSICOLÓGICOS ---
 FRASES_FOMO = [
-    "🔥 Alguien en Rafaela acaba de pedir 20 Chapas T101.",
-    "⚠️ Stock Bajo: Quedan pocas unidades de este lote.",
-    "👀 5 personas están viendo precios de Perfiles ahora.",
-    "📉 El dólar está estable AHORA. Aprovechá antes del cierre.",
-    "🚚 Camión saliendo para Zona Oeste esta tarde. ¡Sumate!"
+    "🔥 Chapas T101: Precio especial por cierre de lote.",
+    "⚠️ Hierro Construcción: Stock con alta rotación hoy.",
+    "👀 Perfiles C: 3 clientes están consultando stock ahora.",
+    "📉 Dólar BNA estable: Aprovechá para congelar precio.",
+    "🚚 Logística: Armado de reparto para zona centro."
 ]
 
 # ==========================================
 # 2. MOTOR DE BACKEND
 # ==========================================
-
 if "log_data" not in st.session_state: st.session_state.log_data = []
 if "admin_mode" not in st.session_state: st.session_state.admin_mode = False
 if "monto_acumulado" not in st.session_state: st.session_state.monto_acumulado = 0.0
-# Inicializar mensajes si no existen
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "⚡ **Sistema En Vivo.**\n\nEl stock está volando. ¿Qué necesitás cotizar YA?"}]
+    st.session_state.messages = [{"role": "assistant", "content": "🏗️ **Bienvenido a Pedro Bravin S.A.**\n\nSoy Miguel. Tengo **tarifas especiales** en Chapas, Perfiles y Hierros.\n¿Qué materiales cotizamos?"}]
 
 def enviar_a_google_form_background(cliente, monto, oportunidad):
     if URL_FORM_GOOGLE and "docs.google.com" in URL_FORM_GOOGLE:
@@ -67,10 +72,10 @@ def enviar_a_google_form_background(cliente, monto, oportunidad):
 
 def log_interaction(user_text, bot_response, monto_detectado):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    opportunity = "NORMAL"
-    if monto_detectado > 300000: opportunity = "🔥 ALTA (MAYORISTA)"
-    elif monto_detectado > 0: opportunity = "MEDIA (COTIZANDO)"
-
+    opportunity = "BAJA"
+    if monto_detectado > 1500000: opportunity = "🔥 ALTA (CONSTRUCTOR)"
+    elif monto_detectado > 500000: opportunity = "MEDIA (OBRA)"
+    
     st.session_state.log_data.append({"Fecha": timestamp, "Usuario": user_text[:50], "Oportunidad": opportunity, "Monto": monto_detectado})
     
     thread = threading.Thread(target=enviar_a_google_form_background, args=(user_text, monto_detectado, opportunity))
@@ -82,20 +87,41 @@ def extraer_monto(texto):
     montos = [int(p.replace('.', '')) for p in patrones if p.replace('.', '').isdigit()]
     return max(montos) if montos else 0
 
-# ==========================================
-# 3. INTERFAZ "TEMU STYLE"
-# ==========================================
+def obtener_nivel_actual(monto):
+    for nivel in NIVELES:
+        if monto < nivel["techo"]: return nivel
+    return NIVELES[-1]
 
-# Cálculo Barra
-porcentaje = min(st.session_state.monto_acumulado / MONTO_OBJETIVO_MAYORISTA, 1.0) * 100
-falta = max(MONTO_OBJETIVO_MAYORISTA - st.session_state.monto_acumulado, 0)
-mensaje_barra = "🎉 ¡DESCUENTO MAYORISTA ACTIVADO!" if falta == 0 else f"Faltan ${falta:,.0f} para 15% OFF"
-color_barra = "#00e676" if falta == 0 else "#ff9100" 
+# ==========================================
+# 3. INTERFAZ VISUAL (BARRA DINÁMICA)
+# ==========================================
+nivel_actual = obtener_nivel_actual(st.session_state.monto_acumulado)
+meta = nivel_actual["techo"]
+label_descuento = nivel_actual["label_desc"]
+siguiente_descuento = nivel_actual["next_desc"]
+color_barra = nivel_actual["color"]
+
+base_nivel_anterior = 0
+for i, n in enumerate(NIVELES):
+    if n == nivel_actual and i > 0:
+        base_nivel_anterior = NIVELES[i-1]["techo"]
+        break
+
+if meta == float('inf'):
+    porcentaje = 100
+    texto_meta = "🏆 ¡MEJOR PRECIO DEL MERCADO!"
+    falta = 0
+else:
+    rango = meta - base_nivel_anterior
+    progreso_en_rango = st.session_state.monto_acumulado - base_nivel_anterior
+    porcentaje = min(max(progreso_en_rango / rango, 0), 1) * 100
+    falta = meta - st.session_state.monto_acumulado
+    texto_meta = f"Faltan ${falta:,.0f} para {siguiente_descuento}% OFF"
 
 st.markdown(f"""
     <style>
     #MainMenu, footer, header {{visibility: hidden;}}
-    .block-container {{ padding-top: 160px !important; padding-bottom: 120px !important; }}
+    .block-container {{ padding-top: 165px !important; padding-bottom: 120px !important; }}
     
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; 
@@ -109,18 +135,20 @@ st.markdown(f"""
     }}
     .legal-text {{ color: #ffeb3b; font-weight: 600; font-size: 0.7rem; }}
     
-    .progress-wrapper {{ padding: 10px 20px; background: #fff8e1; border-bottom: 1px solid #ffe0b2; }}
-    .progress-title {{ 
-        display: flex; justify-content: space-between; font-weight: 800; 
-        color: #e65100; font-size: 0.9rem; margin-bottom: 5px; text-transform: uppercase;
+    /* BARRA DE PROGRESO */
+    .game-zone {{ padding: 10px 20px; background: #fafafa; border-bottom: 1px solid #eee; }}
+    .level-info {{ display: flex; justify-content: space-between; margin-bottom: 5px; align-items: center; }}
+    .current-badge {{ 
+        background: #37474f; color: white; padding: 4px 10px; border-radius: 12px; 
+        font-size: 0.75rem; font-weight: bold; border: 1px solid #cfd8dc;
     }}
-    .custom-progress-bg {{
-        width: 100%; height: 12px; background: #e0e0e0; border-radius: 10px; overflow: hidden;
-    }}
+    .next-target {{ color: {color_barra}; font-weight: 800; font-size: 0.9rem; }}
+    .custom-progress-bg {{ width: 100%; height: 14px; background: #e0e0e0; border-radius: 10px; overflow: hidden; }}
     .custom-progress-fill {{
         height: 100%; width: {porcentaje}%; 
-        background: linear-gradient(90deg, #ff9800, #f57c00, {color_barra}); 
-        transition: width 0.5s ease-in-out;
+        background: linear-gradient(90deg, {color_barra} 0%, {color_barra} 100%); 
+        transition: width 0.6s ease-in-out;
+        box-shadow: 0 0 10px {color_barra};
     }}
     
     .wa-float {{
@@ -130,34 +158,33 @@ st.markdown(f"""
         font-size: 30px; box-shadow: 0 4px 15px rgba(37, 211, 102, 0.4);
         z-index: 9999; transition: transform 0.2s;
     }}
-    .wa-float:hover {{ transform: scale(1.1) rotate(10deg); }}
+    .wa-float:hover {{ transform: scale(1.1); }}
     
     .closing-card {{
-        background: linear-gradient(135deg, #d50000 0%, #c62828 100%);
+        background: linear-gradient(135deg, #d50000 0%, #b71c1c 100%);
         color: white !important; text-align: center; padding: 18px; 
         border-radius: 12px; text-decoration: none; display: block;
         font-weight: 900; font-size: 1.2rem; margin-top: 15px;
-        box-shadow: 0 8px 25px rgba(213, 0, 0, 0.4);
-        border: 2px solid #ff8a80; animation: pulse 1.5s infinite;
+        box-shadow: 0 8px 25px rgba(213, 0, 0, 0.3);
+        border: 2px solid #ff8a80; animation: pulse 2s infinite;
     }}
     @keyframes pulse {{
-        0% {{ box-shadow: 0 0 0 0 rgba(213, 0, 0, 0.7); transform: scale(1); }}
-        70% {{ box-shadow: 0 0 0 10px rgba(213, 0, 0, 0); transform: scale(1.02); }}
-        100% {{ box-shadow: 0 0 0 0 rgba(213, 0, 0, 0); transform: scale(1); }}
+        0% {{ transform: scale(1); }}
+        50% {{ transform: scale(1.02); }}
+        100% {{ transform: scale(1); }}
     }}
-    
     .stChatMessage {{ border-radius: 15px !important; }}
     </style>
     
     <div class="fixed-header">
         <div class="top-strip">
             <span>⚡ PEDRO BRAVIN S.A. | LIVE</span>
-            <span class="legal-text">⚠️ Precios est. (Web Parcial)</span>
+            <span class="legal-text">⚠️ Precios Web Estimados</span>
         </div>
-        <div class="progress-wrapper">
-            <div class="progress-title">
-                <span><i class="fa-solid fa-trophy"></i> Meta Mayorista</span>
-                <span>{mensaje_barra}</span>
+        <div class="game-zone">
+            <div class="level-info">
+                <span class="current-badge">TU NIVEL: {label_descuento}</span>
+                <span class="next-target">{texto_meta}</span>
             </div>
             <div class="custom-progress-bg">
                 <div class="custom-progress-fill"></div>
@@ -172,13 +199,13 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 4. CEREBRO IA
+# 4. CEREBRO IA (CON UPGRADE COMPETITIVO)
 # ==========================================
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
 except:
-    st.error("⚠️ Sistema en Mantenimiento (API Key).")
+    st.error("⚠️ Error API Key.")
     st.stop()
 
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvnarDQ/pub?gid=2029869540&single=true&output=csv"
@@ -193,25 +220,37 @@ def load_data():
 csv_context = load_data()
 
 sys_prompt = f"""
-ROL: Eres Miguel, el Mejor Vendedor de Pedro Bravin S.A.
+ROL: Eres Miguel, el Asesor Estrella de Pedro Bravin S.A.
 BASE DE DATOS: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
-META: ${MONTO_OBJETIVO_MAYORISTA}
 
-MISIÓN: CERRAR LA VENTA.
-1. **PRECIO:** Siempre "+ IVA".
-2. **ESCASEZ:** Usa frases como "Quedan pocos metros", "Precio congela hoy".
-3. **LOGÍSTICA:** Si ZONA GRATIS -> "¡Flete BONIFICADO!".
-4. **GAMIFICACIÓN:** Calcula cuánto falta para ${MONTO_OBJETIVO_MAYORISTA} y dilo.
+🔥 **PROTOCOLOS DE DESCUENTO:**
 
-FORMATO RESPUESTA FINAL:
+1.  **PRODUCTOS ESTRELLA (COMPETITIVOS):**
+    * Si piden **CHAPAS DE TECHO**, **PERFILES C** o **HIERRO DE CONSTRUCCIÓN**:
+    * ⚡ **UPGRADE AUTOMÁTICO:** Sé MUY agresivo. Ignora los niveles bajos.
+    * Ofrece descuentos fuertes (10% al 15%) desde el inicio para ganar la venta.
+    * *Argumento:* "En chapas y perfiles tengo el mejor precio de la zona garantizado".
+
+2.  **PRODUCTOS ESTÁNDAR (ESCALA GENERAL):**
+    * **$0 - $500k:** Ofrece **5% OFF (Pago Contado)**.
+    * **$500k - $1.5M:** 10% OFF.
+    * **$1.5M - $3M:** 15% OFF.
+    * **+$3M:** 18% OFF (Partner).
+
+3.  **TÁCTICA DE CIERRE:**
+    * **Precio:** Siempre di "$ Precio + IVA".
+    * **Escasez:** "Queda poco stock de este lote".
+    * **Logística:** Si es zona gratis, grítalo: "¡Flete BONIFICADO!".
+
+FORMATO SALIDA WHATSAPP:
 [TEXTO_WHATSAPP]:
-Hola Martín, quiero CONGELAR PRECIO Y STOCK.
+Hola Martín, CONGELAR STOCK.
 📦 Pedido: [Items]
-📍 Zona: [Ciudad]
-💰 Total: $[Monto] + IVA
-🏆 Nivel Mayorista: [{'✅ DESBLOQUEADO' if st.session_state.monto_acumulado >= MONTO_OBJETIVO_MAYORISTA else '❌ Faltan items'}]
-¡Pasame el CBU!
+📍 Localidad: [Ciudad]
+💰 Total Aprox: $[Monto] + IVA
+💎 Descuento Aplicado: [{label_descuento} o 'ESPECIAL COMPETITIVO']
+Link de pago por favor.
 """
 
 if "chat_session" not in st.session_state:
@@ -221,50 +260,41 @@ if "chat_session" not in st.session_state:
     except: pass
 
 # ==========================================
-# 5. RENDERIZADO HISTORIAL (PRIMERO)
+# 5. CHAT Y PROCESAMIENTO
 # ==========================================
-# 🔥 CORRECCIÓN CLAVE: Renderizar mensajes ANTES de procesar input nuevo
-# Esto asegura que el chat se vea siempre, incluso al recargar.
+
+# Renderizado Historial
 for msg in st.session_state.messages:
     avatar = "👷‍♂️" if msg["role"] == "assistant" else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-# ==========================================
-# 6. INPUT Y PROCESAMIENTO
-# ==========================================
-if prompt := st.chat_input("Ej: 20 Chapas C25 para El Trébol..."):
-    # Admin Backdoor
+# Input Usuario
+if prompt := st.chat_input("Ej: 20 Chapas C25 y Perfiles C..."):
     if prompt == "#admin-miguel":
         st.session_state.admin_mode = not st.session_state.admin_mode
         st.rerun()
 
-    # 1. Globito FOMO (Solo si no es admin)
-    if random.random() > 0.5:
+    if random.random() > 0.6:
         st.toast(random.choice(FRASES_FOMO), icon='🔥')
 
-    # 2. Agregar mensaje usuario a estado visual (inmediato)
     st.session_state.messages.append({"role": "user", "content": prompt})
-    # Dibujarlo manualmente para feedback instantáneo antes del rerun
     st.chat_message("user").markdown(prompt)
-    
-    # 3. Procesamiento IA
+
     try:
         chat = st.session_state.chat_session
-        
         with st.chat_message("assistant", avatar="👷‍♂️"):
-            with st.spinner("⚡ Verificando stock..."):
+            with st.spinner("⚡ Analizando descuentos especiales..."):
                 response = chat.send_message(prompt)
                 full_text = response.text
                 
-                # Análisis de Respuesta
                 nuevo_monto = extraer_monto(full_text)
                 if nuevo_monto > 0: st.session_state.monto_acumulado = nuevo_monto
                 
                 log_interaction(prompt, full_text, nuevo_monto)
 
-                if st.session_state.monto_acumulado >= MONTO_OBJETIVO_MAYORISTA:
-                    st.balloons()
-                    st.toast("🎉 ¡PRECIO MAYORISTA DESBLOQUEADO!", icon="💰")
+                if st.session_state.monto_acumulado > 1000000:
+                    st.balloons() # Solo festeja ventas grandes
+                    st.toast("🚀 ¡PRECIO MAYORISTA DETECTADO!", icon="💰")
 
                 if "[TEXTO_WHATSAPP]:" in full_text:
                     display, wa_msg = full_text.split("[TEXTO_WHATSAPP]:", 1)
@@ -274,27 +304,22 @@ if prompt := st.chat_input("Ej: 20 Chapas C25 para El Trébol..."):
                     wa_url = f"https://wa.me/5493401527780?text={urllib.parse.quote(wa_msg.strip())}"
                     st.markdown(f"""
                     <a href="{wa_url}" target="_blank" class="closing-card">
-                        🔥 ¡CONGELAR PRECIO AHORA! <br>
-                        <span style="font-size:0.9rem; font-weight:400; opacity:0.9;">Antes que aumente o se agote</span>
+                        🔥 ASEGURAR PRECIO Y STOCK <br>
+                        <span style="font-size:0.9rem; font-weight:400; opacity:0.9;">Antes del cambio de lista</span>
                     </a>
                     """, unsafe_allow_html=True)
                 else:
                     st.markdown(full_text)
                     st.session_state.messages.append({"role": "assistant", "content": full_text})
-
-                # Rerun para que la barra del header se actualice
-                time.sleep(0.5) 
+                
+                time.sleep(0.5)
                 st.rerun()
 
     except Exception as e:
         st.error(f"Error: {e}")
 
-# ==========================================
-# 7. PANEL ADMIN
-# ==========================================
+# Panel Admin
 if st.session_state.admin_mode:
-    with st.expander("🔐 PANEL ADMIN"):
-        st.write(st.session_state.log_data)
+    with st.expander("🔐 ADMIN PANEL"):
         if st.session_state.log_data:
-            df = pd.DataFrame(st.session_state.log_data)
-            st.download_button("Descargar CSV", df.to_csv(), "leads.csv")
+            st.dataframe(pd.DataFrame(st.session_state.log_data))
