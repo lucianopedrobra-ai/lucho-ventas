@@ -20,7 +20,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- VARIABLES DE NEGOCIO ---
+# --- VARIABLES ---
 DOLAR_BNA = 1060.00
 COSTO_FLETE_USD = 0.85 
 CONDICION_PAGO = "Contado/Transferencia"
@@ -54,6 +54,8 @@ FRASES_FOMO = [
 if "cart" not in st.session_state: st.session_state.cart = []
 if "log_data" not in st.session_state: st.session_state.log_data = []
 if "admin_mode" not in st.session_state: st.session_state.admin_mode = False
+# Estado para controlar que la foto no se procese dos veces
+if "last_processed_file" not in st.session_state: st.session_state.last_processed_file = None
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Escribí tu pedido o subí una foto de la lista."}]
 
@@ -186,21 +188,32 @@ def procesar_vision(img):
     return st.session_state.chat_session.send_message(["Analiza lista. APLICA REGLAS. Genera [ADD...]. SOLO CONFIRMA.", img]).text
 
 # ==========================================
-# 6. INTERFAZ TABS (SOLO TEXTO Y FOTO)
+# 6. INTERFAZ TABS (SOLO TEXTO Y FOTO AUTOMÁTICA)
 # ==========================================
 tab1, tab2 = st.tabs(["💬 COTIZAR", f"🛒 MI PEDIDO ({len(st.session_state.cart)})"])
 
 with tab1:
-    # --- INPUT FOTO (DISCRETO) ---
+    # --- INPUT FOTO AUTOMÁTICA ---
     with st.expander("📷 **Subir Foto de Lista**", expanded=False):
         img_val = st.file_uploader("", type=["jpg","png","jpeg"], label_visibility="collapsed")
-        if img_val and st.button("Procesar Foto", type="primary"):
-            with st.spinner("👀 Analizando lista..."):
-                full_text = procesar_vision(Image.open(img_val))
-                news = parsear_ordenes_bot(full_text)
-                st.session_state.messages.append({"role": "assistant", "content": full_text})
-                log_interaction("FOTO", total_final)
-                st.rerun()
+        
+        # LOGICA DE AUTO-PROCESAMIENTO
+        if img_val is not None:
+            # Chequeamos si es un archivo nuevo comparando nombre y tamaño
+            file_id = f"{img_val.name}_{img_val.size}"
+            
+            if st.session_state.last_processed_file != file_id:
+                # Es una foto nueva -> PROCESAMOS
+                with st.spinner("👀 Analizando lista automáticamente..."):
+                    full_text = procesar_vision(Image.open(img_val))
+                    news = parsear_ordenes_bot(full_text)
+                    st.session_state.messages.append({"role": "assistant", "content": full_text})
+                    
+                    # Guardamos ID para no re-procesar en el próximo rerun
+                    st.session_state.last_processed_file = file_id
+                    
+                    log_interaction("FOTO AUTO", total_final)
+                    st.rerun()
 
     # --- HISTORIAL CHAT ---
     for m in st.session_state.messages:
