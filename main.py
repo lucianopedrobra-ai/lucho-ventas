@@ -56,11 +56,7 @@ st.markdown("""
     }
     .header-branding { display: flex; flex-direction: column; }
     .brand-name { color: #0f2c59; font-weight: 800; font-size: 0.95rem; text-transform: uppercase; }
-    /* *** MODIFICACIÓN 1: MEJORA DE CONTRASTE DEL TEXTO DE DESCARGO (MÓVIL) *** */
-    .brand-disclaimer { 
-        color: #444; /* Anteriormente #666. Oscurecido para mayor legibilidad en fondo blanco. */
-        font-size: 0.75rem; 
-    }
+    .brand-disclaimer { color: #666; font-size: 0.75rem; }
     
     /* Botón WhatsApp en Header */
     .wa-pill-btn {
@@ -72,10 +68,7 @@ st.markdown("""
     .wa-pill-btn:hover { transform: scale(1.05); background-color: #1ebc57; }
 
     /* Padding principal para evitar que el contenido se oculte bajo el header */
-    .block-container { 
-        /* padding-top: 85px !important; ELIMINADO: Streamlit ya maneja este espacio, era redundante y causaba problemas. */
-        padding-bottom: 40px !important; 
-    }
+    .block-container { padding-top: 85px !important; padding-bottom: 40px !important; }
 
     /* Estilos de Chat y CTA */
     .stChatMessage[data-testid="stChatMessage"]:nth-child(odd) { background-color: #f8f9fa; border: 1px solid #eee; border-radius: 10px; }
@@ -95,11 +88,11 @@ st.markdown("""
     /* Spinner de carga personalizado */
     .stSpinner > div { border-top-color: #0f2c59 !important; }
     
-    /* !!! MODIFICACIÓN 2: SOLUCIÓN RESPONSIVA MÓVIL (MENOS AGRESIVA) !!! */
-    @media (max-width: 992px) { 
+    /* !!! SOLUCIÓN FINAL MÓVIL (MUY AGRESIVA) !!! */
+    @media (max-width: 992px) { /* Aumentamos el alcance para tablets y móviles */
         .stApp {
-            /* Reducido de 200px a 100px. Deja espacio suficiente para el chat input en móvil. */
-            padding-bottom: 100px !important; 
+            /* 200px es un margen de seguridad extrema para el chat input + teclado virtual */
+            padding-bottom: 200px !important; 
         }
         /* Aseguramos que el input se mantenga en el fondo */
         div[data-testid="stChatInput"] {
