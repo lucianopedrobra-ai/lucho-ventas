@@ -10,13 +10,6 @@ import time
 import random
 from PIL import Image
 
-# INTENTO DE IMPORTAR MICROFONO
-try:
-    from streamlit_mic_recorder import speech_to_text
-    MIC_AVAILABLE = True
-except ImportError:
-    MIC_AVAILABLE = False
-
 # ==========================================
 # 1. CONFIGURACIÓN
 # ==========================================
@@ -33,9 +26,7 @@ COSTO_FLETE_USD = 0.85
 CONDICION_PAGO = "Contado/Transferencia"
 SHEET_ID = "2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvnarDQ"
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/e/{SHEET_ID}/pub?gid=2029869540&single=true&output=csv"
-
-# 🔴 PEGAR TU LINK DE GOOGLE FORM AQUI
-URL_FORM_GOOGLE = "" 
+URL_FORM_GOOGLE = "" # 🔴 PEGAR LINK FORM
 ID_CAMPO_CLIENTE = "entry.xxxxxx"
 ID_CAMPO_MONTO = "entry.xxxxxx"
 ID_CAMPO_OPORTUNIDAD = "entry.xxxxxx"
@@ -64,7 +55,7 @@ if "cart" not in st.session_state: st.session_state.cart = []
 if "log_data" not in st.session_state: st.session_state.log_data = []
 if "admin_mode" not in st.session_state: st.session_state.admin_mode = False
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Hablame, escribí o subí foto."}]
+    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Escribí, mandá audio o subí foto."}]
 
 # ==========================================
 # 3. BACKEND
@@ -78,14 +69,7 @@ csv_context = load_data()
 
 def enviar_a_google_form_background(cliente, monto, oportunidad):
     if URL_FORM_GOOGLE:
-        try: 
-            requests.post(URL_FORM_GOOGLE, data={
-                ID_CAMPO_CLIENTE: str(cliente), 
-                ID_CAMPO_MONTO: str(monto), 
-                ID_CAMPO_OPORTUNIDAD: str(oportunidad)
-            }, timeout=1)
-        except: 
-            pass
+        try: requests.post(URL_FORM_GOOGLE, data={ID_CAMPO_CLIENTE: str(cliente), ID_CAMPO_MONTO: str(monto), ID_CAMPO_OPORTUNIDAD: str(oportunidad)}, timeout=1); except: pass
 
 def log_interaction(user_text, monto):
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -95,18 +79,8 @@ def log_interaction(user_text, monto):
 
 def parsear_ordenes_bot(texto):
     items_nuevos = []
-    # Corrección Regex para detectar números decimales mejor
-    patron = r'\[ADD:([\d\.]+):([^:]+):([\d\.]+):([^\]]+)\]'
-    coincidencias = re.findall(patron, texto)
-    
-    for cant, prod, precio, tipo in coincidencias:
-        item = {
-            "cantidad": float(cant), 
-            "producto": prod.strip(), 
-            "precio_unit": float(precio), 
-            "subtotal": float(cant)*float(precio), 
-            "tipo": tipo.strip().upper()
-        }
+    for cant, prod, precio, tipo in re.findall(r'\[ADD:([\d\.]+):([^:]+):([\d\.]+):([^\]]+)\]', texto):
+        item = {"cantidad": float(cant), "producto": prod.strip(), "precio_unit": float(precio), "subtotal": float(cant)*float(precio), "tipo": tipo.strip().upper()}
         st.session_state.cart.append(item)
         items_nuevos.append(item)
     return items_nuevos
@@ -114,14 +88,10 @@ def parsear_ordenes_bot(texto):
 def calcular_negocio():
     bruto = sum(i['subtotal'] for i in st.session_state.cart)
     desc = 3; color = "#546e7a"; nivel = "INICIAL"
-    
-    # 1. Regla Gancho
     if any(x['tipo'] in ['CHAPA', 'PERFIL', 'HIERRO', 'CAÑO'] for x in st.session_state.cart):
         desc = 15; nivel = "🔥 MAYORISTA"; color = "#d32f2f"
-    # 2. Regla Volumen
     elif bruto > 3000000: desc = 15; nivel = "👑 PARTNER"; color = "#6200ea"
     elif bruto > 1500000: desc = 10; nivel = "🏗️ OBRA"; color = "#f57c00"
-    
     return bruto, bruto*(1-(desc/100)), desc, color, nivel
 
 def generar_link_wa(total):
@@ -130,10 +100,10 @@ def generar_link_wa(total):
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 4. UI: HEADER FIJO + TABS
+# 4. UI: HEADER FIJO
 # ==========================================
 subtotal, total_final, desc_actual, color_barra, nombre_nivel = calcular_negocio()
-pct_barra = min(total_final / 3000000 * 100, 100) if total_final < 3000000 else 100
+pct_barra = min(total_final / 3000000 * 100, 100)
 
 st.markdown(f"""
     <style>
@@ -170,7 +140,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 5. CEREBRO IA (REGLAS BLINDADAS)
+# 5. CEREBRO IA (MULTIMODAL: AUDIO/IMAGEN)
 # ==========================================
 try: genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 except: st.error("Falta API KEY")
@@ -180,24 +150,26 @@ ROL: Miguel, vendedor Pedro Bravin S.A.
 DB: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
 
-📜 REGLAS DE NEGOCIO INMUTABLES (DO NOT TOUCH):
-1. **LARGOS:** 12m (Perfiles/Hierro Const), 6.40m (Caños Epoxi/Galv), 6m (Resto).
-2. **UNIDADES:** Clavos/Alambre=KG, Mallas/Planchuelas=UNIDAD, Alambre Agro=ROLLO.
+📜 REGLAS INMUTABLES (DO NOT TOUCH):
+1. **LARGOS:** 12m (Perfiles/Hierro), 6.40m (Caños Epoxi/Galv), 6m (Resto).
+2. **UNIDADES:** KG (Clavos/Alambre), UNIDAD (Mallas), ROLLO (Agro).
 3. **CHAPAS:** Acanalada=COD4, T101=COD6, Sin corte=METRO.
-4. **LOGÍSTICA:**
-   - ZONA BENEFICIO ({CIUDADES_GRATIS}): ¡ENVÍO GRATIS!
-   - RESTO: Estima (KM*2*0.85 USD). Aclara "Estimado".
-   - RETIROS: "Retiro en Planta".
-5. **DISCLAIMER:** Precio estimado IA. Martín confirma.
+4. **LOGÍSTICA:** Gratis en Zona. Resto Estimado. Retiros en Planta.
+5. **DISCLAIMER:** Cotización estimada.
 
-SALIDA: Breve. FORMATO: [ADD:CANTIDAD:PRODUCTO:PRECIO:TIPO]
+INSTRUCCIONES:
+- Analiza TEXTO, IMAGEN o AUDIO.
+- Identifica productos y cantidades.
+- Aplica reglas técnicas (si piden metros de caño, calcula barras).
+- SALIDA: [ADD:CANTIDAD:PRODUCTO:PRECIO:TIPO]
 """
 
 if "chat_session" not in st.session_state:
     st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
 
-def procesar_vision(img):
-    return st.session_state.chat_session.send_message(["Analiza lista. APLICA REGLAS. Genera [ADD...]. SOLO CONFIRMA.", img]).text
+def procesar_multimodal(prompt_input):
+    """Procesa Texto, Imagen o Audio enviándolo a Gemini"""
+    return st.session_state.chat_session.send_message([prompt_input]).text
 
 # ==========================================
 # 6. INTERFAZ TABS
@@ -205,73 +177,79 @@ def procesar_vision(img):
 tab1, tab2 = st.tabs(["💬 COTIZAR", f"🛒 MI PEDIDO ({len(st.session_state.cart)})"])
 
 with tab1:
-    # --- ZONA DE INPUTS SUPERIORES ---
-    c_mic, c_cam = st.columns([1, 1])
-    
-    with c_mic:
-        if MIC_AVAILABLE:
-            # EL BOTÓN QUE SIMULA GEMINI: GRANDE Y CLARO
-            audio_text = speech_to_text(
-                language='es', 
-                start_prompt="🎙️ TOCÁ PARA HABLAR", 
-                stop_prompt="⏹️ LISTO (ENVIAR)", 
-                just_once=True, 
-                key='mic_input',
-                use_container_width=True # Ocupa todo el ancho disponible
-            )
-        else:
-            st.warning("⚠️ Sin Micrófono")
-            audio_text = None
-            
-    with c_cam:
-        with st.expander("📷 **FOTO**", expanded=False):
-            up_file = st.file_uploader("", type=["jpg","png","jpeg"], label_visibility="collapsed")
-            if up_file and st.button("⚡ ENVIAR", type="primary", use_container_width=True):
-                with st.spinner("👀 Mirando..."):
-                    txt = procesar_vision(Image.open(up_file))
-                    if parsear_ordenes_bot(txt):
-                        st.session_state.messages.append({"role": "assistant", "content": txt})
-                        log_interaction("FOTO", total_final)
-                        st.rerun()
-
-    # --- HISTORIAL CHAT ---
+    # --- HISTORIAL ---
     for m in st.session_state.messages:
         if m["role"] != "system":
             clean = re.sub(r'\[ADD:.*?\]', '', m["content"]).strip()
             if clean: st.chat_message(m["role"], avatar="👷‍♂️" if m["role"]=="assistant" else "👤").markdown(clean)
 
-    # --- LÓGICA DE ENVÍO ---
-    prompt = audio_text if audio_text else st.chat_input("Escribí acá...")
+    # --- INPUTS MODERNOS ---
+    st.write("---")
+    
+    # 1. AUDIO NATIVO
+    audio_val = st.audio_input("🎙️ Grabar Nota de Voz")
+    
+    # 2. FOTO Y TEXTO
+    c_text, c_cam = st.columns([4, 1])
+    with c_text:
+        text_val = st.chat_input("Escribí acá...")
+    with c_cam:
+        with st.expander("📷", expanded=False):
+            img_val = st.file_uploader("", type=["jpg","png"], label_visibility="collapsed")
 
-    if prompt:
-        if prompt == "#admin-miguel": st.session_state.admin_mode = not st.session_state.admin_mode; st.rerun()
-        if random.random() > 0.7: st.toast(random.choice(FRASES_FOMO), icon='🔥')
+    # --- LÓGICA CENTRAL DE PROCESAMIENTO ---
+    prompt_to_send = None
+    input_type = None
 
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        st.chat_message("user").markdown(prompt)
+    if audio_val:
+        prompt_to_send = {"mime_type": "audio/wav", "data": audio_val.read()}
+        input_type = "AUDIO"
+        user_display = "🎤 *Nota de voz enviada*"
+    elif img_val and st.button("Enviar Foto"):
+        prompt_to_send = Image.open(img_val)
+        input_type = "IMAGE"
+        user_display = "📷 *Foto enviada*"
+    elif text_val:
+        prompt_to_send = text_val
+        input_type = "TEXT"
+        user_display = text_val
 
+    if prompt_to_send:
+        # Mostrar mensaje usuario
+        st.session_state.messages.append({"role": "user", "content": user_display})
+        st.chat_message("user").markdown(user_display)
+
+        # Procesar con Gemini
         with st.chat_message("assistant", avatar="👷‍♂️"):
-            with st.spinner("Calculando..."):
+            with st.spinner("Analizando..."):
                 try:
-                    resp = st.session_state.chat_session.send_message(prompt).text
-                    news = parsear_ordenes_bot(resp)
+                    # Enviar el objeto crudo (Audio bytes, Imagen PIL o Texto) directo a Gemini
+                    # Gemini Flash maneja esto nativamente
+                    prompt_con_instruccion = ["Analiza este pedido. Aplica reglas inmutables. Genera comandos [ADD...].", prompt_to_send]
                     
-                    display = re.sub(r'\[ADD:.*?\]', '', resp)
+                    response = st.session_state.chat_session.send_message(prompt_con_instruccion)
+                    full_text = response.text
+                    
+                    news = parsear_ordenes_bot(full_text)
+                    display = re.sub(r'\[ADD:.*?\]', '', full_text)
                     st.markdown(display)
                     
                     if news:
                         st.caption("✅ Agregado al pedido")
                         st.dataframe(pd.DataFrame(news)[['cantidad','producto','precio_unit']], hide_index=True)
+                        time.sleep(1)
+                        st.rerun()
+
+                    st.session_state.messages.append({"role": "assistant", "content": full_text})
                     
-                    st.session_state.messages.append({"role": "assistant", "content": resp})
-                    log_interaction(prompt, total_final)
+                    total_nuevo = sum(i['subtotal'] for i in st.session_state.cart) * (1 - (desc_actual/100))
+                    log_interaction(f"INPUT {input_type}", total_nuevo)
                     
-                    if news: time.sleep(1); st.rerun()
                 except Exception as e: st.error(f"Error: {e}")
 
 with tab2:
     if not st.session_state.cart:
-        st.info("Carrito vacío. Volvé a 'COTIZAR' para agregar cosas.")
+        st.info("Carrito vacío.")
     else:
         for i, item in enumerate(st.session_state.cart):
             st.markdown(f"""
@@ -279,7 +257,7 @@ with tab2:
                 <div style="font-weight:bold;">{item['cantidad']}x {item['producto']}</div>
                 <div style="display:flex; justify-content:space-between; color:#555;">
                     <span>Unit: ${item['precio_unit']:,.0f}</span>
-                    <span style="font-weight:bold; color:#0f2c59; font-size:1.1rem;">${item['subtotal']:,.0f}</span>
+                    <span style="font-weight:bold; color:#0f2c59;">${item['subtotal']:,.0f}</span>
                 </div>
             </div>
             """, unsafe_allow_html=True)
