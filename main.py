@@ -56,7 +56,7 @@ if "log_data" not in st.session_state: st.session_state.log_data = []
 if "admin_mode" not in st.session_state: st.session_state.admin_mode = False
 if "last_processed_file" not in st.session_state: st.session_state.last_processed_file = None
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Escribí tu pedido o subí una foto de la lista."}]
+    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Escribí tu pedido o subí una foto."}]
 
 # ==========================================
 # 3. BACKEND
@@ -125,14 +125,12 @@ st.markdown(f"""
     .block-container {{ padding-top: 130px !important; padding-bottom: 90px !important; }}
     [data-testid="stSidebar"] {{ display: none; }} 
     
-    /* PESTAÑAS ESTILO APP */
     .stTabs [data-baseweb="tab-list"] {{
         position: fixed; top: 80px; left: 0; width: 100%; background: white; z-index: 9999;
         display: flex; justify-content: space-around; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
     }}
     .stTabs [data-baseweb="tab"] {{ flex: 1; text-align: center; padding: 10px; font-weight: bold; font-size: 0.9rem; }}
     
-    /* HEADER FIJO */
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; background: white; z-index: 10000;
         border-bottom: 3px solid {color_barra};
@@ -155,50 +153,41 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 5. CEREBRO IA (LÓGICA CORREGIDA)
+# 5. CEREBRO IA (INTELIGENCIA CONSULTIVA)
 # ==========================================
 try: genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 except: st.error("Falta API KEY")
 
-# 🧠 AQUI ESTÁ EL CAMBIO CLAVE EN LA INSTRUCCIÓN
 sys_prompt = f"""
-ROL: Miguel, vendedor Pedro Bravin S.A.
+ROL: Miguel, vendedor experto de Pedro Bravin S.A.
 DB: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
 
 📜 REGLAS INMUTABLES (DO NOT TOUCH):
-1. **LARGOS COMERCIALES:**
-   - 12.00m: Perfiles C, Hierro Const, Lisos AL 220, UPN/IPN (>=80).
-   - 6.40m: Caños (Epoxi, Galv, Sched, Mecánico).
-   - 6.00m: Tubos Estructurales, Ángulos, Planchuelas, UPN/IPN (<80).
-2. **UNIDADES DE VENTA:** Clavos/Alambre=KG. Planchuelas/Mallas=UNIDAD. Alambres Agro=ROLLO.
+1. **LARGOS:** 12m (Perfiles/Hierro), 6.40m (Caños Epoxi/Galv), 6m (Resto).
+2. **UNIDADES:** KG (Clavos/Alambre), UNIDAD (Mallas), ROLLO (Agro).
 3. **CHAPAS:** Acanalada=COD4, T101=COD6, Sin corte=METRO.
-4. **INTERPRETACIÓN DEL CSV (PESOS):**
-   - El número al final de la descripción es el **PESO (KG)**.
-   - Tubos Estructurales: Peso por BARRA de 6m.
-   - Perfiles/Caños: Peso por METRO.
+4. **PESOS:** Número al final de descripción es PESO (KG).
 5. **LOGÍSTICA:** Gratis en Zona. Resto Estimado. Retiro en Planta.
 6. **DISCLAIMER:** Cotización estimada.
 
-🎯 INSTRUCCIONES DE RESPUESTA (CRÍTICO):
-1. **LO QUE SÍ ESTÁ:** Genera SIEMPRE los comandos `[ADD:...]` para los productos que encuentres en la DB. **NO LOS OMITAS** aunque haya otros que falten.
-2. **LO QUE NO ESTÁ:** Si hay items de la lista que no están en la DB, agrégalos en el texto visible como: "⚠️ No coticé: [Lista]".
-3. **CONFIRMACIÓN:** Empieza diciendo "Procesé tu lista. Cargué lo disponible."
+🕵️‍♂️ PROTOCOLO DE AMBIGÜEDAD (CRÍTICO):
+Si el usuario pide un producto que tiene variantes importantes (ej: "Perfil C" o "Caño") y NO especifica el tipo:
+1. 🛑 **NO AGREGUES NADA AL CARRITO.**
+2. ❓ **PREGUNTA AL CLIENTE:** "¿Lo buscás Negro o Galvanizado?", "¿Chapa Color o Cincalum?".
+3. Solo si el cliente ya especificó (ej: "Perfil C Galvanizado"), entonces agrega el item.
 
-SALIDA OBLIGATORIA:
-[Texto visible con advertencias si hay faltantes]
-[ADD:CANTIDAD:PRODUCTO:PRECIO:TIPO]
-[ADD:CANTIDAD:PRODUCTO:PRECIO:TIPO]
-...
+INSTRUCCIONES DE SALIDA:
+- Si hay dudas, pregunta.
+- Si está claro, confirma ("Cargué X productos") y genera comandos.
+- SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO:TIPO]
 """
 
 if "chat_session" not in st.session_state:
     st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
 
 def procesar_vision(img):
-    # Prompt reforzado para la imagen
-    prompt_vision = "Analiza la imagen. Identifica TODOS los productos. Para los que existan en DB, genera comandos [ADD...]. Para los que no, avísame en texto. NO DEJES DE GENERAR LOS ADD DE LO QUE SÍ HAY."
-    return st.session_state.chat_session.send_message([prompt_vision, img]).text
+    return st.session_state.chat_session.send_message(["Analiza lista. Si hay ambigüedad (Negro/Galv), PREGUNTA. Si está claro, genera comandos [ADD...] y confirma.", img]).text
 
 # ==========================================
 # 6. INTERFAZ TABS
