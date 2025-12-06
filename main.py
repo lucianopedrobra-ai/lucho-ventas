@@ -22,7 +22,7 @@ st.set_page_config(
 )
 
 # ==========================================
-# 2. MOTOR INVISIBLE
+# 2. MOTOR INVISIBLE (DÓLAR)
 # ==========================================
 @st.cache_data(ttl=3600)
 def obtener_dolar_bna():
@@ -63,7 +63,7 @@ CIUDADES_GRATIS = [
     "PIAMONTE", "VILA", "SAN FRANCISCO"
 ]
 
-TOASTS_EXITO = ["🛒 Calculando peso...", "🔥 Precio x Barra OK", "✅ Agregado al pedido", "🏗️ Carga Lista"]
+TOASTS_EXITO = ["🛒 Calculando...", "🔥 Precio OK", "✅ Agregado", "🏗️ Listo"]
 
 # ==========================================
 # 3. ESTADO
@@ -77,7 +77,7 @@ if "expiry_time" not in st.session_state:
     st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
 
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Aprovechá el descuento por tiempo limitado."}]
+    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Pasame tu lista y te armo el presupuesto final."}]
 
 # ==========================================
 # 4. BACKEND
@@ -160,7 +160,7 @@ def generar_link_wa(total):
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 5. UI: HEADER CON RELOJ HÍBRIDO
+# 5. UI: HEADER CON RELOJ (CORREGIDO)
 # ==========================================
 subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer, reloj_python = calcular_negocio()
 porcentaje_barra = 100
@@ -171,7 +171,7 @@ display_iva = "+IVA" if subtotal > 0 else ""
 display_badge = nombre_nivel if subtotal > 0 else "⚡ AHORRÁ YA"
 subtext_badge = f"Ahorro extra: {desc_actual}%" if (oferta_viva and subtotal > 0) else "OFERTA POR TIEMPO LIMITADO"
 
-# HTML DEL HEADER
+# HTML HEADER (Variable {reloj_python} corregida)
 header_html = f"""
     <style>
     .block-container {{ padding-top: 175px !important; padding-bottom: 60px !important; }}
@@ -232,11 +232,11 @@ header_html = f"""
     </script>
 """
 
-# AQUI ESTA LA MAGIA: unsafe_allow_html=True
+# RENDERIZADO DEL HEADER CORRECTO
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA
+# 6. CEREBRO IA (REGLAS MATEMÁTICAS OK)
 # ==========================================
 try: genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 except: st.error("Falta API KEY")
@@ -247,29 +247,32 @@ DB: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
 # DATO INTERNO: DOLAR = {DOLAR_BNA}
 
-🧮 **REGLAS MATEMÁTICAS INMUTABLES:**
-Los precios CSV pueden ser en Dólares. Multiplica por {DOLAR_BNA} para PESOS.
+🧮 **REGLAS MATEMÁTICAS INMUTABLES (PRECIOS SIDERÚRGICOS):**
+*El precio en CSV es BASE. Si es Dólares, multiplicá por {DOLAR_BNA}.*
 
-1. **IPN / UPN / PERFIL C (12m):**
-   - CSV: Precio x Kilo. Descripción: Peso x Metro.
-   - 🧮 CUENTA: `(Peso_metro * 12) * Precio_CSV * {DOLAR_BNA}`
+1. **IPN / UPN / PERFIL C (Largo 12m):**
+   - CSV: Precio por KILO ($/KG).
+   - Descripción: Peso por METRO.
+   - 🧮 FÓRMULA BARRA: `(Peso_por_metro * 12) * Precio_CSV_Kilo * {DOLAR_BNA}`
 
-2. **ÁNGULOS / PLANCHUELAS / HIERRO T / REDONDOS (6m):**
-   - CSV: Precio x Kilo. Descripción: **PESO TOTAL BARRA**.
-   - 🧮 CUENTA: `Peso_Total_Barra * Precio_CSV * {DOLAR_BNA}`
+2. **ÁNGULOS / PLANCHUELAS / HIERRO T / REDONDOS / CUADRADOS (Largo 6m):**
+   - CSV: Precio por KILO ($/KG).
+   - Descripción: **PESO TOTAL DE LA BARRA** (Kg/Barra).
+   - 🧮 FÓRMULA BARRA: `Peso_Total_Barra * Precio_CSV_Kilo * {DOLAR_BNA}`
 
-3. **CAÑOS (Epoxi, Galv, Sched, Mec) (6.40m):**
-   - CSV: Precio x Kilo. Descripción: Peso x Metro.
-   - 🧮 CUENTA: `(Peso_metro * 6.40) * Precio_CSV * {DOLAR_BNA}`
+3. **CAÑOS (Epoxi, Galv, Sched, Mec) (Largo 6.40m):**
+   - CSV: Precio por KILO ($/KG).
+   - Descripción: Peso por METRO.
+   - 🧮 FÓRMULA BARRA: `(Peso_por_metro * 6.40) * Precio_CSV_Kilo * {DOLAR_BNA}`
 
-4. **TUBOS ESTRUCTURALES (6m):**
-   - CSV: Precio x BARRA.
-   - 🧮 CUENTA: `Precio_CSV * {DOLAR_BNA}`
+4. **TUBOS ESTRUCTURALES (Largo 6m):**
+   - CSV: Precio por BARRA ($/Unidad).
+   - 🧮 FÓRMULA BARRA: `Precio_CSV_Unidad * {DOLAR_BNA}`
 
 5. **FLETE:**
-   - Si es lejos, calcula: `(KM * 2 * {COSTO_FLETE_USD} * {DOLAR_BNA})`.
+   - Lejos: `(KM * 2 * {COSTO_FLETE_USD} * {DOLAR_BNA})`.
 
-SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_PESOS:TIPO]
+SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_PESOS_BARRA:TIPO]
 """
 
 if "chat_session" not in st.session_state:
@@ -330,7 +333,7 @@ with tab1:
                         st.markdown(f"""
                         <div style="background:#e8f5e9; padding:10px; border-radius:10px; border:1px solid #25D366; margin-top:5px;">
                             <strong>✅ {len(news)} items agregados.</strong><br>
-                            <span style="font-size:0.85rem">💰 Total: ${total_final:,.0f} | ⏳ Quedan {reloj} min</span>
+                            <span style="font-size:0.85rem">💰 Total: ${total_final:,.0f} | ⏳ Quedan {reloj_python} min</span>
                         </div>
                         """, unsafe_allow_html=True)
                         if desc_actual >= 15 and len(st.session_state.cart) > 1: st.balloons()
