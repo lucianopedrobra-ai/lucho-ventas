@@ -10,7 +10,7 @@ import time
 import random
 
 # ==========================================
-# 1. CONFIGURACIÓN TÉCNICA (INNEGOCIABLE)
+# 1. CONFIGURACIÓN TÉCNICA
 # ==========================================
 st.set_page_config(
     page_title="Pedro Bravin S.A. | Stock Vivo",
@@ -21,16 +21,15 @@ st.set_page_config(
 
 # --- VARIABLES DE NEGOCIO ---
 DOLAR_BNA_REF = 1060.00
-MONTO_OBJETIVO_MAYORISTA = 300000  # Meta para disparar la dopamina del cliente
+MONTO_OBJETIVO_MAYORISTA = 300000  
 
-# --- INFRAESTRUCTURA DE DATOS (GOOGLE FORMS) ---
-# NO TOCAR: Esto asegura que tengas el lead aunque no compren
-URL_FORM_GOOGLE = ""  # 🔴 PEGAR TU LINK DE GOOGLE FORMS AQUÍ
+# --- INFRAESTRUCTURA DE DATOS ---
+URL_FORM_GOOGLE = ""  # 🔴 TU LINK DE GOOGLE FORMS
 ID_CAMPO_CLIENTE = "entry.xxxxxx"
 ID_CAMPO_MONTO = "entry.xxxxxx"
 ID_CAMPO_OPORTUNIDAD = "entry.xxxxxx"
 
-# --- LISTA MAESTRA DE LOGÍSTICA (RECUPERADA AL 100%) ---
+# --- LISTA DE LOGÍSTICA ---
 CIUDADES_GRATIS = """
 EL TREBOL, LOS CARDOS, LAS ROSAS, SAN GENARO, CENTENO, CASAS, CAÑADA ROSQUIN,
 SAN VICENTE, SAN MARTIN DE LAS ESCOBAS, ANGELICA, SUSANA, RAFAELA, SUNCHALES,
@@ -39,7 +38,7 @@ SAN JORGE, LAS PETACAS, ZENON PEREYRA, CARLOS PELLEGRINI, LANDETA, MARIA SUSANA,
 PIAMONTE, VILA, SAN FRANCISCO.
 """
 
-# --- GATILLOS PSICOLÓGICOS (TIPO TEMU) ---
+# --- GATILLOS PSICOLÓGICOS ---
 FRASES_FOMO = [
     "🔥 Alguien en Rafaela acaba de pedir 20 Chapas T101.",
     "⚠️ Stock Bajo: Quedan pocas unidades de este lote.",
@@ -49,15 +48,16 @@ FRASES_FOMO = [
 ]
 
 # ==========================================
-# 2. MOTOR DE BACKEND (HILOS Y LOGS)
+# 2. MOTOR DE BACKEND
 # ==========================================
 
-# Inicialización de Estados
 if "log_data" not in st.session_state: st.session_state.log_data = []
 if "admin_mode" not in st.session_state: st.session_state.admin_mode = False
 if "monto_acumulado" not in st.session_state: st.session_state.monto_acumulado = 0.0
+# Inicializar mensajes si no existen
+if "messages" not in st.session_state:
+    st.session_state.messages = [{"role": "assistant", "content": "⚡ **Sistema En Vivo.**\n\nEl stock está volando. ¿Qué necesitás cotizar YA?"}]
 
-# Función Silenciosa: Envío a Google Forms sin trabar la UI
 def enviar_a_google_form_background(cliente, monto, oportunidad):
     if URL_FORM_GOOGLE and "docs.google.com" in URL_FORM_GOOGLE:
         try:
@@ -73,41 +73,35 @@ def log_interaction(user_text, bot_response, monto_detectado):
 
     st.session_state.log_data.append({"Fecha": timestamp, "Usuario": user_text[:50], "Oportunidad": opportunity, "Monto": monto_detectado})
     
-    # Ejecución en hilo paralelo (Performance pura)
     thread = threading.Thread(target=enviar_a_google_form_background, args=(user_text, monto_detectado, opportunity))
     thread.daemon = True
     thread.start()
 
 def extraer_monto(texto):
-    """Detecta el precio más alto en la respuesta para llenar la barra de codicia"""
     patrones = re.findall(r'\$\s?([\d\.]+)', texto)
     montos = [int(p.replace('.', '')) for p in patrones if p.replace('.', '').isdigit()]
     return max(montos) if montos else 0
 
 # ==========================================
-# 3. INTERFAZ "TEMU STYLE" (AGRESIVA)
+# 3. INTERFAZ "TEMU STYLE"
 # ==========================================
 
-# Cálculo de la Barra de Progreso
+# Cálculo Barra
 porcentaje = min(st.session_state.monto_acumulado / MONTO_OBJETIVO_MAYORISTA, 1.0) * 100
 falta = max(MONTO_OBJETIVO_MAYORISTA - st.session_state.monto_acumulado, 0)
 mensaje_barra = "🎉 ¡DESCUENTO MAYORISTA ACTIVADO!" if falta == 0 else f"Faltan ${falta:,.0f} para 15% OFF"
-color_barra = "#00e676" if falta == 0 else "#ff9100" # Verde si ganó, Naranja si falta
+color_barra = "#00e676" if falta == 0 else "#ff9100" 
 
 st.markdown(f"""
     <style>
-    /* Limpieza extrema */
     #MainMenu, footer, header {{visibility: hidden;}}
     .block-container {{ padding-top: 160px !important; padding-bottom: 120px !important; }}
     
-    /* HEADER FIJO ESTILO APP */
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; 
         background: white; z-index: 99999;
         box-shadow: 0 4px 15px rgba(0,0,0,0.15);
     }}
-    
-    /* Tira Superior (Marca + Disclaimer) */
     .top-strip {{
         background: #0f2c59; color: white; padding: 8px 15px;
         display: flex; justify-content: space-between; align-items: center;
@@ -115,7 +109,6 @@ st.markdown(f"""
     }}
     .legal-text {{ color: #ffeb3b; font-weight: 600; font-size: 0.7rem; }}
     
-    /* BARRA DE PROGRESO "GAMIFICADA" (HTML PURO) */
     .progress-wrapper {{ padding: 10px 20px; background: #fff8e1; border-bottom: 1px solid #ffe0b2; }}
     .progress-title {{ 
         display: flex; justify-content: space-between; font-weight: 800; 
@@ -130,7 +123,6 @@ st.markdown(f"""
         transition: width 0.5s ease-in-out;
     }}
     
-    /* BOTÓN FLOTANTE WHATSAPP (SIEMPRE VISIBLE) */
     .wa-float {{
         position: fixed; bottom: 90px; right: 20px;
         background: #25D366; color: white; width: 60px; height: 60px;
@@ -140,7 +132,6 @@ st.markdown(f"""
     }}
     .wa-float:hover {{ transform: scale(1.1) rotate(10deg); }}
     
-    /* TARJETA DE CIERRE (PULSATING) */
     .closing-card {{
         background: linear-gradient(135deg, #d50000 0%, #c62828 100%);
         color: white !important; text-align: center; padding: 18px; 
@@ -155,7 +146,6 @@ st.markdown(f"""
         100% {{ box-shadow: 0 0 0 0 rgba(213, 0, 0, 0); transform: scale(1); }}
     }}
     
-    /* GLOBITOS DE CHAT */
     .stChatMessage {{ border-radius: 15px !important; }}
     </style>
     
@@ -182,7 +172,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 4. CEREBRO IA (MIGUEL EL "CLOSER")
+# 4. CEREBRO IA
 # ==========================================
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
@@ -208,15 +198,11 @@ BASE DE DATOS: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
 META: ${MONTO_OBJETIVO_MAYORISTA}
 
-MISIÓN: CERRAR LA VENTA. NO EXPLICAR.
+MISIÓN: CERRAR LA VENTA.
 1. **PRECIO:** Siempre "+ IVA".
 2. **ESCASEZ:** Usa frases como "Quedan pocos metros", "Precio congela hoy".
-3. **LOGÍSTICA:**
-   - Si está en ZONA GRATIS -> "¡Flete BONIFICADO! (Ahorro importante)".
-   - Si no -> "Busco el envío más barato posible".
-4. **GAMIFICACIÓN (Barra):**
-   - Calcula cuánto falta para ${MONTO_OBJETIVO_MAYORISTA}.
-   - Di: "Estás a solo $X del PRECIO MAYORISTA. ¿Sumamos tornillos?".
+3. **LOGÍSTICA:** Si ZONA GRATIS -> "¡Flete BONIFICADO!".
+4. **GAMIFICACIÓN:** Calcula cuánto falta para ${MONTO_OBJETIVO_MAYORISTA} y dilo.
 
 FORMATO RESPUESTA FINAL:
 [TEXTO_WHATSAPP]:
@@ -232,34 +218,41 @@ if "chat_session" not in st.session_state:
     try:
         model = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt)
         st.session_state.chat_session = model.start_chat(history=[])
-        st.session_state.messages = [{"role": "assistant", "content": "⚡ **Sistema En Vivo.**\n\nEl stock está volando. ¿Qué necesitás cotizar YA?"}]
     except: pass
 
 # ==========================================
-# 5. FLUJO DE CHAT & EVENTOS
+# 5. RENDERIZADO HISTORIAL (PRIMERO)
 # ==========================================
+# 🔥 CORRECCIÓN CLAVE: Renderizar mensajes ANTES de procesar input nuevo
+# Esto asegura que el chat se vea siempre, incluso al recargar.
+for msg in st.session_state.messages:
+    avatar = "👷‍♂️" if msg["role"] == "assistant" else "👤"
+    st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-# Input de Usuario
+# ==========================================
+# 6. INPUT Y PROCESAMIENTO
+# ==========================================
 if prompt := st.chat_input("Ej: 20 Chapas C25 para El Trébol..."):
-    # Backdoor Admin
+    # Admin Backdoor
     if prompt == "#admin-miguel":
         st.session_state.admin_mode = not st.session_state.admin_mode
         st.rerun()
 
-    # 1. Gatillo de Ansiedad (Social Proof Toast)
+    # 1. Globito FOMO (Solo si no es admin)
     if random.random() > 0.5:
         st.toast(random.choice(FRASES_FOMO), icon='🔥')
 
+    # 2. Agregar mensaje usuario a estado visual (inmediato)
     st.session_state.messages.append({"role": "user", "content": prompt})
+    # Dibujarlo manualmente para feedback instantáneo antes del rerun
+    st.chat_message("user").markdown(prompt)
     
-    # Procesamiento IA
+    # 3. Procesamiento IA
     try:
         chat = st.session_state.chat_session
         
-        # UI Placeholder para simular "Escribiendo..."
-        with st.chat_message("user"): st.markdown(prompt)
         with st.chat_message("assistant", avatar="👷‍♂️"):
-            with st.spinner("⚡ Verificando stock en tiempo real..."):
+            with st.spinner("⚡ Verificando stock..."):
                 response = chat.send_message(prompt)
                 full_text = response.text
                 
@@ -267,21 +260,17 @@ if prompt := st.chat_input("Ej: 20 Chapas C25 para El Trébol..."):
                 nuevo_monto = extraer_monto(full_text)
                 if nuevo_monto > 0: st.session_state.monto_acumulado = nuevo_monto
                 
-                # Logging Oculto
                 log_interaction(prompt, full_text, nuevo_monto)
 
-                # Efectos de Victoria
                 if st.session_state.monto_acumulado >= MONTO_OBJETIVO_MAYORISTA:
                     st.balloons()
                     st.toast("🎉 ¡PRECIO MAYORISTA DESBLOQUEADO!", icon="💰")
 
-                # Renderizado Inteligente
                 if "[TEXTO_WHATSAPP]:" in full_text:
                     display, wa_msg = full_text.split("[TEXTO_WHATSAPP]:", 1)
                     st.markdown(display)
                     st.session_state.messages.append({"role": "assistant", "content": display})
                     
-                    # EL BOTÓN "PREDATOR"
                     wa_url = f"https://wa.me/5493401527780?text={urllib.parse.quote(wa_msg.strip())}"
                     st.markdown(f"""
                     <a href="{wa_url}" target="_blank" class="closing-card">
@@ -293,23 +282,19 @@ if prompt := st.chat_input("Ej: 20 Chapas C25 para El Trébol..."):
                     st.markdown(full_text)
                     st.session_state.messages.append({"role": "assistant", "content": full_text})
 
-                # Rerun para que la barra del header se actualice visualmente
+                # Rerun para que la barra del header se actualice
                 time.sleep(0.5) 
                 st.rerun()
 
     except Exception as e:
-        st.error(f"Error de conexión: {e}")
+        st.error(f"Error: {e}")
 
-# Renderizar Historial (Al final para mantener orden visual)
-if not prompt:
-    for msg in st.session_state.messages:
-        avatar = "👷‍♂️" if msg["role"] == "assistant" else "👤"
-        st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
-
-# Panel Admin Oculto
+# ==========================================
+# 7. PANEL ADMIN
+# ==========================================
 if st.session_state.admin_mode:
-    with st.expander("🔐 PANEL ADMIN (DATOS DE SESIÓN)"):
+    with st.expander("🔐 PANEL ADMIN"):
         st.write(st.session_state.log_data)
         if st.session_state.log_data:
             df = pd.DataFrame(st.session_state.log_data)
-            st.download_button("Descargar CSV", df.to_csv(), "leads_miguel.csv")
+            st.download_button("Descargar CSV", df.to_csv(), "leads.csv")
