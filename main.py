@@ -63,7 +63,7 @@ CIUDADES_GRATIS = [
     "PIAMONTE", "VILA", "SAN FRANCISCO"
 ]
 
-TOASTS_EXITO = ["🛒 Calculando peso...", "🔥 Precio x Barra OK", "✅ Agregado", "🏗️ Carga Lista"]
+TOASTS_EXITO = ["🛒 Calculando peso...", "🔥 Precio x Barra OK", "✅ Agregado al pedido", "🏗️ Carga Lista"]
 
 # ==========================================
 # 3. ESTADO
@@ -120,7 +120,6 @@ def parsear_ordenes_bot(texto):
     return items_nuevos
 
 def calcular_negocio():
-    # Timer Check
     now = datetime.datetime.now()
     tiempo_restante = st.session_state.expiry_time - now
     segundos_restantes = int(tiempo_restante.total_seconds())
@@ -167,40 +166,12 @@ subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_re
 porcentaje_barra = 100
 if prox_meta > 0: porcentaje_barra = min((subtotal / prox_meta) * 100, 100)
 
-# ESTADO DE PRECIO VACÍO (EN ESPAÑOL)
 display_precio = f"${total_final:,.0f}" if subtotal > 0 else "🛒 EMPEZÁ A COTIZAR"
 display_iva = "+IVA" if subtotal > 0 else ""
 display_badge = nombre_nivel if subtotal > 0 else "⚡ AHORRÁ YA"
 subtext_badge = f"Ahorro extra: {desc_actual}%" if (oferta_viva and subtotal > 0) else "OFERTA POR TIEMPO LIMITADO"
 
-# JAVASCRIPT
-js_script = f"""
-<script>
-    function startTimer(duration, display) {{
-        var timer = duration, minutes, seconds;
-        var interval = setInterval(function () {{
-            minutes = parseInt(timer / 60, 10);
-            seconds = parseInt(timer % 60, 10);
-
-            minutes = minutes < 10 ? "0" + minutes : minutes;
-            seconds = seconds < 10 ? "0" + seconds : seconds;
-
-            display.textContent = minutes + ":" + seconds;
-
-            if (--timer < 0) {{
-                clearInterval(interval);
-                display.textContent = "00:00";
-            }}
-        }}, 1000);
-    }}
-    setTimeout(function() {{
-        var display = document.getElementById("countdown_display");
-        if (display) {{ startTimer({seg_restantes}, display); }}
-    }}, 500);
-</script>
-"""
-
-# HTML DEL HEADER (CON UNSAFE_ALLOW_HTML)
+# HTML DEL HEADER
 header_html = f"""
     <style>
     .block-container {{ padding-top: 175px !important; padding-bottom: 60px !important; }}
@@ -239,9 +210,29 @@ header_html = f"""
         </div>
         <div class="progress-container"><div class="progress-bar"></div></div>
     </div>
-    {js_script}
+    <script>
+        function startTimer(duration, display) {{
+            var timer = duration, minutes, seconds;
+            var interval = setInterval(function () {{
+                minutes = parseInt(timer / 60, 10);
+                seconds = parseInt(timer % 60, 10);
+                minutes = minutes < 10 ? "0" + minutes : minutes;
+                seconds = seconds < 10 ? "0" + seconds : seconds;
+                display.textContent = minutes + ":" + seconds;
+                if (--timer < 0) {{
+                    clearInterval(interval);
+                    display.textContent = "00:00";
+                }}
+            }}, 1000);
+        }}
+        setTimeout(function() {{
+            var display = document.getElementById("countdown_display");
+            if (display) {{ startTimer({seg_restantes}, display); }}
+        }}, 500);
+    </script>
 """
 
+# AQUI ESTA LA MAGIA: unsafe_allow_html=True
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
