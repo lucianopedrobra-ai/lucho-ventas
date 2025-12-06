@@ -16,7 +16,7 @@ from bs4 import BeautifulSoup
 # ==========================================
 st.set_page_config(
     page_title="Pedro Bravin S.A.",
-    page_icon="🚨",
+    page_icon="🦁", # Icono de LEÓN
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -63,7 +63,7 @@ CIUDADES_GRATIS = [
     "PIAMONTE", "VILA", "SAN FRANCISCO"
 ]
 
-TOASTS_EXITO = ["🛒 Calculando peso...", "🔥 Precio x Barra OK", "✅ Agregado al pedido", "🏗️ Carga Lista"]
+TOASTS_EXITO = ["🛒 ¡ES TUYO!", "🔥 PRECIO CONGELADO", "✅ STOCK RESERVADO", "🏃‍♂️ ¡APURATE!"]
 
 # ==========================================
 # 3. ESTADO
@@ -77,7 +77,8 @@ if "expiry_time" not in st.session_state:
     st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
 
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Pasame tu lista y te armo el presupuesto final."}]
+    # SALUDO INICIAL AGRESIVO
+    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola.** Soy Miguel. Veo que buscás acero.\nPasame la lista YA MISMO que tengo un **lote con precio viejo** a punto de agotarse."}]
 
 # ==========================================
 # 4. BACKEND
@@ -160,37 +161,24 @@ def generar_link_wa(total):
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 5. UI: HEADER Y CSS MEJORADO
+# 5. UI: HEADER (ESTILO FINAL)
 # ==========================================
 subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer, reloj_python = calcular_negocio()
 porcentaje_barra = 100
 if prox_meta > 0: porcentaje_barra = min((subtotal / prox_meta) * 100, 100)
 
-display_precio = f"${total_final:,.0f}" if subtotal > 0 else "🛒 EMPEZÁ A COTIZAR"
+display_precio = f"${total_final:,.0f}" if subtotal > 0 else "🛒 COTIZAR AHORA"
 display_iva = "+IVA" if subtotal > 0 else ""
-display_badge = nombre_nivel if subtotal > 0 else "⚡ AHORRÁ YA"
+display_badge = nombre_nivel if subtotal > 0 else "⚡ 3% EXTRA YA"
 subtext_badge = f"Ahorro extra: {desc_actual}%" if (oferta_viva and subtotal > 0) else "OFERTA POR TIEMPO LIMITADO"
 
 header_html = f"""
     <style>
-    /* AJUSTE DE CONTENEDOR PRINCIPAL: MAS ESPACIO ARRIBA Y ABAJO */
-    .block-container {{ 
-        padding-top: 170px !important; 
-        padding-bottom: 120px !important; /* Espacio extra abajo para el input */
-    }}
-    
+    .block-container {{ padding-top: 170px !important; padding-bottom: 120px !important; }}
     [data-testid="stSidebar"] {{ display: none; }} 
     
-    /* HEADER FIJO EN EL TOPE */
-    .fixed-header {{
-        position: fixed; top: 0; left: 0; width: 100%; 
-        background: white; z-index: 100000;
-        border-bottom: 4px solid {color_barra}; height: 95px;
-    }}
-    
-    /* PESTAÑAS (TABS) JUSTO DEBAJO DEL HEADER */
     .stTabs [data-baseweb="tab-list"] {{
-        position: fixed; top: 95px; left: 0; width: 100%; 
+        position: fixed; top: 110px; left: 0; width: 100%; 
         background: white; z-index: 99999;
         display: flex; justify-content: space-around;
         box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
@@ -198,32 +186,47 @@ header_html = f"""
     }}
     .stTabs [data-baseweb="tab"] {{ flex: 1; text-align: center; padding: 10px; font-weight: bold; font-size: 0.9rem; }}
     
-    /* BARRA DE TEXTO (CHAT INPUT) ANCLADA ABAJO */
+    .fixed-header {{
+        position: fixed; top: 0; left: 0; width: 100%; 
+        background: white; z-index: 100000;
+        border-bottom: 4px solid {color_barra}; 
+        height: 110px;
+    }}
+    
     [data-testid="stChatInput"] {{
-        position: fixed; 
-        bottom: 0; 
-        left: 0; 
-        width: 100%; 
-        padding: 10px; 
-        background: white; 
-        z-index: 100000;
+        position: fixed; bottom: 0; left: 0; width: 100%; padding: 10px; background: white; z-index: 100000;
         box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
     }}
     
-    /* RESTO DE ESTILOS DEL HEADER */
-    .top-strip {{ background: #111; color: #fff; padding: 5px 15px; display: flex; justify-content: space-between; font-size: 0.75rem; align-items: center; }}
-    .cart-summary {{ padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; }}
+    .top-strip {{ 
+        background: #111; color: #fff; 
+        padding: 15px 15px 5px 15px; 
+        display: flex; justify-content: space-between; 
+        font-size: 0.75rem; align-items: center; 
+    }}
+    
+    .cart-summary {{ padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; }}
     .price-tag {{ font-size: 1.5rem; font-weight: 900; color: #333; }}
     .badge {{ background: {color_barra}; color: white; padding: 4px 12px; border-radius: 4px; font-size: 0.75rem; font-weight: 900; text-transform: uppercase; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }}
-    .timer-box {{ color: {color_timer}; font-weight: 900; font-size: 0.8rem; background: #fff; padding: 2px 8px; border-radius: 4px; margin-left: 5px; }}
+    
+    .timer-container {{ display: flex; align-items: center; gap: 5px; }}
+    .timer-box {{ 
+        color: {color_timer}; font-weight: 900; font-size: 0.9rem; 
+        background: #fff; padding: 2px 8px; border-radius: 4px; 
+        border: 1px solid {color_timer};
+    }}
+    
     .progress-container {{ width: 100%; height: 6px; background: #eee; position: absolute; bottom: 0; }}
     .progress-bar {{ height: 100%; width: {porcentaje_barra}%; background: {color_barra}; transition: width 0.8s ease-out; }}
     </style>
     
     <div class="fixed-header">
         <div class="top-strip">
-            <span>🔥 PEDRO BRAVIN S.A.</span>
-            <span>⏱️ EXPIRA EN: <span id="countdown_display" class="timer-box">{reloj_python}</span></span>
+            <div class="timer-container">
+                <span>⏱️ EXPIRA:</span>
+                <span id="countdown_display" class="timer-box">{reloj_python}</span>
+            </div>
+            <span style="margin-right: 30px;">🔥 PEDRO BRAVIN S.A.</span>
         </div>
         <div class="cart-summary">
             <div>
@@ -261,38 +264,33 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA
+# 6. CEREBRO IA (MODO LEÓN DEPREDADOR)
 # ==========================================
 try: genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 except: st.error("Falta API KEY")
 
 sys_prompt = f"""
-ROL: Miguel, vendedor técnico experto en aceros.
+ROL: Miguel, vendedor agresivo "Lobo de Wall Street" de Pedro Bravin S.A.
 DB: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
 # DATO INTERNO: DOLAR = {DOLAR_BNA}
 
 🧮 **REGLAS MATEMÁTICAS INMUTABLES:**
-Los precios CSV pueden ser en Dólares. Multiplica por {DOLAR_BNA} para PESOS.
+1. IPN/UPN/PERFIL C (12m): `(Peso_metro * 12) * Precio_CSV * {DOLAR_BNA}`
+2. TREFILADOS (6m): `Peso_Total_Barra * Precio_CSV * {DOLAR_BNA}`
+3. CAÑOS (6.40m): `(Peso_metro * 6.40) * Precio_CSV * {DOLAR_BNA}`
+4. TUBOS ESTRUCTURALES (6m): `Precio_CSV * {DOLAR_BNA}`
+5. FLETE: Lejos = `(KM * 2 * {COSTO_FLETE_USD} * {DOLAR_BNA})`.
 
-1. **IPN / UPN / PERFIL C (12m):**
-   - CSV: Precio x Kilo. Descripción: Peso x Metro.
-   - 🧮 CUENTA: `(Peso_metro * 12) * Precio_CSV * {DOLAR_BNA}`
+🦁 **PERSONALIDAD DEPREDADORA (CIERRE):**
+- **ACTITUD:** No pidas permiso. ASUME LA VENTA.
+- **PROHIBIDO:** Decir "Aquí tienes el presupuesto".
+- **OBLIGATORIO:** Decir "¡Listo! Ya te separé el material. ¿Te lo facturo ahora para congelar el precio?".
+- **URGENCIA:** "Me queda poco stock de este lote, confirmame YA".
+- **CIERRE DOBLE ALTERNATIVA:** "¿Te lo envío o lo pasás a buscar?".
 
-2. **ÁNGULOS / PLANCHUELAS / HIERRO T / REDONDOS (6m):**
-   - CSV: Precio x Kilo. Descripción: **PESO TOTAL BARRA**.
-   - 🧮 CUENTA: `Peso_Total_Barra * Precio_CSV * {DOLAR_BNA}`
-
-3. **CAÑOS (Epoxi, Galv, Sched, Mec) (6.40m):**
-   - CSV: Precio x Kilo. Descripción: Peso x Metro.
-   - 🧮 CUENTA: `(Peso_metro * 6.40) * Precio_CSV * {DOLAR_BNA}`
-
-4. **TUBOS ESTRUCTURALES (6m):**
-   - CSV: Precio x BARRA.
-   - 🧮 CUENTA: `Precio_CSV * {DOLAR_BNA}`
-
-5. **FLETE:**
-   - Si es lejos, calcula: `(KM * 2 * {COSTO_FLETE_USD} * {DOLAR_BNA})`.
+🕵️‍♂️ AMBIGÜEDAD:
+- Si falta variante (Negro/Galv) -> PREGUNTA SECA: "¿Negro o Galvanizado?".
 
 SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_PESOS_BARRA:TIPO]
 """
@@ -301,7 +299,7 @@ if "chat_session" not in st.session_state:
     st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
 
 def procesar_vision(img):
-    return st.session_state.chat_session.send_message(["Analiza lista. APLICA FÓRMULAS MATEMÁTICAS DE PESO. Genera comandos [ADD...] con precio final de barra.", img]).text
+    return st.session_state.chat_session.send_message(["Analiza lista. COTIZA Y PRESIONA EL CIERRE YA MISMO.", img]).text
 
 # ==========================================
 # 7. INTERFAZ TABS
@@ -321,12 +319,12 @@ with tab1:
         if img_val is not None:
             file_id = f"{img_val.name}_{img_val.size}"
             if st.session_state.last_processed_file != file_id:
-                with st.spinner("👀 Analizando y calculando..."):
+                with st.spinner("👀 Analizando y cerrando venta..."):
                     full_text = procesar_vision(Image.open(img_val))
                     news = parsear_ordenes_bot(full_text)
                     st.session_state.messages.append({"role": "assistant", "content": full_text})
                     st.session_state.last_processed_file = file_id
-                    if news: st.toast("🔥 Precios Calculados", icon='✅')
+                    if news: st.toast("🔥 Productos Cargados", icon='✅')
                     log_interaction("FOTO AUTO", total_final)
                     st.rerun()
 
@@ -344,7 +342,10 @@ with tab1:
         with st.chat_message("assistant", avatar="👷‍♂️"):
             with st.spinner("Cotizando..."):
                 try:
-                    response = st.session_state.chat_session.send_message(prompt)
+                    # PROMPT INYECTADO PARA FORZAR CIERRE EN CADA TURNO
+                    prompt_con_presion = f"{prompt}. (NOTA INTERNA: Cierra la venta YA. Usa técnica de doble alternativa o escasez. NO seas pasivo)."
+                    
+                    response = st.session_state.chat_session.send_message(prompt_con_presion)
                     full_text = response.text
                     news = parsear_ordenes_bot(full_text)
                     display = re.sub(r'\[ADD:.*?\]', '', full_text)
@@ -354,7 +355,7 @@ with tab1:
                         st.toast(random.choice(TOASTS_EXITO), icon='🛒')
                         st.markdown(f"""
                         <div style="background:#e8f5e9; padding:10px; border-radius:10px; border:1px solid #25D366; margin-top:5px;">
-                            <strong>✅ {len(news)} items agregados.</strong><br>
+                            <strong>✅ {len(news)} items reservados.</strong><br>
                             <span style="font-size:0.85rem">💰 Total: ${total_final:,.0f} | ⏳ Quedan {reloj_python} min</span>
                         </div>
                         """, unsafe_allow_html=True)
