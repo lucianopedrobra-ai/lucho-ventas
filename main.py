@@ -15,7 +15,7 @@ from PIL import Image
 # ==========================================
 st.set_page_config(
     page_title="Pedro Bravin S.A.",
-    page_icon="🔥", # Icono de fuego para modo venta
+    page_icon="🔥",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -40,14 +40,7 @@ CIUDADES_GRATIS = [
     "PIAMONTE", "VILA", "SAN FRANCISCO"
 ]
 
-# FRASES PARA EL "TOAST" (NOTIFICACIÓN FLOTANTE)
-TOASTS_EXITO = [
-    "🛒 ¡Al carrito! Buen precio.",
-    "🔥 ¡Boom! Agregado.",
-    "✅ Stock reservado (por ahora).",
-    "🏃‍♂️ ¡Apurate antes que suba!",
-    "🏗️ Material cargado."
-]
+TOASTS_EXITO = ["🛒 Actualizado", "🔥 ¡Boom! Listo", "✅ Modificado", "✏️ Editado"]
 
 # ==========================================
 # 2. ESTADO
@@ -57,7 +50,7 @@ if "log_data" not in st.session_state: st.session_state.log_data = []
 if "admin_mode" not in st.session_state: st.session_state.admin_mode = False
 if "last_processed_file" not in st.session_state: st.session_state.last_processed_file = None
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Pasame tu lista escrita o subí foto."}]
+    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Escribí tu pedido o subí foto."}]
 
 # ==========================================
 # 3. BACKEND
@@ -71,13 +64,7 @@ csv_context = load_data()
 
 def enviar_a_google_form_background(cliente, monto, oportunidad):
     if URL_FORM_GOOGLE:
-        try: 
-            requests.post(URL_FORM_GOOGLE, data={
-                ID_CAMPO_CLIENTE: str(cliente), 
-                ID_CAMPO_MONTO: str(monto), 
-                ID_CAMPO_OPORTUNIDAD: str(oportunidad)
-            }, timeout=1)
-        except: pass
+        try: requests.post(URL_FORM_GOOGLE, data={ID_CAMPO_CLIENTE: str(cliente), ID_CAMPO_MONTO: str(monto), ID_CAMPO_OPORTUNIDAD: str(oportunidad)}, timeout=1); except: pass
 
 def log_interaction(user_text, monto):
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -87,7 +74,6 @@ def log_interaction(user_text, monto):
 
 def parsear_ordenes_bot(texto):
     items_nuevos = []
-    # Regex robusta
     for cant, prod, precio, tipo in re.findall(r'\[ADD:([\d\.]+):([^:]+):([\d\.]+):([^\]]+)\]', texto):
         item = {
             "cantidad": float(cant), 
@@ -104,7 +90,6 @@ def calcular_negocio():
     bruto = sum(i['subtotal'] for i in st.session_state.cart)
     desc = 3; color = "#546e7a"; nivel = "INICIAL"; siguiente_meta = 500000
     
-    # LÓGICA DE NIVELES TEMU
     tiene_gancho = any(x['tipo'] in ['CHAPA', 'PERFIL', 'HIERRO', 'CAÑO'] for x in st.session_state.cart)
     
     if tiene_gancho:
@@ -114,7 +99,6 @@ def calcular_negocio():
     elif bruto > 1500000:
         desc = 10; nivel = "🏗️ OBRA"; color = "#f57c00"; siguiente_meta = 3000000
     else:
-        # Nivel inicial
         siguiente_meta = 1500000
     
     neto = bruto * (1 - (desc/100))
@@ -126,14 +110,11 @@ def generar_link_wa(total):
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 4. UI: HEADER FIJO + TABS
+# 4. UI: HEADER FIJO
 # ==========================================
 subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta = calcular_negocio()
-
-# Cálculo barra de progreso para efecto visual
 porcentaje_barra = 100
-if prox_meta > 0:
-    porcentaje_barra = min((subtotal / prox_meta) * 100, 100)
+if prox_meta > 0: porcentaje_barra = min((subtotal / prox_meta) * 100, 100)
 
 st.markdown(f"""
     <style>
@@ -153,11 +134,9 @@ st.markdown(f"""
     .top-strip {{ background: #111; color: #fff; padding: 6px 15px; display: flex; justify-content: space-between; font-size: 0.75rem; }}
     .cart-summary {{ padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; }}
     .price-tag {{ font-size: 1.3rem; font-weight: 900; color: #333; }}
-    .badge {{ background: {color_barra}; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; }}
+    .badge {{ background: {color_barra}; color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; }}
     .warning-text {{ color: #ffeb3b; font-weight: bold; font-size: 0.7rem; animation: pulse-yellow 2s infinite; }}
     @keyframes pulse-yellow {{ 0% {{ opacity: 0.8; }} 50% {{ opacity: 1; }} 100% {{ opacity: 0.8; }} }}
-    
-    /* Barra animada estilo videojuego */
     .progress-container {{ width: 100%; height: 6px; background: #eee; }}
     .progress-bar {{ height: 100%; width: {porcentaje_barra}%; background: {color_barra}; transition: width 1s ease-out; box-shadow: 0 0 10px {color_barra}; }}
     </style>
@@ -178,7 +157,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 5. CEREBRO IA (REGLAS Y VENTAS)
+# 5. CEREBRO IA
 # ==========================================
 try: genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 except: st.error("Falta API KEY")
@@ -188,30 +167,26 @@ ROL: Miguel, vendedor experto de Pedro Bravin S.A.
 DB: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
 
-📜 REGLAS INMUTABLES (DO NOT TOUCH):
+📜 REGLAS INMUTABLES:
 1. **LARGOS:** 12m (Perfiles/Hierro), 6.40m (Caños Epoxi/Galv), 6m (Resto).
-2. **UNIDADES:** KG (Clavos/Alambre), UNIDAD (Mallas), ROLLO (Agro).
+2. **UNIDADES:** KG (Clavos), UNIDAD (Mallas), ROLLO (Agro).
 3. **CHAPAS:** Acanalada=COD4, T101=COD6, Sin corte=METRO.
 4. **PESOS:** Número al final de descripción es PESO (KG).
 5. **LOGÍSTICA:** Gratis en Zona. Resto Estimado. Retiro en Planta.
 6. **DISCLAIMER:** Cotización estimada.
 
-🕵️‍♂️ PROTOCOLO DE AMBIGÜEDAD (CRÍTICO):
-- Si el usuario NO especifica variante (Ej: pide "Perfil C" sin decir Negro o Galv):
-  🛑 **NO COTICES.** Pregunta: "¿Lo buscás Negro o Galvanizado?".
-- Si pide "Antióxido", busca esa palabra exacta. Si hay varios, elige el intermedio y avisa.
+🕵️‍♂️ PROTOCOLO AMBIGÜEDAD:
+- Si no especifican variante (Negro/Galv) -> PREGUNTAR. No cotizar.
+- Si piden "Antióxido", buscar coincidencia exacta y ofrecer alternativas.
 
-INSTRUCCIONES DE SALIDA:
-- Si hay dudas -> Pregunta.
-- Si cotizas -> Usa emojis. Sé vendedor. **DILE AL CLIENTE QUE REVISE SU CARRITO.**
-- SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO:TIPO]
+SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO:TIPO]
 """
 
 if "chat_session" not in st.session_state:
     st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
 
 def procesar_vision(img):
-    return st.session_state.chat_session.send_message(["Analiza lista. Si hay ambigüedad, PREGUNTA. Si está claro, genera comandos [ADD...] y confirma.", img]).text
+    return st.session_state.chat_session.send_message(["Analiza lista. Pregunta ambigüedades o genera comandos.", img]).text
 
 # ==========================================
 # 6. INTERFAZ TABS
@@ -219,38 +194,28 @@ def procesar_vision(img):
 tab1, tab2 = st.tabs(["💬 COTIZAR", f"🛒 MI PEDIDO ({len(st.session_state.cart)})"])
 
 with tab1:
-    # --- FOTO AUTOMÁTICA ---
     with st.expander("📷 **Subir Foto de Lista**", expanded=False):
         img_val = st.file_uploader("", type=["jpg","png","jpeg"], label_visibility="collapsed")
-        
         if img_val is not None:
             file_id = f"{img_val.name}_{img_val.size}"
             if st.session_state.last_processed_file != file_id:
                 with st.spinner("👀 Miguel está leyendo tu foto..."):
                     full_text = procesar_vision(Image.open(img_val))
                     news = parsear_ordenes_bot(full_text)
-                    
                     st.session_state.messages.append({"role": "assistant", "content": full_text})
                     st.session_state.last_processed_file = file_id
-                    
-                    # FEEDBACK VISUAL POTENTE
-                    if news:
-                        st.toast(random.choice(TOASTS_EXITO), icon='🎉')
-                        if desc_actual >= 15: st.balloons()
-                    
+                    if news: st.toast("🔥 Productos Cargados!", icon='🛒')
                     log_interaction("FOTO AUTO", total_final)
                     st.rerun()
 
-    # --- HISTORIAL ---
     for m in st.session_state.messages:
         if m["role"] != "system":
             clean = re.sub(r'\[ADD:.*?\]', '', m["content"]).strip()
             if clean: st.chat_message(m["role"], avatar="👷‍♂️" if m["role"]=="assistant" else "👤").markdown(clean)
 
-    # --- INPUT TEXTO ---
     if prompt := st.chat_input("Escribí tu pedido acá..."):
         if prompt == "#admin-miguel": st.session_state.admin_mode = not st.session_state.admin_mode; st.rerun()
-        if random.random() > 0.7: st.toast("🔥 Mucha demanda hoy en perfiles", icon='⚡')
+        if random.random() > 0.7: st.toast("🔥 Alta demanda en chapas", icon='⚡')
 
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.chat_message("user").markdown(prompt)
@@ -261,59 +226,71 @@ with tab1:
                     response = st.session_state.chat_session.send_message(prompt)
                     full_text = response.text
                     news = parsear_ordenes_bot(full_text)
-                    
                     display = re.sub(r'\[ADD:.*?\]', '', full_text)
                     st.markdown(display)
                     
-                    # --- AQUÍ ESTÁ EL EFECTO TEMU / CIERRE ---
                     if news:
                         st.toast(random.choice(TOASTS_EXITO), icon='🛒')
                         st.success(f"✅ ¡Agregué {len(news)} productos! Revisa tu pedido.")
-                        
-                        # Tarjeta de acción rápida
                         st.markdown(f"""
                         <div style="border:1px solid #25D366; background:#e8f5e9; padding:10px; border-radius:10px; text-align:center; margin-top:5px;">
                             <strong>Total Actual: ${total_final:,.0f}</strong><br>
-                            <span style="font-size:0.8rem">👉 Tocá la pestaña 'MI PEDIDO' para finalizar</span>
+                            <span style="font-size:0.8rem">👉 Tocá la pestaña 'MI PEDIDO' para editar o finalizar</span>
                         </div>
                         """, unsafe_allow_html=True)
-                        
-                        # Si desbloqueó descuento groso
-                        if desc_actual >= 15 and len(st.session_state.cart) > 1:
-                            st.balloons()
+                        if desc_actual >= 15 and len(st.session_state.cart) > 1: st.balloons()
 
                     st.session_state.messages.append({"role": "assistant", "content": full_text})
-                    
-                    total_nuevo = sum(i['subtotal'] for i in st.session_state.cart) * (1 - (desc_actual/100))
-                    log_interaction(prompt, total_nuevo)
-                    
-                    # Forzamos rerun para que se limpie el input y se actualice el header
-                    if news: 
-                        time.sleep(1.5) # Le damos tiempo a leer la notificación
-                        st.rerun()
-                        
+                    log_interaction(prompt, total_final)
+                    if news: time.sleep(1.5); st.rerun()
                 except Exception as e: st.error(f"Error: {e}")
 
+# --- PESTAÑA CARRITO EDITABLE (V24) ---
 with tab2:
     if not st.session_state.cart:
         st.info("Tu carrito está vacío. ¡Escribile a Miguel para llenarlo!")
     else:
-        st.markdown(f"### 📋 Tu Pedido ({len(st.session_state.cart)} items)")
+        st.markdown(f"### 📋 Editá tu Pedido ({len(st.session_state.cart)} items)")
         
         for i, item in enumerate(st.session_state.cart):
-            st.markdown(f"""
-            <div style="background:white; border-left: 4px solid {color_barra}; border-radius:5px; padding:10px; margin-bottom:8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                <div style="font-weight:bold; font-size:0.95rem;">{item['cantidad']}x {item['producto']}</div>
-                <div style="display:flex; justify-content:space-between; color:#555; margin-top:4px;">
-                    <span style="font-size:0.85rem;">C/U: ${item['precio_unit']:,.0f}</span>
-                    <span style="font-weight:bold; color:#0f2c59;">${item['subtotal']:,.0f}</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            if st.button(f"🗑️ Quitar item", key=f"d{i}"): st.session_state.cart.pop(i); st.rerun()
+            # Layout de Tarjeta Editable
+            with st.container():
+                c1, c2, c3 = st.columns([3, 1.5, 0.5])
+                
+                with c1:
+                    st.markdown(f"**{item['producto']}**")
+                    st.caption(f"C/U: ${item['precio_unit']:,.0f}")
+                
+                with c2:
+                    # INPUT NUMÉRICO PARA EDITAR CANTIDAD
+                    nueva_cant = st.number_input(
+                        "Cant", 
+                        min_value=0.0, 
+                        value=float(item['cantidad']), 
+                        step=1.0,
+                        key=f"qty_{i}", 
+                        label_visibility="collapsed"
+                    )
+                    
+                    # Lógica de Actualización en Tiempo Real
+                    if nueva_cant != item['cantidad']:
+                        if nueva_cant == 0:
+                            st.session_state.cart.pop(i)
+                            st.toast("🗑️ Producto eliminado")
+                        else:
+                            st.session_state.cart[i]['cantidad'] = nueva_cant
+                            st.session_state.cart[i]['subtotal'] = nueva_cant * item['precio_unit']
+                            st.toast("✏️ Cantidad actualizada")
+                        time.sleep(0.5)
+                        st.rerun()
 
-        st.divider()
-        
+                with c3:
+                    if st.button("🗑️", key=f"del_{i}"):
+                        st.session_state.cart.pop(i)
+                        st.rerun()
+                
+                st.markdown("---") # Separador
+
         # RESUMEN FINAL
         col_res1, col_res2 = st.columns(2)
         col_res1.write("Subtotal:")
