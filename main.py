@@ -20,7 +20,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- VARIABLES ---
+# --- VARIABLES DE NEGOCIO ---
 DOLAR_BNA = 1060.00
 COSTO_FLETE_USD = 0.85 
 CONDICION_PAGO = "Contado/Transferencia"
@@ -40,6 +40,14 @@ CIUDADES_GRATIS = [
     "PIAMONTE", "VILA", "SAN FRANCISCO"
 ]
 
+FRASES_FOMO = [
+    "🔥 Stock bajo en este ítem.",
+    "⚡ 2 clientes están llevando esto.",
+    "🚚 Salida de camión programada.",
+    "📉 Precio congelado por 1 hora.",
+    "💎 Oferta exclusiva web."
+]
+
 # ==========================================
 # 2. ESTADO
 # ==========================================
@@ -47,10 +55,10 @@ if "cart" not in st.session_state: st.session_state.cart = []
 if "log_data" not in st.session_state: st.session_state.log_data = []
 if "admin_mode" not in st.session_state: st.session_state.admin_mode = False
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica."}]
+    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Escribí tu pedido o subí una foto de la lista."}]
 
 # ==========================================
-# 3. BACKEND
+# 3. BACKEND (LÓGICA)
 # ==========================================
 @st.cache_data(ttl=600)
 def load_data():
@@ -77,7 +85,7 @@ def log_interaction(user_text, monto):
 
 def parsear_ordenes_bot(texto):
     items_nuevos = []
-    # Regex robusta para decimales
+    # Regex robusta
     for cant, prod, precio, tipo in re.findall(r'\[ADD:([\d\.]+):([^:]+):([\d\.]+):([^\]]+)\]', texto):
         item = {
             "cantidad": float(cant), 
@@ -114,12 +122,12 @@ pct_barra = min(total_final / 3000000 * 100, 100)
 
 st.markdown(f"""
     <style>
-    .block-container {{ padding-top: 120px !important; padding-bottom: 90px !important; }}
+    .block-container {{ padding-top: 130px !important; padding-bottom: 90px !important; }}
     [data-testid="stSidebar"] {{ display: none; }} 
     
     /* PESTAÑAS ESTILO APP */
     .stTabs [data-baseweb="tab-list"] {{
-        position: fixed; top: 70px; left: 0; width: 100%; background: white; z-index: 9999;
+        position: fixed; top: 80px; left: 0; width: 100%; background: white; z-index: 9999;
         display: flex; justify-content: space-around; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
     }}
     .stTabs [data-baseweb="tab"] {{ flex: 1; text-align: center; padding: 10px; font-weight: bold; font-size: 0.9rem; }}
@@ -165,7 +173,7 @@ ZONA GRATIS: {CIUDADES_GRATIS}
 5. **DISCLAIMER:** Cotización estimada.
 
 INSTRUCCIONES:
-- Analiza TEXTO, IMAGEN o AUDIO.
+- Analiza TEXTO o IMAGEN.
 - Identifica productos y cantidades.
 - Aplica reglas técnicas (si piden metros de caño, calcula barras).
 - SALIDA: [ADD:CANTIDAD:PRODUCTO:PRECIO:TIPO]
@@ -174,56 +182,44 @@ INSTRUCCIONES:
 if "chat_session" not in st.session_state:
     st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
 
+def procesar_vision(img):
+    return st.session_state.chat_session.send_message(["Analiza lista. APLICA REGLAS. Genera [ADD...]. SOLO CONFIRMA.", img]).text
+
 # ==========================================
-# 6. INTERFAZ TABS
+# 6. INTERFAZ TABS (SOLO TEXTO Y FOTO)
 # ==========================================
 tab1, tab2 = st.tabs(["💬 COTIZAR", f"🛒 MI PEDIDO ({len(st.session_state.cart)})"])
 
 with tab1:
-    # 1. AUDIO NATIVO (EL MÁS IMPORTANTE)
-    st.markdown("##### 🎙️ ¿Qué estás buscando?")
-    audio_val = st.audio_input("Grabar pedido (Tocar para grabar)")
-
-    # 2. INPUTS SECUNDARIOS
+    # --- INPUT FOTO (DISCRETO) ---
     with st.expander("📷 **Subir Foto de Lista**", expanded=False):
         img_val = st.file_uploader("", type=["jpg","png","jpeg"], label_visibility="collapsed")
         if img_val and st.button("Procesar Foto", type="primary"):
             with st.spinner("👀 Analizando lista..."):
-                prompt_con_instruccion = ["Analiza lista. Genera comandos [ADD...].", Image.open(img_val)]
-                response = st.session_state.chat_session.send_message(prompt_con_instruccion)
-                news = parsear_ordenes_bot(response.text)
-                if news:
-                    st.success(f"✅ Se cargaron {len(news)} productos.")
-                    time.sleep(1); st.rerun()
+                full_text = procesar_vision(Image.open(img_val))
+                news = parsear_ordenes_bot(full_text)
+                st.session_state.messages.append({"role": "assistant", "content": full_text})
+                log_interaction("FOTO", total_final)
+                st.rerun()
 
-    # 3. HISTORIAL CHAT
+    # --- HISTORIAL CHAT ---
     for m in st.session_state.messages:
         if m["role"] != "system":
             clean = re.sub(r'\[ADD:.*?\]', '', m["content"]).strip()
             if clean: st.chat_message(m["role"], avatar="👷‍♂️" if m["role"]=="assistant" else "👤").markdown(clean)
 
-    # 4. TEXT INPUT (ABAJO DEL TODO)
-    text_val = st.chat_input("O escribí tu pedido acá...")
+    # --- INPUT TEXTO PRINCIPAL ---
+    if prompt := st.chat_input("Escribí tu pedido acá..."):
+        if prompt == "#admin-miguel": st.session_state.admin_mode = not st.session_state.admin_mode; st.rerun()
+        if random.random() > 0.7: st.toast(random.choice(FRASES_FOMO), icon='🔥')
 
-    # LÓGICA DE PROCESAMIENTO CENTRAL
-    prompt_to_send = None
-    
-    if audio_val:
-        # Si hay audio, lo procesamos
-        prompt_to_send = {"mime_type": "audio/wav", "data": audio_val.read()}
-        user_msg = "🎤 *Nota de voz enviada*"
-    elif text_val:
-        prompt_to_send = text_val
-        user_msg = text_val
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.chat_message("user").markdown(prompt)
 
-    if prompt_to_send:
-        st.session_state.messages.append({"role": "user", "content": user_msg})
-        st.chat_message("user").markdown(user_msg)
-        
         with st.chat_message("assistant", avatar="👷‍♂️"):
             with st.spinner("Cotizando..."):
                 try:
-                    response = st.session_state.chat_session.send_message([prompt_to_send] if isinstance(prompt_to_send, dict) else prompt_to_send)
+                    response = st.session_state.chat_session.send_message(prompt)
                     full_text = response.text
                     news = parsear_ordenes_bot(full_text)
                     
@@ -232,11 +228,12 @@ with tab1:
                     
                     if news:
                         st.dataframe(pd.DataFrame(news)[['cantidad','producto','precio_unit']], hide_index=True)
-                        time.sleep(2) # Tiempo para leer antes de recargar
-                        st.rerun()
+                        time.sleep(1); st.rerun()
                         
                     st.session_state.messages.append({"role": "assistant", "content": full_text})
-                    log_interaction("INPUT", total_final)
+                    
+                    total_nuevo = sum(i['subtotal'] for i in st.session_state.cart) * (1 - (desc_actual/100))
+                    log_interaction(prompt, total_nuevo)
                 except Exception as e: st.error(f"Error: {e}")
 
 with tab2:
