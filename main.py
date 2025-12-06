@@ -9,63 +9,49 @@ import threading
 import time
 import random
 from PIL import Image
-from bs4 import BeautifulSoup # Necesario para leer la web del BNA
+from bs4 import BeautifulSoup
 
 # ==========================================
 # 1. CONFIGURACIÓN
 # ==========================================
 st.set_page_config(
     page_title="Pedro Bravin S.A.",
-    page_icon="💸",
+    page_icon="🚨",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 # ==========================================
-# 2. MOTOR DE COTIZACIÓN (DÓLAR LIVE)
+# 2. MOTOR INVISIBLE
 # ==========================================
-@st.cache_data(ttl=3600) # Se actualiza cada 1 hora para no saturar
+@st.cache_data(ttl=3600)
 def obtener_dolar_bna():
     url = "https://www.bna.com.ar/Personas"
-    backup_value = 1060.00 # Valor de seguridad por si falla la web
-    
+    backup = 1060.00
     try:
-        # 1. Intentamos leer la web oficial
         headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=5)
-        
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
-            # Buscamos la tabla de billetes (Suele estar en un div con id 'billetes' o tabla genérica)
-            # Estrategia: Buscar el texto "Dolar U.S.A" y tomar el siguiente valor de Venta
+        r = requests.get(url, headers=headers, timeout=5)
+        if r.status_code == 200:
+            soup = BeautifulSoup(r.content, 'html.parser')
             target = soup.find(string=re.compile("Dolar U.S.A"))
-            
             if target:
-                # Navegamos al valor de venta (suele ser el 2do <td> después del nombre)
                 row = target.find_parent('tr')
                 cols = row.find_all('td')
                 if len(cols) >= 3:
-                    valor_texto = cols[2].get_text().replace(',', '.')
-                    return float(valor_texto)
-                    
-        return backup_value
-    except Exception as e:
-        # Si falla (web caída), usamos respaldo
-        return backup_value
+                    return float(cols[2].get_text().replace(',', '.'))
+        return backup
+    except: return backup
 
-# --- VARIABLES ---
-DOLAR_BNA = obtener_dolar_bna() # ¡AHORA ES DINÁMICO!
+DOLAR_BNA = obtener_dolar_bna() 
 COSTO_FLETE_USD = 0.85 
 CONDICION_PAGO = "Contado/Transferencia"
 SHEET_ID = "2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvnarDQ"
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/e/{SHEET_ID}/pub?gid=2029869540&single=true&output=csv"
-URL_FORM_GOOGLE = "" # 🔴 PEGAR LINK FORM AQUI
+URL_FORM_GOOGLE = "" # 🔴 PEGAR LINK AQUI
 ID_CAMPO_CLIENTE = "entry.xxxxxx"
 ID_CAMPO_MONTO = "entry.xxxxxx"
 ID_CAMPO_OPORTUNIDAD = "entry.xxxxxx"
 
-# TIEMPO LIMITE (10 MINUTOS)
 MINUTOS_OFERTA = 10 
 
 CIUDADES_GRATIS = [
@@ -87,12 +73,12 @@ if "log_data" not in st.session_state: st.session_state.log_data = []
 if "admin_mode" not in st.session_state: st.session_state.admin_mode = False
 if "last_processed_file" not in st.session_state: st.session_state.last_processed_file = None
 
-# Timer
+# Timer Fijo en el servidor (para que no hagan trampa)
 if "expiry_time" not in st.session_state:
     st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
 
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": f"👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica.\n💵 **Dólar BNA Hoy:** ${DOLAR_BNA:,.2f}"}]
+    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Pasame tu lista y aprovechá el descuento por tiempo limitado."}]
 
 # ==========================================
 # 4. BACKEND
@@ -135,58 +121,79 @@ def parsear_ordenes_bot(texto):
     return items_nuevos
 
 def calcular_negocio():
-    # Timer Check
+    # Timer Check (Backend)
     now = datetime.datetime.now()
     tiempo_restante = st.session_state.expiry_time - now
     segundos_restantes = int(tiempo_restante.total_seconds())
-    oferta_activa = segundos_restantes > 0
+    activa = segundos_restantes > 0
     
-    if oferta_activa:
-        mins, secs = divmod(segundos_restantes, 60)
-        reloj_str = f"{mins:02d}:{secs:02d}"
-        color_reloj = "#2e7d32" if mins > 2 else "#d32f2f"
-    else:
-        reloj_str = "00:00"
-        color_reloj = "#b0bec5"
+    # Colores para el JS
+    color_reloj = "#2e7d32" if segundos_restantes > 120 else "#d32f2f" # Rojo si quedan menos de 2 min
 
     bruto = sum(i['subtotal'] for i in st.session_state.cart)
-    desc = 0; color = "#546e7a"; nivel = "PRECIO LISTA (EXPIRÓ)"; siguiente_meta = 1500000
+    desc = 0; color = "#546e7a"; nivel = "PRECIO LISTA (EXPIRÓ)"; meta = 1500000
     
-    tiene_gancho = any(x['tipo'] in ['CHAPA', 'PERFIL', 'HIERRO', 'CAÑO'] for x in st.session_state.cart)
+    gancho = any(x['tipo'] in ['CHAPA', 'PERFIL', 'HIERRO', 'CAÑO'] for x in st.session_state.cart)
     
-    if oferta_activa:
-        if bruto > 5000000:
-            desc = 18; nivel = "👑 PARTNER MAX (18%)"; color = "#6200ea"; siguiente_meta = 0
-        elif bruto > 3000000:
-            desc = 15; nivel = "🏗️ CONSTRUCTOR (15%)"; color = "#d32f2f"; siguiente_meta = 5000000
+    if activa:
+        if bruto > 5000000: desc = 18; nivel = "👑 PARTNER MAX (18%)"; color = "#6200ea"; meta = 0
+        elif bruto > 3000000: desc = 15; nivel = "🏗️ CONSTRUCTOR (15%)"; color = "#d32f2f"; meta = 5000000
         elif bruto > 1500000:
-            if tiene_gancho: 
-                desc = 15; nivel = "🔥 MAYORISTA (15%)"; color = "#d32f2f"; siguiente_meta = 5000000
-            else:
-                desc = 10; nivel = "🏢 OBRA (10%)"; color = "#f57c00"; siguiente_meta = 3000000
+            if gancho: desc = 15; nivel = "🔥 MAYORISTA (15%)"; color = "#d32f2f"; meta = 5000000
+            else: desc = 10; nivel = "🏢 OBRA (10%)"; color = "#f57c00"; meta = 3000000
         else:
-            if tiene_gancho:
-                desc = 15; nivel = "🔥 MAYORISTA (15%)"; color = "#d32f2f"; siguiente_meta = 5000000
-            else:
-                desc = 3; nivel = "⚡ 3% EXTRA CONTADO"; color = "#2e7d32"; siguiente_meta = 1500000
+            if gancho: desc = 15; nivel = "🔥 MAYORISTA (15%)"; color = "#d32f2f"; meta = 5000000
+            else: desc = 3; nivel = "⚡ 3% EXTRA CONTADO"; color = "#2e7d32"; meta = 1500000
     else:
         if bruto > 5000000: desc = 15; nivel = "PARTNER (SIN BONUS)"; color = "#6200ea"
         else: desc = 0; nivel = "⚠️ OFERTA CADUCADA"; color = "#455a64"
 
     neto = bruto * (1 - (desc/100))
-    return bruto, neto, desc, color, nivel, siguiente_meta, reloj_str, oferta_activa, color_reloj
+    # Pasamos los segundos restantes al frontend para que JS haga la cuenta regresiva
+    return bruto, neto, desc, color, nivel, meta, segundos_restantes, activa, color_reloj
 
 def generar_link_wa(total):
-    txt = "Hola Martín, confirmar pedido con CÁLCULO DE PESOS:\n" + "\n".join([f"▪ {i['cantidad']}x {i['producto']}" for i in st.session_state.cart])
+    txt = "Hola Martín, confirmar pedido:\n" + "\n".join([f"▪ {i['cantidad']}x {i['producto']}" for i in st.session_state.cart])
     txt += f"\n💰 TOTAL FINAL: ${total:,.0f} + IVA"
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 5. UI: HEADER CON TIMER
+# 5. UI: HEADER CON RELOJ JS
 # ==========================================
-subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, reloj, oferta_viva, color_timer = calcular_negocio()
+subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer = calcular_negocio()
 porcentaje_barra = 100
 if prox_meta > 0: porcentaje_barra = min((subtotal / prox_meta) * 100, 100)
+
+# JAVASCRIPT INYECTADO PARA EL RELOJ
+js_script = f"""
+<script>
+    function startTimer(duration, display) {{
+        var timer = duration, minutes, seconds;
+        var interval = setInterval(function () {{
+            minutes = parseInt(timer / 60, 10);
+            seconds = parseInt(timer % 60, 10);
+
+            minutes = minutes < 10 ? "0" + minutes : minutes;
+            seconds = seconds < 10 ? "0" + seconds : seconds;
+
+            display.textContent = minutes + ":" + seconds;
+
+            if (--timer < 0) {{
+                clearInterval(interval);
+                display.textContent = "00:00";
+            }}
+        }}, 1000);
+    }}
+
+    // Esperar a que cargue el DOM
+    setTimeout(function() {{
+        var display = document.getElementById("countdown_display");
+        if (display) {{
+            startTimer({seg_restantes}, display);
+        }}
+    }}, 500);
+</script>
+"""
 
 st.markdown(f"""
     <style>
@@ -205,7 +212,15 @@ st.markdown(f"""
     .cart-summary {{ padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; }}
     .price-tag {{ font-size: 1.5rem; font-weight: 900; color: #333; }}
     .badge {{ background: {color_barra}; color: white; padding: 4px 12px; border-radius: 4px; font-size: 0.75rem; font-weight: 900; text-transform: uppercase; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }}
-    .timer-box {{ color: {color_timer}; font-weight: 900; font-size: 0.8rem; background: #fff; padding: 2px 8px; border-radius: 4px; margin-left: 5px; }}
+    
+    /* ESTILO DEL RELOJ */
+    .timer-box {{ 
+        color: {color_timer}; font-weight: 900; font-size: 0.9rem; 
+        background: #fff; padding: 2px 8px; border-radius: 4px; margin-left: 5px; 
+        border: 1px solid {color_timer};
+        font-family: monospace;
+    }}
+    
     .progress-container {{ width: 100%; height: 6px; background: #eee; position: absolute; bottom: 0; }}
     .progress-bar {{ height: 100%; width: {porcentaje_barra}%; background: {color_barra}; transition: width 0.8s ease-out; }}
     </style>
@@ -213,7 +228,7 @@ st.markdown(f"""
     <div class="fixed-header">
         <div class="top-strip">
             <span>🔥 PEDRO BRAVIN S.A.</span>
-            <span>⏱️ EXPIRA EN: <span class="timer-box">{reloj}</span></span>
+            <span>⏱️ EXPIRA EN: <span id="countdown_display" class="timer-box">--:--</span></span>
         </div>
         <div class="cart-summary">
             <div>
@@ -226,10 +241,11 @@ st.markdown(f"""
         </div>
         <div class="progress-container"><div class="progress-bar"></div></div>
     </div>
+    {js_script}
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA (CON DOLAR LIVE Y CALCULADORA)
+# 6. CEREBRO IA (CÁLCULO PESOS)
 # ==========================================
 try: genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 except: st.error("Falta API KEY")
@@ -238,30 +254,31 @@ sys_prompt = f"""
 ROL: Miguel, vendedor técnico experto en aceros.
 DB: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
-DOLAR OFICIAL BNA (VENTA): ${DOLAR_BNA}
+# DATO INTERNO: DOLAR = {DOLAR_BNA}
 
-🧮 **REGLAS MATEMÁTICAS INMUTABLES (CALCULA BIEN):**
-El CSV tiene PRECIO POR KILO ($/KG) o PRECIO POR UNIDAD.
-**IMPORTANTE:** Todos los precios en CSV son en **DÓLARES**. Multiplica por {DOLAR_BNA} si es necesario pasar a pesos o mantén la moneda base. (Asumiendo CSV en pesos por la variable DOLAR_BNA en código, confirma esto. Si el CSV ya está en pesos, ignora el dolar).
-*NOTA: El código asume que el CSV tiene valores base que requieren cálculo. Si son DOLARES, multiplica por {DOLAR_BNA}.*
+🧮 **REGLAS MATEMÁTICAS INMUTABLES:**
+Los precios CSV pueden ser en Dólares. Multiplica por {DOLAR_BNA} para PESOS.
 
-1. **IPN / UPN / PERFIL C (Largo 12m):**
+1. **IPN / UPN / PERFIL C (12m):**
    - CSV: Precio x Kilo. Descripción: Peso x Metro.
-   - 🧮 FÓRMULA: `(Peso_metro * 12) * Precio_CSV_Kilo`
+   - 🧮 CUENTA: `(Peso_metro * 12) * Precio_CSV * {DOLAR_BNA}`
 
-2. **ÁNGULOS / PLANCHUELAS / HIERRO T / REDONDOS / CUADRADOS (Largo 6m):**
+2. **ÁNGULOS / PLANCHUELAS / HIERRO T / REDONDOS (6m):**
    - CSV: Precio x Kilo. Descripción: **PESO TOTAL BARRA**.
-   - 🧮 FÓRMULA: `Peso_Total_Barra * Precio_CSV_Kilo`
+   - 🧮 CUENTA: `Peso_Total_Barra * Precio_CSV * {DOLAR_BNA}`
 
-3. **CAÑOS (Epoxi, Galv, Sched, Mec) (Largo 6.40m):**
+3. **CAÑOS (Epoxi, Galv, Sched, Mec) (6.40m):**
    - CSV: Precio x Kilo. Descripción: Peso x Metro.
-   - 🧮 FÓRMULA: `(Peso_metro * 6.40) * Precio_CSV_Kilo`
+   - 🧮 CUENTA: `(Peso_metro * 6.40) * Precio_CSV * {DOLAR_BNA}`
 
-4. **TUBOS ESTRUCTURALES (Largo 6m):**
+4. **TUBOS ESTRUCTURALES (6m):**
    - CSV: Precio x BARRA.
-   - 🧮 FÓRMULA: Precio Directo.
+   - 🧮 CUENTA: `Precio_CSV * {DOLAR_BNA}`
 
-SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_BARRA_CALCULADO:TIPO]
+5. **FLETE:**
+   - Si es lejos, calcula: `(KM * 2 * {COSTO_FLETE_USD} * {DOLAR_BNA})`.
+
+SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_PESOS:TIPO]
 """
 
 if "chat_session" not in st.session_state:
@@ -277,10 +294,10 @@ tab1, tab2 = st.tabs(["💬 COTIZAR", f"🛒 MI PEDIDO ({len(st.session_state.ca
 
 with tab1:
     if not oferta_viva:
-        st.error("⚠️ ¡SE ACABÓ EL TIEMPO! PERDISTE EL 3% EXTRA.")
-        if st.button("🔄 SOLICITAR PRÓRROGA (REACTIVAR)", type="primary", use_container_width=True):
+        st.error("⚠️ SE ACABÓ EL TIEMPO. PRECIOS ACTUALIZADOS.")
+        if st.button("🔄 REACTIVAR BENEFICIO (PRÓRROGA)", type="primary", use_container_width=True):
             st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
-            st.toast("✅ ¡Salvado! Tiempo reiniciado.", icon="😅")
+            st.toast("✅ ¡Tiempo reiniciado!", icon="😅")
             st.rerun()
 
     with st.expander("📷 **Subir Foto de Lista**", expanded=False):
@@ -288,12 +305,12 @@ with tab1:
         if img_val is not None:
             file_id = f"{img_val.name}_{img_val.size}"
             if st.session_state.last_processed_file != file_id:
-                with st.spinner("👀 Calculando precios BNA al día..."):
+                with st.spinner("👀 Analizando y calculando..."):
                     full_text = procesar_vision(Image.open(img_val))
                     news = parsear_ordenes_bot(full_text)
                     st.session_state.messages.append({"role": "assistant", "content": full_text})
                     st.session_state.last_processed_file = file_id
-                    if news: st.toast("🔥 Precios Calculados", icon='✅')
+                    if news: st.toast("🔥 Productos Cargados", icon='✅')
                     log_interaction("FOTO AUTO", total_final)
                     st.rerun()
 
@@ -309,7 +326,7 @@ with tab1:
         st.chat_message("user").markdown(prompt)
 
         with st.chat_message("assistant", avatar="👷‍♂️"):
-            with st.spinner("Cotizando con Dólar BNA..."):
+            with st.spinner("Cotizando..."):
                 try:
                     response = st.session_state.chat_session.send_message(prompt)
                     full_text = response.text
