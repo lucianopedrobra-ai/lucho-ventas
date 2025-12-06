@@ -253,18 +253,19 @@ if "chat_session" not in st.session_state:
     
     model_initialized = False
     
-    # 1. Intento con GEMINI 2.5 PRO (Máxima potencia)
+    # 1. Intento PRIMARIO con GEMINI 2.5 PRO (Razonamiento y lógica)
     try:
         generation_config = {"temperature": 0.2, "max_output_tokens": 4096}
         model = genai.GenerativeModel('gemini-2.5-pro', system_instruction=sys_prompt, generation_config=generation_config)
         st.session_state.chat_session = model.start_chat(history=[])
         model_initialized = True
     except Exception:
-        # 2. Fallback a GEMINI 2.5 FLASH (Recomendado para estabilidad y velocidad)
+        # 2. Fallback a GEMINI 2.5 FLASH (Estabilidad/Velocidad, si PRO falla)
         try:
             model = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt)
             st.session_state.chat_session = model.start_chat(history=[])
             model_initialized = True
+            st.warning("⚠️ Usando modelo FLASH. El razonamiento PRO falló al iniciar.")
         except Exception as e:
             # 3. Fallo total
             st.error(f"❌ Error de Conexión y Fallback: El asistente IA no pudo iniciar. Revisa la API Key. ({e})")
@@ -273,7 +274,7 @@ if "chat_session" not in st.session_state:
 
 # Renderizado de Historial
 for msg in st.session_state.messages:
-    avatar = "👷‍♂️" if msg["role"] == "assistant" else "👤"
+    avatar = "👷‍♂️" if msg["role"] == "assistant"] else "👤"
     st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
 # Input de Usuario
