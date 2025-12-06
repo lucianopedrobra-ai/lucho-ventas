@@ -15,7 +15,7 @@ from PIL import Image
 # ==========================================
 st.set_page_config(
     page_title="Pedro Bravin S.A.",
-    page_icon="🏗️",
+    page_icon="🔥",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -40,7 +40,7 @@ CIUDADES_GRATIS = [
     "PIAMONTE", "VILA", "SAN FRANCISCO"
 ]
 
-TOASTS_EXITO = ["🛒 Agregado", "🔥 Buen precio", "✅ Stock OK", "🏗️ Material cargado"]
+TOASTS_EXITO = ["🛒 Agregado con éxito", "🔥 3% Extra Aplicado", "✅ Stock Reservado", "🏗️ Material Cargado"]
 
 # ==========================================
 # 2. ESTADO
@@ -50,7 +50,7 @@ if "log_data" not in st.session_state: st.session_state.log_data = []
 if "admin_mode" not in st.session_state: st.session_state.admin_mode = False
 if "last_processed_file" not in st.session_state: st.session_state.last_processed_file = None
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Escribí tu pedido o subí una foto."}]
+    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Pasame tu lista y aplicamos el descuento contado."}]
 
 # ==========================================
 # 3. BACKEND
@@ -95,16 +95,15 @@ def parsear_ordenes_bot(texto):
 
 def calcular_negocio():
     bruto = sum(i['subtotal'] for i in st.session_state.cart)
-    desc = 3; color = "#546e7a"; nivel = "INICIAL (3% EXTRA)"; siguiente_meta = 1500000
+    desc = 3; color = "#546e7a"; nivel = "INICIAL"; siguiente_meta = 1500000
     
-    # 1. DETECTAR SI HAY PRODUCTOS GANCHO (15% PISO)
+    # 1. PRODUCTOS GANCHO (15% PISO)
     tiene_gancho = any(x['tipo'] in ['CHAPA', 'PERFIL', 'HIERRO', 'CAÑO'] for x in st.session_state.cart)
     
-    # 2. ESCALAS DE VOLUMEN (EL 18% ES EL REY)
+    # 2. ESCALAS + BONUS CONTADO INTEGRADO
     if bruto > 5000000:
         desc = 18; nivel = "👑 PARTNER MAX"; color = "#6200ea"; siguiente_meta = 0
     elif bruto > 3000000:
-        # Si tiene gancho ya tiene 15%, pero por volumen confirmamos 15% y le mostramos la meta del 18%
         desc = 15; nivel = "🏗️ CONSTRUCTOR"; color = "#d32f2f"; siguiente_meta = 5000000
     elif bruto > 1500000:
         if tiene_gancho: 
@@ -112,22 +111,23 @@ def calcular_negocio():
         else:
             desc = 10; nivel = "🏢 OBRA"; color = "#f57c00"; siguiente_meta = 3000000
     else:
-        # Menos de 1.5M
+        # BASE (3% Contado)
         if tiene_gancho:
-            desc = 15; nivel = "🔥 MAYORISTA (GANCHO)"; color = "#d32f2f"; siguiente_meta = 5000000 # Salta directo a buscar el 18
+            desc = 15; nivel = "🔥 MAYORISTA (GANCHO)"; color = "#d32f2f"; siguiente_meta = 5000000
         else:
-            siguiente_meta = 1500000
+            # Aquí el 3% es el gancho explícito
+            desc = 3; nivel = "⚡ PROMO CONTADO"; color = "#2e7d32"; siguiente_meta = 1500000
 
     neto = bruto * (1 - (desc/100))
     return bruto, neto, desc, color, nivel, siguiente_meta
 
 def generar_link_wa(total):
-    txt = "Hola Martín, confirmar pedido:\n" + "\n".join([f"▪ {i['cantidad']}x {i['producto']}" for i in st.session_state.cart])
-    txt += f"\n💰 TOTAL FINAL: ${total:,.0f} + IVA\n(Incluye bonificación pago contado)"
+    txt = "Hola Martín, quiero cerrar YA con el descuento contado:\n" + "\n".join([f"▪ {i['cantidad']}x {i['producto']}" for i in st.session_state.cart])
+    txt += f"\n💰 TOTAL FINAL: ${total:,.0f} + IVA\n(Incluye bonificación 3% extra contado)"
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 4. UI: HEADER FIJO
+# 4. UI: HEADER AGRESIVO
 # ==========================================
 subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta = calcular_negocio()
 porcentaje_barra = 100
@@ -139,7 +139,7 @@ st.markdown(f"""
     [data-testid="stSidebar"] {{ display: none; }} 
     
     .stTabs [data-baseweb="tab-list"] {{
-        position: fixed; top: 89px; left: 0; width: 100%; background: white; z-index: 9999;
+        position: fixed; top: 95px; left: 0; width: 100%; background: white; z-index: 9999;
         display: flex; justify-content: space-around; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
         padding-bottom: 5px;
     }}
@@ -148,13 +148,25 @@ st.markdown(f"""
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; background: white; z-index: 10000;
         border-bottom: 4px solid {color_barra};
-        height: 85px;
+        height: 95px;
     }}
     
-    .top-strip {{ background: #1e1e1e; color: #fff; padding: 5px 15px; display: flex; justify-content: space-between; font-size: 0.7rem; align-items: center; }}
+    .top-strip {{ background: #111; color: #fff; padding: 5px 15px; display: flex; justify-content: space-between; font-size: 0.75rem; align-items: center; }}
     .cart-summary {{ padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; }}
-    .price-tag {{ font-size: 1.4rem; font-weight: 900; color: #333; }}
-    .badge {{ background: {color_barra}; color: white; padding: 4px 12px; border-radius: 15px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; }}
+    .price-tag {{ font-size: 1.5rem; font-weight: 900; color: #333; }}
+    
+    /* Etiqueta de Descuento Pulsante */
+    .badge {{ 
+        background: {color_barra}; color: white; padding: 4px 12px; 
+        border-radius: 4px; font-size: 0.75rem; font-weight: 900; text-transform: uppercase; 
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }}
+    
+    .extra-discount {{
+        color: #2e7d32; font-weight: bold; font-size: 0.65rem; margin-top: 2px;
+        display: flex; align-items: center; gap: 4px;
+    }}
+    
     .warning-text {{ color: #ffd700; font-weight: bold; font-size: 0.7rem; animation: pulse 2s infinite; }}
     @keyframes pulse {{ 0% {{ opacity: 0.7; }} 50% {{ opacity: 1; }} 100% {{ opacity: 0.7; }} }}
     
@@ -170,18 +182,19 @@ st.markdown(f"""
         <div class="cart-summary">
             <div>
                 <span class="badge">{nombre_nivel} {desc_actual}% OFF</span>
-                <div style="font-size:0.65rem; color:#666; margin-top:3px;">
-                    {f"Faltan ${prox_meta - subtotal:,.0f} para 18% OFF" if prox_meta > 0 else "¡MÁXIMO 18% ALCANZADO!"}
+                <div class="extra-discount">
+                    <i class="fa-solid fa-check"></i> INCLUYE 3% EXTRA CONTADO
                 </div>
             </div>
             <div class="price-tag">${total_final:,.0f} <span style="font-size:0.7rem; color:#666; font-weight:400;">+IVA</span></div>
         </div>
         <div class="progress-container"><div class="progress-bar"></div></div>
     </div>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 5. CEREBRO IA
+# 5. CEREBRO IA (VENTA AGRESIVA)
 # ==========================================
 try: genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 except: st.error("Falta API KEY")
@@ -199,6 +212,11 @@ ZONA GRATIS: {CIUDADES_GRATIS}
 5. **LOGÍSTICA:** Gratis en Zona. Resto Estimado. Retiro en Planta.
 6. **DISCLAIMER:** Cotización estimada.
 
+🧨 **ESTRATEGIA DE CIERRE (3% EXTRA):**
+- Tu objetivo es que cierren YA.
+- USA SIEMPRE ESTE ARGUMENTO: **"Te apliqué el 3% EXTRA por pago contado para congelar el precio."**
+- Si piden cotización, dales el precio y recuérdales el beneficio de contado.
+
 🕵️‍♂️ PROTOCOLO AMBIGÜEDAD:
 - Si falta variante (Negro/Galv) -> PREGUNTAR.
 - Si piden "Antióxido", busca exacto y ofrece opciones.
@@ -210,7 +228,7 @@ if "chat_session" not in st.session_state:
     st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
 
 def procesar_vision(img):
-    return st.session_state.chat_session.send_message(["Analiza lista. Si hay ambigüedad, PREGUNTA. Si está claro, genera comandos [ADD...] y confirma.", img]).text
+    return st.session_state.chat_session.send_message(["Analiza lista. Si hay ambigüedad, PREGUNTA. Si está claro, genera comandos [ADD...] y usa el argumento del 3% Extra Contado.", img]).text
 
 # ==========================================
 # 6. INTERFAZ TABS
@@ -223,12 +241,12 @@ with tab1:
         if img_val is not None:
             file_id = f"{img_val.name}_{img_val.size}"
             if st.session_state.last_processed_file != file_id:
-                with st.spinner("👀 Leyendo foto..."):
+                with st.spinner("👀 Analizando para aplicar descuento..."):
                     full_text = procesar_vision(Image.open(img_val))
                     news = parsear_ordenes_bot(full_text)
                     st.session_state.messages.append({"role": "assistant", "content": full_text})
                     st.session_state.last_processed_file = file_id
-                    if news: st.toast(random.choice(TOASTS_EXITO), icon='🛒')
+                    if news: st.toast("🔥 3% Extra Aplicado", icon='💰')
                     log_interaction("FOTO AUTO", total_final)
                     st.rerun()
 
@@ -244,7 +262,7 @@ with tab1:
         st.chat_message("user").markdown(prompt)
 
         with st.chat_message("assistant", avatar="👷‍♂️"):
-            with st.spinner("Cotizando..."):
+            with st.spinner("Calculando mejor oferta..."):
                 try:
                     response = st.session_state.chat_session.send_message(prompt)
                     full_text = response.text
@@ -253,11 +271,11 @@ with tab1:
                     st.markdown(display)
                     
                     if news:
-                        st.toast(random.choice(TOASTS_EXITO), icon='🛒')
+                        st.toast("🔥 3% Extra Aplicado", icon='💰')
                         st.markdown(f"""
                         <div style="background:#e8f5e9; padding:10px; border-radius:10px; border:1px solid #25D366; margin-top:5px;">
-                            <strong>✅ {len(news)} items agregados.</strong><br>
-                            <span style="font-size:0.85rem">💰 Total: ${total_final:,.0f} | 🚚 ¿Te lo envío o retirás?</span>
+                            <strong>✅ {len(news)} items con precio contado.</strong><br>
+                            <span style="font-size:0.85rem">💰 Total: ${total_final:,.0f} | 👇 Finalizá en 'MI PEDIDO'</span>
                         </div>
                         """, unsafe_allow_html=True)
                         if desc_actual >= 15 and len(st.session_state.cart) > 1: st.balloons()
@@ -270,9 +288,9 @@ with tab1:
 # --- PESTAÑA CARRITO EDITABLE ---
 with tab2:
     if not st.session_state.cart:
-        st.info("Carrito vacío. ¡Pedile algo a Miguel!")
+        st.info("Carrito vacío. ¡Aprovechá el 3% extra hoy!")
     else:
-        st.markdown(f"### 📋 Editá tu Pedido ({len(st.session_state.cart)} items)")
+        st.markdown(f"### 📋 Confirmar Pedido ({len(st.session_state.cart)} items)")
         
         for i, item in enumerate(st.session_state.cart):
             with st.container():
@@ -297,15 +315,15 @@ with tab2:
         col_res2.write(f"${subtotal:,.0f}")
         
         if desc_actual > 0:
-            col_res1.markdown(f"**Beneficio {nombre_nivel}:**")
+            col_res1.markdown(f"**Bonificación {desc_actual}%:**")
             col_res2.markdown(f"**-${subtotal * (desc_actual/100):,.0f}**")
             
         st.markdown(f"""
-        <div style="background:{color_barra}; color:white; padding:20px; border-radius:15px; text-align:center; margin-top:15px; box-shadow: 0 4px 15px {color_barra}66;">
-            <div style="font-size:0.8rem; opacity:0.9;">TOTAL FINAL A PAGAR (+IVA)</div>
+        <div style="background:{color_barra}; color:white; padding:20px; border-radius:15px; text-align:center; margin-top:15px; box-shadow: 0 4px 15px {color_barra}66; border: 2px solid #fff;">
+            <div style="font-size:0.8rem; opacity:0.9;">TOTAL FINAL CONTADO (+IVA)</div>
             <div style="font-size:2.2rem; font-weight:900;">${total_final:,.0f}</div>
-            <div style="font-size:0.8rem; margin-top:5px; background:rgba(0,0,0,0.2); padding:2px 8px; border-radius:10px; display:inline-block;">
-                {CONDICION_PAGO} | ACOPIO 6 MESES
+            <div style="font-size:0.8rem; margin-top:5px; background:rgba(0,0,0,0.2); padding:4px 10px; border-radius:10px; display:inline-block;">
+                ⚡ INCLUYE 3% EXTRA YA APLICADO
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -316,7 +334,7 @@ with tab2:
             text-align:center; padding:18px; border-radius:50px; text-decoration:none; 
             font-weight:bold; font-size:1.2rem; box-shadow: 0 4px 15px rgba(37,211,102,0.5);
             animation: pulse-green 2s infinite;">
-            🚀 CONFIRMAR CON MARTÍN
+            🚀 ENVIAR PEDIDO AHORA
         </a>
         <style>@keyframes pulse-green {{ 0% {{ transform: scale(1); }} 50% {{ transform: scale(1.02); }} 100% {{ transform: scale(1); }} }}</style>
         """, unsafe_allow_html=True)
