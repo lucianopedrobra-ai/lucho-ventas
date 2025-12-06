@@ -63,7 +63,7 @@ CIUDADES_GRATIS = [
     "PIAMONTE", "VILA", "SAN FRANCISCO"
 ]
 
-TOASTS_EXITO = ["🛒 Calculando peso exacto...", "🔥 Precio x Barra OK", "✅ Agregado al pedido", "🏗️ Carga Lista"]
+TOASTS_EXITO = ["🛒 Calculando peso...", "🔥 Precio x Barra OK", "✅ Agregado", "🏗️ Carga Lista"]
 
 # ==========================================
 # 3. ESTADO
@@ -73,12 +73,12 @@ if "log_data" not in st.session_state: st.session_state.log_data = []
 if "admin_mode" not in st.session_state: st.session_state.admin_mode = False
 if "last_processed_file" not in st.session_state: st.session_state.last_processed_file = None
 
-# Timer Fijo en el servidor (para que no hagan trampa)
+# Timer Fijo
 if "expiry_time" not in st.session_state:
     st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
 
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Pasame tu lista y aprovechá el descuento por tiempo limitado."}]
+    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Aprovechá el descuento por tiempo limitado."}]
 
 # ==========================================
 # 4. BACKEND
@@ -127,8 +127,14 @@ def calcular_negocio():
     segundos_restantes = int(tiempo_restante.total_seconds())
     activa = segundos_restantes > 0
     
-    # Colores para el JS
-    color_reloj = "#2e7d32" if segundos_restantes > 120 else "#d32f2f" # Rojo si quedan menos de 2 min
+    # Formato Inicial Python (Para que no se vea --:--)
+    if activa:
+        m, s = divmod(segundos_restantes, 60)
+        reloj_init = f"{m:02d}:{s:02d}"
+        color_reloj = "#2e7d32" if m > 2 else "#d32f2f"
+    else:
+        reloj_init = "00:00"
+        color_reloj = "#b0bec5"
 
     bruto = sum(i['subtotal'] for i in st.session_state.cart)
     desc = 0; color = "#546e7a"; nivel = "PRECIO LISTA (EXPIRÓ)"; meta = 1500000
@@ -149,8 +155,7 @@ def calcular_negocio():
         else: desc = 0; nivel = "⚠️ OFERTA CADUCADA"; color = "#455a64"
 
     neto = bruto * (1 - (desc/100))
-    # Pasamos los segundos restantes al frontend para que JS haga la cuenta regresiva
-    return bruto, neto, desc, color, nivel, meta, segundos_restantes, activa, color_reloj
+    return bruto, neto, desc, color, nivel, meta, segundos_restantes, activa, color_reloj, reloj_init
 
 def generar_link_wa(total):
     txt = "Hola Martín, confirmar pedido:\n" + "\n".join([f"▪ {i['cantidad']}x {i['producto']}" for i in st.session_state.cart])
@@ -158,11 +163,15 @@ def generar_link_wa(total):
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 5. UI: HEADER CON RELOJ JS
+# 5. UI: HEADER CON RELOJ HÍBRIDO (PY+JS)
 # ==========================================
-subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer = calcular_negocio()
+subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer, reloj_python = calcular_negocio()
 porcentaje_barra = 100
 if prox_meta > 0: porcentaje_barra = min((subtotal / prox_meta) * 100, 100)
+
+# ESTADO DE PRECIO VACÍO
+display_precio = f"${total_final:,.0f}" if subtotal > 0 else "🛒 COTIZAR"
+display_iva = "+IVA" if subtotal > 0 else ""
 
 # JAVASCRIPT INYECTADO PARA EL RELOJ
 js_script = f"""
@@ -184,13 +193,9 @@ js_script = f"""
             }}
         }}, 1000);
     }}
-
-    // Esperar a que cargue el DOM
     setTimeout(function() {{
         var display = document.getElementById("countdown_display");
-        if (display) {{
-            startTimer({seg_restantes}, display);
-        }}
+        if (display) {{ startTimer({seg_restantes}, display); }}
     }}, 500);
 </script>
 """
@@ -228,7 +233,7 @@ st.markdown(f"""
     <div class="fixed-header">
         <div class="top-strip">
             <span>🔥 PEDRO BRAVIN S.A.</span>
-            <span>⏱️ EXPIRA EN: <span id="countdown_display" class="timer-box">--:--</span></span>
+            <span>⏱️ EXPIRA EN: <span id="countdown_display" class="timer-box">{reloj_python}</span></span>
         </div>
         <div class="cart-summary">
             <div>
@@ -237,7 +242,7 @@ st.markdown(f"""
                     {f"Ahorro extra: {desc_actual}%" if oferta_viva else "DESCUENTO PERDIDO"}
                 </div>
             </div>
-            <div class="price-tag">${total_final:,.0f} <span style="font-size:0.7rem; color:#666; font-weight:400;">+IVA</span></div>
+            <div class="price-tag">{display_precio} <span style="font-size:0.7rem; color:#666; font-weight:400;">{display_iva}</span></div>
         </div>
         <div class="progress-container"><div class="progress-bar"></div></div>
     </div>
@@ -310,7 +315,7 @@ with tab1:
                     news = parsear_ordenes_bot(full_text)
                     st.session_state.messages.append({"role": "assistant", "content": full_text})
                     st.session_state.last_processed_file = file_id
-                    if news: st.toast("🔥 Productos Cargados", icon='✅')
+                    if news: st.toast("🔥 Precios Calculados", icon='✅')
                     log_interaction("FOTO AUTO", total_final)
                     st.rerun()
 
@@ -335,7 +340,7 @@ with tab1:
                     st.markdown(display)
                     
                     if news:
-                        st.toast("🛒 Agregado", icon='✅')
+                        st.toast(random.choice(TOASTS_EXITO), icon='🛒')
                         st.markdown(f"""
                         <div style="background:#e8f5e9; padding:10px; border-radius:10px; border:1px solid #25D366; margin-top:5px;">
                             <strong>✅ {len(news)} items agregados.</strong><br>
