@@ -26,7 +26,7 @@ COSTO_FLETE_USD = 0.85
 CONDICION_PAGO = "Contado/Transferencia"
 SHEET_ID = "2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvnarDQ"
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/e/{SHEET_ID}/pub?gid=2029869540&single=true&output=csv"
-URL_FORM_GOOGLE = "" # 🔴 PEGAR LINK FORM
+URL_FORM_GOOGLE = "" # 🔴 PEGAR LINK FORM AQUI
 ID_CAMPO_CLIENTE = "entry.xxxxxx"
 ID_CAMPO_MONTO = "entry.xxxxxx"
 ID_CAMPO_OPORTUNIDAD = "entry.xxxxxx"
@@ -69,7 +69,15 @@ csv_context = load_data()
 
 def enviar_a_google_form_background(cliente, monto, oportunidad):
     if URL_FORM_GOOGLE:
-        try: requests.post(URL_FORM_GOOGLE, data={ID_CAMPO_CLIENTE: str(cliente), ID_CAMPO_MONTO: str(monto), ID_CAMPO_OPORTUNIDAD: str(oportunidad)}, timeout=1); except: pass
+        try: 
+            # CORREGIDO: Bloque try/except expandido
+            requests.post(URL_FORM_GOOGLE, data={
+                ID_CAMPO_CLIENTE: str(cliente), 
+                ID_CAMPO_MONTO: str(monto), 
+                ID_CAMPO_OPORTUNIDAD: str(oportunidad)
+            }, timeout=1)
+        except: 
+            pass
 
 def log_interaction(user_text, monto):
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -79,8 +87,15 @@ def log_interaction(user_text, monto):
 
 def parsear_ordenes_bot(texto):
     items_nuevos = []
+    # Regex mejorada para decimales
     for cant, prod, precio, tipo in re.findall(r'\[ADD:([\d\.]+):([^:]+):([\d\.]+):([^\]]+)\]', texto):
-        item = {"cantidad": float(cant), "producto": prod.strip(), "precio_unit": float(precio), "subtotal": float(cant)*float(precio), "tipo": tipo.strip().upper()}
+        item = {
+            "cantidad": float(cant), 
+            "producto": prod.strip(), 
+            "precio_unit": float(precio), 
+            "subtotal": float(cant)*float(precio), 
+            "tipo": tipo.strip().upper()
+        }
         st.session_state.cart.append(item)
         items_nuevos.append(item)
     return items_nuevos
@@ -88,10 +103,13 @@ def parsear_ordenes_bot(texto):
 def calcular_negocio():
     bruto = sum(i['subtotal'] for i in st.session_state.cart)
     desc = 3; color = "#546e7a"; nivel = "INICIAL"
+    
+    # Lógica de Descuentos
     if any(x['tipo'] in ['CHAPA', 'PERFIL', 'HIERRO', 'CAÑO'] for x in st.session_state.cart):
         desc = 15; nivel = "🔥 MAYORISTA"; color = "#d32f2f"
     elif bruto > 3000000: desc = 15; nivel = "👑 PARTNER"; color = "#6200ea"
     elif bruto > 1500000: desc = 10; nivel = "🏗️ OBRA"; color = "#f57c00"
+    
     return bruto, bruto*(1-(desc/100)), desc, color, nivel
 
 def generar_link_wa(total):
@@ -167,10 +185,6 @@ INSTRUCCIONES:
 if "chat_session" not in st.session_state:
     st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
 
-def procesar_multimodal(prompt_input):
-    """Procesa Texto, Imagen o Audio enviándolo a Gemini"""
-    return st.session_state.chat_session.send_message([prompt_input]).text
-
 # ==========================================
 # 6. INTERFAZ TABS
 # ==========================================
@@ -223,8 +237,6 @@ with tab1:
         with st.chat_message("assistant", avatar="👷‍♂️"):
             with st.spinner("Analizando..."):
                 try:
-                    # Enviar el objeto crudo (Audio bytes, Imagen PIL o Texto) directo a Gemini
-                    # Gemini Flash maneja esto nativamente
                     prompt_con_instruccion = ["Analiza este pedido. Aplica reglas inmutables. Genera comandos [ADD...].", prompt_to_send]
                     
                     response = st.session_state.chat_session.send_message(prompt_con_instruccion)
