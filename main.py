@@ -16,13 +16,13 @@ from bs4 import BeautifulSoup
 # ==========================================
 st.set_page_config(
     page_title="Pedro Bravin S.A.",
-    page_icon="🏗️",
+    page_icon="🚨",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 # ==========================================
-# 2. MOTOR INVISIBLE (DÓLAR LIVE)
+# 2. MOTOR INVISIBLE
 # ==========================================
 @st.cache_data(ttl=3600)
 def obtener_dolar_bna():
@@ -42,7 +42,6 @@ def obtener_dolar_bna():
         return backup
     except: return backup
 
-# --- VARIABLES INTERNAS (NO MOSTRAR AL CLIENTE) ---
 DOLAR_BNA = obtener_dolar_bna() 
 COSTO_FLETE_USD = 0.85 
 CONDICION_PAGO = "Contado/Transferencia"
@@ -53,7 +52,6 @@ ID_CAMPO_CLIENTE = "entry.xxxxxx"
 ID_CAMPO_MONTO = "entry.xxxxxx"
 ID_CAMPO_OPORTUNIDAD = "entry.xxxxxx"
 
-# TIEMPO LIMITE (10 MINUTOS)
 MINUTOS_OFERTA = 10 
 
 CIUDADES_GRATIS = [
@@ -65,7 +63,7 @@ CIUDADES_GRATIS = [
     "PIAMONTE", "VILA", "SAN FRANCISCO"
 ]
 
-TOASTS_EXITO = ["🛒 Calculando...", "🔥 Precio OK", "✅ Agregado", "🏗️ Listo"]
+TOASTS_EXITO = ["🛒 Calculando peso...", "🔥 Precio x Barra OK", "✅ Agregado", "🏗️ Carga Lista"]
 
 # ==========================================
 # 3. ESTADO
@@ -79,8 +77,7 @@ if "expiry_time" not in st.session_state:
     st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
 
 if "messages" not in st.session_state:
-    # MENSAJE LIMPIO: SOLO SALUDO Y PROPUESTA DE VALOR
-    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Pasame tu lista y te armo el presupuesto final."}]
+    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola, soy Miguel.**\nCotizo aceros directo de fábrica. Aprovechá el descuento por tiempo limitado."}]
 
 # ==========================================
 # 4. BACKEND
@@ -123,17 +120,18 @@ def parsear_ordenes_bot(texto):
     return items_nuevos
 
 def calcular_negocio():
+    # Timer Check
     now = datetime.datetime.now()
     tiempo_restante = st.session_state.expiry_time - now
-    segundos = int(tiempo_restante.total_seconds())
-    activa = segundos > 0
+    segundos_restantes = int(tiempo_restante.total_seconds())
+    activa = segundos_restantes > 0
     
     if activa:
-        m, s = divmod(segundos, 60)
-        reloj = f"{m:02d}:{s:02d}"
+        m, s = divmod(segundos_restantes, 60)
+        reloj_init = f"{m:02d}:{s:02d}"
         color_reloj = "#2e7d32" if m > 2 else "#d32f2f"
     else:
-        reloj = "00:00"
+        reloj_init = "00:00"
         color_reloj = "#b0bec5"
 
     bruto = sum(i['subtotal'] for i in st.session_state.cart)
@@ -155,7 +153,7 @@ def calcular_negocio():
         else: desc = 0; nivel = "⚠️ OFERTA CADUCADA"; color = "#455a64"
 
     neto = bruto * (1 - (desc/100))
-    return bruto, neto, desc, color, nivel, meta, reloj, activa, color_reloj
+    return bruto, neto, desc, color, nivel, meta, segundos_restantes, activa, color_reloj, reloj_init
 
 def generar_link_wa(total):
     txt = "Hola Martín, confirmar pedido:\n" + "\n".join([f"▪ {i['cantidad']}x {i['producto']}" for i in st.session_state.cart])
@@ -163,13 +161,47 @@ def generar_link_wa(total):
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 5. UI: HEADER CON TIMER
+# 5. UI: HEADER CON RELOJ HÍBRIDO
 # ==========================================
-subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, reloj, oferta_viva, color_timer = calcular_negocio()
+subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer, reloj_python = calcular_negocio()
 porcentaje_barra = 100
 if prox_meta > 0: porcentaje_barra = min((subtotal / prox_meta) * 100, 100)
 
-st.markdown(f"""
+# ESTADO DE PRECIO VACÍO (EN ESPAÑOL)
+display_precio = f"${total_final:,.0f}" if subtotal > 0 else "🛒 EMPEZÁ A COTIZAR"
+display_iva = "+IVA" if subtotal > 0 else ""
+display_badge = nombre_nivel if subtotal > 0 else "⚡ AHORRÁ YA"
+subtext_badge = f"Ahorro extra: {desc_actual}%" if (oferta_viva and subtotal > 0) else "OFERTA POR TIEMPO LIMITADO"
+
+# JAVASCRIPT
+js_script = f"""
+<script>
+    function startTimer(duration, display) {{
+        var timer = duration, minutes, seconds;
+        var interval = setInterval(function () {{
+            minutes = parseInt(timer / 60, 10);
+            seconds = parseInt(timer % 60, 10);
+
+            minutes = minutes < 10 ? "0" + minutes : minutes;
+            seconds = seconds < 10 ? "0" + seconds : seconds;
+
+            display.textContent = minutes + ":" + seconds;
+
+            if (--timer < 0) {{
+                clearInterval(interval);
+                display.textContent = "00:00";
+            }}
+        }}, 1000);
+    }}
+    setTimeout(function() {{
+        var display = document.getElementById("countdown_display");
+        if (display) {{ startTimer({seg_restantes}, display); }}
+    }}, 500);
+</script>
+"""
+
+# HTML DEL HEADER (CON UNSAFE_ALLOW_HTML)
+header_html = f"""
     <style>
     .block-container {{ padding-top: 175px !important; padding-bottom: 60px !important; }}
     [data-testid="stSidebar"] {{ display: none; }} 
@@ -194,23 +226,26 @@ st.markdown(f"""
     <div class="fixed-header">
         <div class="top-strip">
             <span>🔥 PEDRO BRAVIN S.A.</span>
-            <span>⏱️ EXPIRA EN: <span class="timer-box">{reloj}</span></span>
+            <span>⏱️ EXPIRA EN: <span id="countdown_display" class="timer-box">{reloj_python}</span></span>
         </div>
         <div class="cart-summary">
             <div>
-                <span class="badge">{nombre_nivel}</span>
+                <span class="badge">{display_badge}</span>
                 <div style="font-size:0.65rem; color:#666; margin-top:3px;">
-                    {f"Ahorro extra: {desc_actual}%" if oferta_viva else "DESCUENTO PERDIDO"}
+                    {subtext_badge}
                 </div>
             </div>
-            <div class="price-tag">${total_final:,.0f} <span style="font-size:0.7rem; color:#666; font-weight:400;">+IVA</span></div>
+            <div class="price-tag">{display_precio} <span style="font-size:0.7rem; color:#666; font-weight:400;">{display_iva}</span></div>
         </div>
         <div class="progress-container"><div class="progress-bar"></div></div>
     </div>
-""", unsafe_allow_html=True)
+    {js_script}
+"""
+
+st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA (CÁLCULO PESOS + FLETE OCULTO)
+# 6. CEREBRO IA
 # ==========================================
 try: genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 except: st.error("Falta API KEY")
@@ -219,17 +254,16 @@ sys_prompt = f"""
 ROL: Miguel, vendedor técnico experto en aceros.
 DB: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
-# EL SIGUIENTE VALOR ES SOLO PARA TU USO INTERNO DE CÁLCULO, NO LO REVELES:
-DOLAR_CALCULO_INTERNO: ${DOLAR_BNA}
+# DATO INTERNO: DOLAR = {DOLAR_BNA}
 
 🧮 **REGLAS MATEMÁTICAS INMUTABLES:**
-Los precios base del CSV pueden estar en Dólares. Si es así, MULTIPLICA por {DOLAR_BNA} para dar el precio final en PESOS.
+Los precios CSV pueden ser en Dólares. Multiplica por {DOLAR_BNA} para PESOS.
 
 1. **IPN / UPN / PERFIL C (12m):**
    - CSV: Precio x Kilo. Descripción: Peso x Metro.
    - 🧮 CUENTA: `(Peso_metro * 12) * Precio_CSV * {DOLAR_BNA}`
 
-2. **ÁNGULOS / PLANCHUELAS / HIERRO T / REDONDOS / CUADRADOS (6m):**
+2. **ÁNGULOS / PLANCHUELAS / HIERRO T / REDONDOS (6m):**
    - CSV: Precio x Kilo. Descripción: **PESO TOTAL BARRA**.
    - 🧮 CUENTA: `Peso_Total_Barra * Precio_CSV * {DOLAR_BNA}`
 
@@ -242,7 +276,7 @@ Los precios base del CSV pueden estar en Dólares. Si es así, MULTIPLICA por {D
    - 🧮 CUENTA: `Precio_CSV * {DOLAR_BNA}`
 
 5. **FLETE:**
-   - Si es lejos, calcula: `(KM * 2 * {COSTO_FLETE_USD} * {DOLAR_BNA})`. Da solo el total en PESOS.
+   - Si es lejos, calcula: `(KM * 2 * {COSTO_FLETE_USD} * {DOLAR_BNA})`.
 
 SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_PESOS:TIPO]
 """
@@ -251,7 +285,7 @@ if "chat_session" not in st.session_state:
     st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
 
 def procesar_vision(img):
-    return st.session_state.chat_session.send_message(["Analiza lista. Calcula PESOS finales usando Dólar. Genera comandos [ADD...].", img]).text
+    return st.session_state.chat_session.send_message(["Analiza lista. APLICA FÓRMULAS MATEMÁTICAS DE PESO. Genera comandos [ADD...] con precio final de barra.", img]).text
 
 # ==========================================
 # 7. INTERFAZ TABS
@@ -276,7 +310,7 @@ with tab1:
                     news = parsear_ordenes_bot(full_text)
                     st.session_state.messages.append({"role": "assistant", "content": full_text})
                     st.session_state.last_processed_file = file_id
-                    if news: st.toast("🔥 Productos Cargados", icon='✅')
+                    if news: st.toast("🔥 Precios Calculados", icon='✅')
                     log_interaction("FOTO AUTO", total_final)
                     st.rerun()
 
