@@ -56,7 +56,8 @@ SHEET_ID = "2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvn
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/e/{SHEET_ID}/pub?gid=2029869540&single=true&output=csv"
 URL_FORM_GOOGLE = "" 
 
-MINUTOS_OFERTA = 5
+# ⏱️ TIEMPO CORTO (3 MINUTOS) -> PRESIÓN TEMU
+MINUTOS_OFERTA = 3
 
 CIUDADES_GRATIS = [
     "EL TREBOL", "LOS CARDOS", "LAS ROSAS", "SAN GENARO", "CENTENO", "CASAS", 
@@ -82,12 +83,11 @@ if "expiry_time" not in st.session_state:
     st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
 
 if "messages" not in st.session_state:
-    # SALUDO "SNIPER"
     saludo = """
-🦁 **Soy Miguel.** Dólar actualizado. Stock listo.
+🦁 **Soy Miguel.** Dólar actualizado. Stock disponible.
 
 👇 **PASAME TU PEDIDO YA** (Escribí o usá el botón **➕** para subir foto).
-*¡El precio se congela por 5 minutos!* ⏳
+*¡El precio se congela por 3 minutos!* ⏳
     """
     st.session_state.messages = [{"role": "assistant", "content": saludo}]
 
@@ -127,9 +127,7 @@ def calcular_negocio():
     if activa:
         m, s = divmod(segundos_restantes, 60)
         reloj_init = f"{m:02d}:{s:02d}"
-        color_reloj = "#2e7d32" if m > 2 else "#ff0000" # Rojo Temu
-        # Efecto parpadeo si falta menos de 1 min
-        if m < 1: color_reloj = "#ff0000; animation: blink 1s infinite"
+        color_reloj = "#2e7d32" if m > 1 else "#d32f2f" # Rojo si falta poco
     else:
         reloj_init = "00:00"
         color_reloj = "#b0bec5"
@@ -165,12 +163,12 @@ def calcular_negocio():
     return bruto, neto, desc_total, color, nivel_texto, meta, segundos_restantes, activa, color_reloj, reloj_init, ahorro_total
 
 def generar_link_wa(total):
-    txt = "HOLA, QUIERO CONGELAR PRECIO YA:\n" + "\n".join([f"▪ {i['cantidad']}x {i['producto']}" for i in st.session_state.cart])
+    txt = "HOLA, QUIERO CONGELAR PRECIO YA (Oferta Flash):\n" + "\n".join([f"▪ {i['cantidad']}x {i['producto']}" for i in st.session_state.cart])
     txt += f"\n💰 TOTAL FINAL: ${total:,.0f} + IVA"
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 5. UI: HEADER AGRESIVO
+# 5. UI: HEADER AGRESIVO Y ESTILOS
 # ==========================================
 subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer, reloj_python, dinero_ahorrado = calcular_negocio()
 porcentaje_barra = 100
@@ -192,7 +190,7 @@ header_html = f"""
     [data-testid="stToolbar"] {{ display: none !important; }}
     
     /* LAYOUT OPTIMIZADO PARA MÓVIL */
-    .block-container {{ padding-top: 130px !important; padding-bottom: 120px !important; }}
+    .block-container {{ padding-top: 130px !important; padding-bottom: 100px !important; }}
     [data-testid="stSidebar"] {{ display: none; }} 
     
     /* INPUT CHAT SLIM */
@@ -230,7 +228,7 @@ header_html = f"""
     .stTabs [data-baseweb="tab-list"] {{ position: fixed; top: 95px; left: 0; width: 100%; background: #ffffff; z-index: 99980; padding-top: 2px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }}
     .stTabs [data-baseweb="tab"] {{ flex: 1; text-align: center; padding: 6px; font-weight: bold; font-size: 0.75rem; }}
     
-    /* BOTÓN FLOTANTE ESTILO WHATSAPP (EL +) CON PULSO */
+    /* BOTÓN FLOTANTE ESTILO WHATSAPP (EL +) */
     div[data-testid="stPopover"] {{
         position: fixed; bottom: 65px; left: 10px; z-index: 200000;
         width: auto;
@@ -292,8 +290,8 @@ DOLAR: {DOLAR_BNA}
 
 📏 **CATÁLOGO TÉCNICO (ESTRICTO):**
 - **12m:** Perfil C, IPN, UPN, ADN.
-- **6.40m:** Caños (Mecánico, Epoxi, Galvanizado).
-- **6m:** Tubos Estructurales, Hierros, Ángulos.
+- **6.40m:** Caños (Mecánico, Epoxi, Galvanizado, Schedule).
+- **6m:** Tubos Estructurales, Hierros, Ángulos, Planchuelas.
 - **CHAPA T90:** Única medida 13m.
 - **CHAPA COLOR:** Por metro.
 - **CINCALUM:** Por metro (Ref Cod 4/6).
@@ -303,11 +301,12 @@ DOLAR: {DOLAR_BNA}
 2. **OTRAS ZONAS:** Costo = `KM_TOTAL (IDA+VUELTA) * 0.85 USD * {DOLAR_BNA} * 1.21 (IVA)`.
 3. **ACOPIO:** "Comprá hoy, retirá en **6 MESES** sin cargo".
 
-⛔ **PROTOCOLO SNIPER:**
-1. **BREVEDAD:** Max 15 palabras. Directo.
-2. **CONFIRMACIÓN:** SOLO agrega `[ADD:...]` si el cliente dice "SÍ". Primero cotiza.
-3. **UPSELL:** "Te faltan $X para el descuento. ¿Agrego pintura?".
-4. **ANTI-AMBIGÜEDAD:** Si falta medida, PREGUNTA.
+⛔ **PROTOCOLO DE ATENCIÓN:**
+1. **BREVEDAD:** Directo al grano.
+2. **CONFIRMACIÓN:** SOLO agrega `[ADD:...]` si el cliente dice "SÍ/CARGALO".
+   - *Ejemplo:* Si piden "Precio perfil C 100", responde el precio y pregunta "¿Te lo separo?".
+3. **UPSELL:** "Te faltan $X para el descuento. ¿Agrego pintura/electrodos?".
+4. **ANTI-AMBIGÜEDAD:** Si falta medida, PREGUNTA antes de cotizar.
 
 SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
 """
@@ -330,7 +329,9 @@ def procesar_input(contenido, es_imagen=False):
 tab1, tab2 = st.tabs(["💬 COTIZAR", f"🛒 MI PEDIDO ({len(st.session_state.cart)})"])
 spacer = '<div style="height: 20px;"></div>'
 
-# --- 💡 "STICKY FOOTER" DE PAGO (SOLO APARECE SI HAY $ EN JUEGO) ---
+# --- 💡 BOTÓN FLOTANTE "FINALIZAR" (SI HAY CARRITO) ---
+# Al hacer clic, lleva a la pestaña 2 simulando un clic en un link interno o simplemente mostrando el botón de WhatsApp directo aquí.
+# ESTRATEGIA TEMU: Directo a WhatsApp para cerrar.
 if len(st.session_state.cart) > 0 and oferta_viva:
     st.markdown(f"""
     <div style="position:fixed; bottom:75px; right:10px; left:10px; z-index:200000; display:flex; justify-content:center;">
@@ -353,9 +354,9 @@ with tab1:
             st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
             st.rerun()
 
-    # POP-UP AGRESIVO DE OPORTUNIDAD
+    # POP-UP DE OPORTUNIDAD (TOAST AGRESIVO)
     if 0 < prox_meta - subtotal < 150000 and oferta_viva:
-        st.toast(f"🚨 ¡FALTAN ${prox_meta - subtotal:,.0f} PARA DESCUENTO! SUMÁ ALGO CHICO.", icon="🔥")
+        st.toast(f"🚨 ¡ESTÁS A ${prox_meta - subtotal:,.0f} DEL PRÓXIMO DESCUENTO! AGREGÁ ALGO CHICO.", icon="🔥")
 
     for m in st.session_state.messages:
         if m["role"] != "system":
