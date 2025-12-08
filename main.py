@@ -11,7 +11,6 @@ import random
 import os
 from PIL import Image
 from bs4 import BeautifulSoup
-# ELIMINADO: import de audio para evitar errores en Cloud Run
 
 # ==========================================
 # 1. CONFIGURACIÓN
@@ -73,7 +72,6 @@ if "expiry_time" not in st.session_state:
     st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
 
 if "messages" not in st.session_state:
-    # --- RECUPERADO: SALUDO EDUCATIVO ---
     saludo_inicial = """
 👋 **¡Hola! Soy Miguel, tu asistente experto.**
 Estoy conectado al stock en tiempo real y tengo el dólar actualizado.
@@ -175,13 +173,15 @@ subtext_badge = f"Ahorro Total: {desc_actual}%" if (oferta_viva and subtotal > 0
 
 header_html = f"""
     <style>
-    /* --- RECUPERADO: PADDING CORRECTO PARA QUE NO SE TAPE --- */
+    /* ESPACIO SUPERIOR PARA NO PISAR */
     .block-container {{ 
         padding-top: 220px !important; 
         padding-bottom: 150px !important; 
     }}
+    
     [data-testid="stSidebar"] {{ display: none; }} 
     
+    /* CHAT ABAJO */
     [data-testid="stBottomBlock"], [data-testid="stChatInput"] {{
         position: fixed; bottom: 0; left: 0; width: 100%;
         background-color: white; padding: 10px;
@@ -214,6 +214,10 @@ header_html = f"""
         .price-tag {{ font-size: 1.2rem; }}
         .badge {{ font-size: 0.65rem; padding: 3px 6px; }}
         .cart-summary {{ padding: 5px 10px; }}
+    }}
+    @media only screen and (min-width: 601px) {{
+        .price-tag {{ font-size: 1.5rem; }}
+        .badge {{ font-size: 0.75rem; padding: 4px 12px; }}
     }}
     
     .timer-container {{ display: flex; align-items: center; gap: 5px; }}
@@ -262,7 +266,7 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA
+# 6. CEREBRO IA (GOOGLE CLOUD + LÓGICA DE PRODUCTO REVISADA)
 # ==========================================
 try:
     api_key = os.environ.get("GOOGLE_API_KEY")
@@ -279,17 +283,19 @@ DB: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
 # DATO INTERNO: DOLAR = {DOLAR_BNA}
 
-📏 **CATÁLOGO TÉCNICO:**
-1. **PERFILES/HIERROS/TUBO/IPN/UPN:** Barras enteras (12m o 6m según tipo).
-2. **CAÑOS:** Barras de 6.40m.
-3. **CHAPA T90:** Hoja cerrada de 13m.
-4. **CHAPA COLOR:** Por Metro Lineal.
-5. **CHAPA CINCALUM:** Códigos de cortes o base 1 Metro.
-6. **PINTURERIA/ACCESORIOS:** Unidad.
+📏 **CATÁLOGO TÉCNICO Y LARGOS DE VENTA (ESTRICTO):**
+1. **CONSTRUCCIÓN (ADN) / PERFIL C / IPN / UPN:** Barras de **12 METROS**.
+2. **TUBOS ESTRUCTURALES / HIERROS / ÁNGULOS / PLANCHUELAS:** Barras de **6 METROS**.
+3. **CAÑOS (Uso Mecánico, Epoxi, Galvanizado, Schedule):** Barras de **6.40 METROS**.
+4. **CHAPA T90:** Única medida **13 METROS** (Hoja cerrada).
+5. **CHAPA COLOR:** Venta por Metro Lineal.
+6. **CHAPA CINCALUM:** Cortes según lista o base 1 Metro.
+7. **PINTURERIA/ACCESORIOS:** Unidad.
 
 ⛔ **REGLAS DE ORO:**
 1. **NO AGREGAR SIN PERMISO:** Cotiza -> Sugiere combo -> Espera "Sí" -> Agrega.
-2. **ANTI-AMBIGÜEDAD:** Si no hay medidas, PREGUNTA.
+2. **ANTI-AMBIGÜEDAD:** - Si piden "Planchuela/Ángulo" sin medida -> PREGUNTA ancho y espesor.
+   - Si piden "Estructural" sin medida -> PREGUNTA (Ej: 100x100, 80x40).
 3. **CLASIFICACIÓN TIPO:** Chapa->CHAPA, Perfil->PERFIL, Pintura->PINTURA, Hierro->HIERRO.
 
 💞 **PERSONALIDAD:** Sé concreto pero amable. Induce al cierre.
@@ -328,7 +334,7 @@ with tab1:
             st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
             st.rerun()
 
-    # --- RECUPERADO: ZERO STATE (AYUDA INICIAL) ---
+    # ZERO STATE
     if len(st.session_state.messages) == 1:
         st.info("💡 **TIP:** Tocá el botón **'➕ Adjuntar'** para subir una foto de tu lista.")
 
@@ -337,7 +343,7 @@ with tab1:
             clean = re.sub(r'\[ADD:.*?\]', '', m["content"]).strip()
             if clean: st.chat_message(m["role"], avatar="👷‍♂️" if m["role"]=="assistant" else "👤").markdown(clean)
 
-    # BARRA FLOTANTE (Solo Foto)
+    # BARRA FLOTANTE
     with st.container():
         col_pop, col_spacer = st.columns([1.5, 8.5])
         with col_pop:
