@@ -193,7 +193,7 @@ def calcular_negocio():
             boosters_activos.append("🏠 KIT TECHO (+3%)")
             
         # Booster 2: Terminación (Acero + Pintura/Consumibles)
-        elif tiene_acero and tiene_pintura: # Usamos elif para no regalar todo junto tan fácil, o if para acumular
+        elif tiene_acero and tiene_pintura: 
             desc_extra += 2
             boosters_activos.append("🎨 PACK TERM. (+2%)")
             
@@ -209,7 +209,7 @@ def calcular_negocio():
     else:
         # Oferta caducada
         if bruto > META_MAXIMA: 
-            desc_total = 12 # Castigo por demora, baja del 15/18 al 12
+            desc_total = 12 # Castigo por demora
             nivel_texto = "OFERTA EXPIRADA"
             color = "#455a64"
         else: 
@@ -234,7 +234,6 @@ if prox_meta > 0: porcentaje_barra = min((subtotal / prox_meta) * 100, 100)
 
 display_precio = f"${total_final:,.0f}" if subtotal > 0 else "🛒 COTIZAR"
 display_iva = "+IVA" if subtotal > 0 else ""
-# Ajuste de Badge para que entren los textos largos de los boosters
 display_badge = nombre_nivel[:25] + "..." if len(nombre_nivel) > 25 and subtotal > 0 else (nombre_nivel if subtotal > 0 else "⚡ 3% OFF YA")
 subtext_badge = f"Ahorro Total: {desc_actual}%" if (oferta_viva and subtotal > 0) else "TIEMPO LIMITADO"
 
@@ -353,7 +352,7 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA (MODO: EXPERTO + CLASIFICADOR DE PRODUCTOS)
+# 6. CEREBRO IA (MODO: EXPERTO + ANTI-AMBIGÜEDAD)
 # ==========================================
 try: genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 except: st.error("Falta API KEY")
@@ -372,16 +371,23 @@ ZONA GRATIS: {CIUDADES_GRATIS}
 5. **CHAPA CINCALUM:** Códigos de cortes o base 1 Metro.
 6. **PINTURERIA/ACCESORIOS:** Unidad.
 
-🏷️ **IMPORTANTE: CLASIFICACIÓN DE TIPOS PARA DESCUENTOS**
-Al generar la salida [ADD:...], en el campo 'TIPO' debes ser preciso para que el sistema active los descuentos combinados:
-- Si es Chapa (Techo) -> TIPO: **CHAPA**
-- Si es Perfil C/U/I -> TIPO: **PERFIL**
-- Si es Pintura, Solvente, Pincel, Disco, Electrodo -> TIPO: **PINTURA**
-- Si es Hierro, Malla, Clavos, Alambre, Caño, Tubo -> TIPO: **HIERRO** (O el específico).
+⛔ **PROTOCOLO DE SEGURIDAD (ANTI-AMBIGÜEDAD):**
+- **SI EL USUARIO PIDE "PLANCHUELA", "ÁNGULO" O "HIERRO" SIN ESPECIFICAR MEDIDA:**
+  - ❌ **PROHIBIDO** AGREGAR AL CARRITO (No inventes medidas).
+  - ✅ **RESPONDER:** "Tengo muchas medidas disponibles (desde 1/2 pulgada hasta 4 pulgadas). ¿Qué ancho y espesor estás buscando exactamente?".
+
+- **SI EL USUARIO PIDE "MALLA":**
+  - Preguntar si busca SIMA (Obra) o STANDARD, y qué medida (Q188, Q335, 15x15, etc).
+
+🏷️ **CLASIFICACIÓN DE TIPOS PARA DESCUENTOS:**
+- Chapa (Techo) -> TIPO: **CHAPA**
+- Perfil C/U/I -> TIPO: **PERFIL**
+- Pintura/Accesorios/Electrodos -> TIPO: **PINTURA**
+- Hierro/Malla/Clavos/Alambre/Caño -> TIPO: **HIERRO**
 
 💞 **PERSONALIDAD "SEDUCTOR COMERCIAL":**
-- **ACTITUD:** "Franelea" al cliente. Hazle notar si activa un combo.
-- **CROSS-SELLING:** Si lleva chapa, sugiérele Perfil C para activar el "Descuento Kit Techo". Si lleva hierro, sugiérele antióxido para el "Descuento Terminación".
+- **ACTITUD:** Seductor pero Técnico. Si falta un dato, pídelo amablemente ("Para cotizarte el mejor precio necesito saber...").
+- **CROSS-SELLING:** Detecta oportunidades (Chapa->Perfil, Hierro->Pintura).
 - **CIERRE:** Induce al botón verde.
 
 SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
@@ -391,7 +397,7 @@ if "chat_session" not in st.session_state:
     st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
 
 def procesar_vision(img):
-    return st.session_state.chat_session.send_message(["Analiza lista. COTIZA, CLASIFICA BIEN LOS TIPOS Y SEDUCE.", img]).text
+    return st.session_state.chat_session.send_message(["Analiza lista. COTIZA CON PRECISIÓN. SI HAY AMBIGUEDAD, PREGUNTA.", img]).text
 
 # ==========================================
 # 7. INTERFAZ TABS
@@ -411,7 +417,7 @@ with tab1:
         if img_val is not None:
             file_id = f"{img_val.name}_{img_val.size}"
             if st.session_state.last_processed_file != file_id:
-                with st.spinner("👀 Analizando combos..."):
+                with st.spinner("👀 Analizando lista..."):
                     full_text = procesar_vision(Image.open(img_val))
                     news = parsear_ordenes_bot(full_text)
                     st.session_state.messages.append({"role": "assistant", "content": full_text})
@@ -434,9 +440,9 @@ with tab1:
         st.chat_message("user").markdown(prompt)
 
         with st.chat_message("assistant", avatar="👷‍♂️"):
-            with st.spinner("Buscando descuentos..."):
+            with st.spinner("Consultando stock y precios..."):
                 try:
-                    prompt_con_presion = f"{prompt}. (NOTA INTERNA: Cotiza exacto. Clasifica bien el TIPO para los descuentos. Seduce con el ahorro)."
+                    prompt_con_presion = f"{prompt}. (NOTA INTERNA: Si es genérico PREGUNTA MEDIDAS. Si es claro, cotiza y SEDUCE para cerrar)."
                     
                     response = st.session_state.chat_session.send_message(prompt_con_presion)
                     full_text = response.text
@@ -447,7 +453,6 @@ with tab1:
                     if news:
                         st.toast(random.choice(TOASTS_EXITO), icon='🎉')
                         
-                        # LOGICA DE GLOBOS Y ALERTAS SEGUN DESCUENTOS OBTENIDOS
                         if desc_actual >= 15 and st.session_state.discount_tier_reached < 3:
                             st.session_state.discount_tier_reached = 3
                             st.balloons()
