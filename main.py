@@ -17,19 +17,19 @@ import streamlit.components.v1 as components
 # 1. CONFIGURACIÓN
 # ==========================================
 st.set_page_config(
-    page_title="Pedro Bravin S.A.",
+    page_title="🔥 OFERTAS PEDRO BRAVIN",
     page_icon="🦁", 
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# 🎯 METAS DE VENTA (GAMIFICACIÓN)
+# 🎯 METAS DE VENTA
 META_MAXIMA = 2500000
 META_MEDIA  = 1500000
 META_BASE   = 800000
 
 # ==========================================
-# 2. MOTOR INVISIBLE
+# 2. MOTOR INVISIBLE (LÓGICA SAGRADA)
 # ==========================================
 @st.cache_data(ttl=3600)
 def obtener_dolar_bna():
@@ -56,7 +56,7 @@ SHEET_ID = "2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvn
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/e/{SHEET_ID}/pub?gid=2029869540&single=true&output=csv"
 URL_FORM_GOOGLE = "" 
 
-# ⏱️ TIEMPO CORTO (3 MINUTOS) -> PRESIÓN TEMU
+# ⏱️ TIEMPO CORTO -> PRESIÓN TEMU
 MINUTOS_OFERTA = 3
 
 CIUDADES_GRATIS = [
@@ -83,12 +83,12 @@ if "expiry_time" not in st.session_state:
     st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
 
 if "messages" not in st.session_state:
-    # SALUDO INICIAL
     saludo = """
-🦁 **Soy Miguel.** Dólar actualizado. Stock disponible.
+🚨 **¡HOLA! SOY MIGUEL.**
+Stock crítico en algunos perfiles. Dólar actualizado.
 
-👇 **PASAME TU PEDIDO YA** (Escribí o tocá **➕** para subir foto).
-*¡El precio se congela por 3 minutos!* ⏳
+👇 **ESCRIBIME QUÉ BUSCÁS YA MISMO**
+*(Ej: "Necesito 10 perfil C 100")*
     """
     st.session_state.messages = [{"role": "assistant", "content": saludo}]
 
@@ -128,10 +128,11 @@ def calcular_negocio():
     if activa:
         m, s = divmod(segundos_restantes, 60)
         reloj_init = f"{m:02d}:{s:02d}"
-        color_reloj = "#2e7d32" if m > 1 else "#d32f2f" # Rojo si falta poco
+        color_reloj = "#2e7d32" 
+        if m < 2: color_reloj = "#ff9800"
+        if m < 1: color_reloj = "#ff0000"
     else:
-        reloj_init = "00:00"
-        color_reloj = "#b0bec5"
+        reloj_init = "00:00"; color_reloj = "#b0bec5"
 
     bruto = sum(i['subtotal'] for i in st.session_state.cart)
     desc_base = 0; desc_extra = 0; nivel_texto = "LISTA"; color = "#546e7a"; meta = META_BASE
@@ -164,12 +165,12 @@ def calcular_negocio():
     return bruto, neto, desc_total, color, nivel_texto, meta, segundos_restantes, activa, color_reloj, reloj_init, ahorro_total
 
 def generar_link_wa(total):
-    txt = "HOLA, CONFIRMO PEDIDO YA (Precios Congelados):\n" + "\n".join([f"▪ {i['cantidad']}x {i['producto']}" for i in st.session_state.cart])
+    txt = "QUIERO MI PEDIDO YA:\n" + "\n".join([f"▪ {i['cantidad']}x {i['producto']}" for i in st.session_state.cart])
     txt += f"\n💰 TOTAL FINAL: ${total:,.0f} + IVA"
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 5. UI: HEADER AGRESIVO
+# 5. UI: HEADER "TEMU EXTREMO"
 # ==========================================
 subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer, reloj_python, dinero_ahorrado = calcular_negocio()
 porcentaje_barra = 100
@@ -182,79 +183,80 @@ display_badge = nombre_nivel[:25] + "..." if len(nombre_nivel) > 25 and subtotal
 if dinero_ahorrado > 0:
     subtext_badge = f"🔥 AHORRAS: ${dinero_ahorrado:,.0f}"
 else:
-    subtext_badge = "TIEMPO LIMITADO"
+    subtext_badge = "OFERTA RELÁMPAGO"
 
 header_html = f"""
     <style>
-    /* LIMPIEZA */
     #MainMenu, footer, header {{ visibility: hidden !important; }}
     [data-testid="stToolbar"] {{ display: none !important; }}
     
-    /* LAYOUT OPTIMIZADO PARA MÓVIL */
-    .block-container {{ padding-top: 130px !important; padding-bottom: 100px !important; }}
+    .block-container {{ padding-top: 140px !important; padding-bottom: 120px !important; }}
     [data-testid="stSidebar"] {{ display: none; }} 
     
-    /* INPUT CHAT SLIM */
+    /* CHAT ABAJO */
     [data-testid="stBottomBlock"], [data-testid="stChatInput"] {{ 
         position: fixed; bottom: 0; left: 0; width: 100%; 
         background: white; padding: 5px 10px !important; 
         z-index: 99999; border-top: 1px solid #eee; 
     }}
-    .stChatInputContainer textarea {{ min-height: 38px !important; height: 38px !important; padding: 8px !important; }}
+    .stChatInputContainer textarea {{ min-height: 40px !important; height: 40px !important; }}
 
     /* HEADER */
-    .fixed-header {{ position: fixed; top: 0; left: 0; width: 100%; background: #fff; z-index: 99990; border-bottom: 4px solid {color_barra}; height: 95px; overflow: hidden; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }}
+    .fixed-header {{ position: fixed; top: 0; left: 0; width: 100%; background: #fff; z-index: 99990; border-bottom: 4px solid {color_barra}; height: 95px; overflow: hidden; box-shadow: 0 5px 20px rgba(0,0,0,0.2); }}
     
-    /* ANIMACIONES */
+    /* ANIMACIONES FRENÉTICAS */
+    @keyframes shake {{ 0% {{ transform: translate(1px, 1px) rotate(0deg); }} 10% {{ transform: translate(-1px, -2px) rotate(-1deg); }} 20% {{ transform: translate(-3px, 0px) rotate(1deg); }} 30% {{ transform: translate(3px, 2px) rotate(0deg); }} 40% {{ transform: translate(1px, -1px) rotate(1deg); }} 50% {{ transform: translate(-1px, 2px) rotate(-1deg); }} 60% {{ transform: translate(-3px, 1px) rotate(0deg); }} 70% {{ transform: translate(3px, 1px) rotate(-1deg); }} 80% {{ transform: translate(-1px, -1px) rotate(1deg); }} 90% {{ transform: translate(1px, 2px) rotate(0deg); }} 100% {{ transform: translate(1px, -2px) rotate(-1deg); }} }}
     @keyframes heartbeat {{ 0% {{ transform: scale(1); }} 15% {{ transform: scale(1.05); }} 30% {{ transform: scale(1); }} 45% {{ transform: scale(1.05); }} 60% {{ transform: scale(1); }} }}
-    @keyframes blink {{ 50% {{ opacity: 0; }} }}
+    @keyframes marquee {{ 0% {{ transform: translateX(100%); }} 100% {{ transform: translateX(-100%); }} }}
     
-    .price-tag {{ font-weight: 900; color: #111; font-size: 1.4rem; animation: heartbeat 2s infinite; }}
-    .badge {{ background: {color_barra}; color: white; padding: 3px 8px; border-radius: 4px; font-weight: 900; font-size: 0.75rem; text-transform: uppercase; }}
+    .price-tag {{ font-weight: 900; color: #d32f2f; font-size: 1.6rem; animation: heartbeat 1.5s infinite; }}
+    .badge {{ background: linear-gradient(90deg, #ff0000, #ff8800); color: white; padding: 4px 10px; border-radius: 4px; font-weight: 900; font-size: 0.7rem; text-transform: uppercase; }}
+    
+    /* MARQUESINA TIPO NOTICIAS (SCROLLING TEXT) */
+    .marquee-container {{ width: 100%; background: #000; color: #fff; overflow: hidden; white-space: nowrap; font-size: 0.65rem; padding: 3px 0; font-weight: bold; text-transform: uppercase; }}
+    .marquee-content {{ display: inline-block; padding-left: 100%; animation: marquee 15s linear infinite; }}
     
     /* BARRA PROGRESO */
-    .progress-container {{ width: 100%; height: 6px; background: #eee; position: absolute; bottom: 0; }}
+    .progress-container {{ width: 100%; height: 8px; background: #eee; position: absolute; bottom: 0; }}
     .progress-bar {{ 
-        height: 100%; width: {porcentaje_barra}%; background: {color_barra}; transition: width 0.5s ease-out; 
-        background-image: linear-gradient(45deg,rgba(255,255,255,.3) 25%,transparent 25%,transparent 50%,rgba(255,255,255,.3) 50%,rgba(255,255,255,.3) 75%,transparent 75%,transparent);
-        background-size: 1rem 1rem; animation: progress-stripes 0.5s linear infinite;
+        height: 100%; width: {porcentaje_barra}%; 
+        background: linear-gradient(90deg, #ff0000, #ffeb3b); 
+        transition: width 0.5s ease-out; 
     }}
-    @keyframes progress-stripes {{ from {{ background-position: 1rem 0; }} to {{ background-position: 0 0; }} }}
 
-    .top-strip {{ background: #000; color: #fff; padding: 4px 10px; display: flex; justify-content: space-between; font-size: 0.7rem; align-items: center; font-weight: bold; letter-spacing: 0.5px; }}
     .cart-summary {{ padding: 5px 15px; display: flex; justify-content: space-between; align-items: center; height: 60px; }}
-    .timer-box {{ color: {color_timer}; background: #fff; padding: 1px 6px; border-radius: 3px; font-weight: 900; }}
+    .timer-box {{ color: {color_timer}; background: #fff; padding: 2px 8px; border-radius: 4px; font-weight: 900; border: 1px solid {color_timer}; }}
     
     /* TABS */
     .stTabs [data-baseweb="tab-list"] {{ position: fixed; top: 95px; left: 0; width: 100%; background: #ffffff; z-index: 99980; padding-top: 2px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }}
     .stTabs [data-baseweb="tab"] {{ flex: 1; text-align: center; padding: 6px; font-weight: bold; font-size: 0.75rem; }}
     
     /* BOTÓN FLOTANTE ESTILO WHATSAPP (EL +) */
-    div[data-testid="stPopover"] {{
-        position: fixed; bottom: 65px; left: 10px; z-index: 200000;
-        width: auto;
-    }}
+    div[data-testid="stPopover"] {{ position: fixed; bottom: 75px; left: 10px; z-index: 200000; width: auto; }}
     div[data-testid="stPopover"] button {{
-        border-radius: 50%; width: 45px; height: 45px;
+        border-radius: 50%; width: 50px; height: 50px;
         background-color: #25D366; color: white; border: 2px solid white;
         box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        display: flex; align-items: center; justify-content: center; font-size: 20px;
-        animation: pulse-green-btn 2s infinite;
+        display: flex; align-items: center; justify-content: center; font-size: 24px;
+        animation: heartbeat 2s infinite;
     }}
-    @keyframes pulse-green-btn {{ 0% {{ box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.7); }} 70% {{ box-shadow: 0 0 0 10px rgba(37, 211, 102, 0); }} 100% {{ box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }} }}
     </style>
     
     <div class="fixed-header">
-        <div class="top-strip">
-            <div>⏱️ EXPIRA: <span id="countdown_display" class="timer-box">{reloj_python}</span></div>
-            <div style="color:#FFD700;">🦁 PEDRO BRAVIN S.A.</div>
+        <div class="marquee-container">
+            <div class="marquee-content">
+                🔥 ALERTA STOCK LIMITADO 🔥 ENVÍOS GRATIS A {', '.join(CIUDADES_GRATIS[:3])}... 🔥 DÓLAR CONGELADO POR {MINUTOS_OFERTA} MINUTOS 🔥
+            </div>
         </div>
         <div class="cart-summary">
             <div>
                 <span class="badge">{display_badge}</span>
-                <div style="font-size:0.7rem; color:{color_barra}; font-weight:800; margin-top:2px; animation: heartbeat 1.5s infinite;">{subtext_badge}</div>
+                <div style="font-size:0.7rem; color:#d32f2f; font-weight:900; margin-top:2px;">{subtext_badge}</div>
             </div>
-            <div class="price-tag">{display_precio}<span style="font-size:0.8rem; font-weight:400; color:#666;">{display_iva}</span></div>
+            <div style="text-align:right;">
+                <div style="font-size:0.6rem; color:#666;">EXPIRA EN: <span id="countdown_display" class="timer-box">{reloj_python}</span></div>
+                <div class="price-tag">{display_precio}<span style="font-size:0.7rem; font-weight:400; color:#666;">{display_iva}</span></div>
+            </div>
         </div>
         <div class="progress-container"><div class="progress-bar"></div></div>
     </div>
@@ -273,7 +275,7 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA (REGLAS + LOGÍSTICA COMPLETA)
+# 6. CEREBRO IA (MODO UPSELL AGRESIVO)
 # ==========================================
 try:
     api_key = os.environ.get("GOOGLE_API_KEY")
@@ -284,31 +286,26 @@ try:
 except: pass
 
 sys_prompt = f"""
-ROL: Miguel, vendedor experto de Pedro Bravin S.A.
+ROL: Miguel, el mejor vendedor de acero (agresivo, rápido, upseller).
 DB: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
 DOLAR: {DOLAR_BNA}
 
-📏 **CATÁLOGO TÉCNICO (ESTRICTO):**
-- **12m:** Perfil C, IPN, UPN, ADN.
-- **6.40m:** Caños (Mecánico, Epoxi, Galvanizado, Schedule).
-- **6m:** Tubos Estructurales, Hierros, Ángulos, Planchuelas.
-- **CHAPA T90:** Única medida 13m.
-- **CHAPA COLOR:** Por metro.
-- **CINCALUM:** Por metro (Ref Cod 4/6).
+📏 **REGLAS TÉCNICAS (ESTRICTO):**
+- 12m: Perfil C, IPN, UPN, ADN.
+- 6.40m: Caños.
+- 6m: Tubos, Hierros, Ángulos.
+- T90: 13m.
+- Color/Cincalum: Metro.
 
-🚚 **LOGÍSTICA Y ENVÍOS:**
-1. **ZONA GRATIS:** Si la ciudad está en {CIUDADES_GRATIS} -> ENVÍO $0.
-2. **OTRAS ZONAS:** El flete se cobra.
-   - Cálculo: `KM_TOTAL (IDA+VUELTA) * 0.85 USD * {DOLAR_BNA} * 1.21 (IVA)`.
-3. **ACOPIO:** "Comprá hoy, retirá en hasta **6 MESES** sin cargo".
-
-⛔ **PROTOCOLO SNIPER:**
-1. **BREVEDAD:** Max 15 palabras. Directo.
-2. **CONFIRMACIÓN:** SOLO agrega `[ADD:...]` si el cliente dice "SÍ/CARGALO".
-   - *Ejemplo:* Si piden precio, dalo y remata: "**¿Te separo el stock?**".
-3. **UPSELL MATEMÁTICO:** "Te faltan $X para el próximo descuento. ¿Sumamos pintura?".
-4. **ANTI-AMBIGÜEDAD:** Si falta medida, PREGUNTA.
+⛔ **PROTOCOLO DE VENTA AGRESIVA:**
+1. **PREGUNTA CANTIDAD SIEMPRE:** Si dicen "Quiero perfil", responde: "**¿Qué medida y CUÁNTOS? Decime ya para separar stock.**"
+2. **UPSELL OBLIGATORIO:**
+   - Si llevan Hierro -> "¿Te sumo la **Malla** o el **Alambre**?"
+   - Si llevan Perfil -> "¿Agrego **Electrodos** o **Discos** para cortar?"
+   - Si llevan Chapa -> "¿Sumo **Tornillos** o **Aislante**?"
+   - *Frase:* "Sumate esto y aprovechás el flete."
+3. **NO AGREGUES SIN EL 'SÍ':** Cotiza, ofrece el Upsell, y espera el OK.
 
 SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
 """
@@ -320,8 +317,8 @@ def procesar_input(contenido, es_imagen=False):
     if "chat_session" in st.session_state:
         msg = contenido
         prefix = ""
-        if es_imagen: msg = ["COTIZA ESTO RÁPIDO. DETECTA OPORTUNIDADES DE COMBO.", contenido]
-        prompt = f"{prefix}{msg}. (NOTA: Sé breve. Cotiza precios. NO AGREGUES sin confirmación)." if not es_imagen else msg
+        if es_imagen: msg = ["COTIZA RÁPIDO. DETECTA UPSELL.", contenido]
+        prompt = f"{prefix}{msg}. (NOTA: Sé breve. Pregunta cantidad. Ofrece Upsell)." if not es_imagen else msg
         return st.session_state.chat_session.send_message(prompt).text
     return "Error: Chat off."
 
@@ -329,21 +326,21 @@ def procesar_input(contenido, es_imagen=False):
 # 7. INTERFAZ TABS
 # ==========================================
 tab1, tab2 = st.tabs(["💬 COTIZAR", f"🛒 MI PEDIDO ({len(st.session_state.cart)})"])
-spacer = '<div style="height: 20px;"></div>'
+spacer = '<div style="height: 30px;"></div>'
 
-# --- 💡 BOTÓN FLOTANTE "FINALIZAR" (SI HAY CARRITO) ---
+# --- 💡 BOTÓN FLOTANTE "PAGAR AHORA" (TEMBLOROSO) ---
 if len(st.session_state.cart) > 0 and oferta_viva:
     st.markdown(f"""
     <div style="position:fixed; bottom:75px; right:10px; left:10px; z-index:200000; display:flex; justify-content:center;">
-        <a href="{generar_link_wa(total_final)}" target="_blank" style="
-            background: linear-gradient(90deg, #ff0000, #ff4d4d); color: white; 
-            padding: 12px 30px; border-radius: 50px; width: 100%; text-align:center;
-            font-weight: 900; text-decoration: none; box-shadow: 0 5px 20px rgba(255,0,0,0.6);
-            border: 2px solid #fff; font-size: 1rem; animation: pulse-red 1.5s infinite;">
-            🔥 PAGAR AHORA: ${total_final:,.0f} ➔
+        <a href="#mi-pedido" onclick="document.getElementsByTagName('button')[1].click();" style="
+            background: linear-gradient(90deg, #ff0000, #d50000); color: white; 
+            padding: 15px 30px; border-radius: 50px; width: 100%; text-align:center;
+            font-weight: 900; text-decoration: none; box-shadow: 0 5px 25px rgba(255,0,0,0.6);
+            border: 3px solid #fff; font-size: 1.2rem; animation: shake 4s infinite; text-transform: uppercase;">
+            🔥 FINALIZAR: ${total_final:,.0f} ➔
         </a>
     </div>
-    <style>@keyframes pulse-red {{ 0% {{ transform: scale(1); }} 50% {{ transform: scale(1.05); }} 100% {{ transform: scale(1); }} }}</style>
+    <style>@keyframes shake {{ 0%, 100% {{transform: translateX(0);}} 10%, 30%, 50%, 70%, 90% {{transform: translateX(-2px);}} 20%, 40%, 60%, 80% {{transform: translateX(2px);}} }}</style>
     """, unsafe_allow_html=True)
 
 with tab1:
@@ -354,9 +351,9 @@ with tab1:
             st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
             st.rerun()
 
-    # POP-UP AGRESIVO DE OPORTUNIDAD
-    if 0 < prox_meta - subtotal < 150000 and oferta_viva:
-        st.toast(f"🚨 ¡FALTAN ${prox_meta - subtotal:,.0f} PARA DESCUENTO! SUMÁ ALGO CHICO.", icon="🔥")
+    # POP-UP DE OPORTUNIDAD
+    if 0 < prox_meta - subtotal < 200000 and oferta_viva:
+        st.toast(f"🚨 ¡FALTAN ${prox_meta - subtotal:,.0f} PARA DESCUENTO! SUMÁ PINTURA O DISCOS.", icon="🔥")
 
     for m in st.session_state.messages:
         if m["role"] != "system":
@@ -366,7 +363,6 @@ with tab1:
     with st.container():
         c1, c2 = st.columns([1.5, 8.5])
         with c1:
-            # BOTÓN + CON ESTILO WHATSAPP
             with st.popover("➕", use_container_width=False):
                 st.caption("Subir Foto")
                 img = st.file_uploader("", type=["jpg","png","jpeg"], label_visibility="collapsed")
@@ -388,60 +384,4 @@ with tab1:
         with st.chat_message("assistant", avatar="👷‍♂️"):
             with st.spinner("Calculando..."):
                 try:
-                    if "chat_session" in st.session_state:
-                        res = st.session_state.chat_session.send_message(f"{p}. (CORTITO Y AL PIE).").text
-                        news = parsear_ordenes_bot(res)
-                        display = re.sub(r'\[ADD:.*?\]', '', res)
-                        st.markdown(display)
-                        
-                        if news: 
-                            st.toast(random.choice(TOASTS_EXITO), icon='🔥')
-                            if desc_actual >= 12: st.balloons()
-                        
-                        st.session_state.messages.append({"role": "assistant", "content": res})
-                        if news: time.sleep(1); st.rerun()
-                except: st.error("Error.")
-
-with tab2:
-    st.markdown(spacer, unsafe_allow_html=True)
-    if not st.session_state.cart:
-        st.info("Carrito vacío. Agregá items para ver el precio final.")
-    else:
-        for i, item in enumerate(st.session_state.cart):
-            with st.container():
-                c1, c2, c3 = st.columns([3, 1.5, 0.5])
-                c1.markdown(f"**{item['producto']}**\n<span style='color:grey;font-size:0.8em'>${item['precio_unit']:,.0f} unit</span>", unsafe_allow_html=True)
-                item['cantidad'] = c2.number_input("Cant", 0.0, value=float(item['cantidad']), key=f"q_{i}", label_visibility="collapsed")
-                item['subtotal'] = item['cantidad'] * item['precio_unit']
-                if c3.button("🗑️", key=f"d_{i}"): st.session_state.cart.pop(i); st.rerun()
-                if item['cantidad'] == 0: st.session_state.cart.pop(i); st.rerun()
-                st.markdown("---")
-        
-        # BOTÓN DE PAGO GIGANTE EN PESTAÑA CARRITO (Backup)
-        st.markdown(f"""
-        <a href="{generar_link_wa(total_final)}" target="_blank" style="
-            display:block; width:100%; background: linear-gradient(45deg, #25D366, #128C7E); 
-            color:white; margin-top:20px; text-align:center; padding:20px; border-radius:12px; 
-            text-decoration:none; font-weight:900; font-size:1.5rem; text-transform:uppercase;
-            box-shadow: 0 10px 25px rgba(37, 211, 102, 0.4); border: 2px solid #fff;
-            animation: pulse-green 1.5s infinite;">
-            🚀 CONFIRMAR PEDIDO <br><span style="font-size:0.8rem; opacity:0.8">CONGELAR PRECIO AHORA</span>
-        </a>
-        <style>@keyframes pulse-green {{ 0% {{ transform: scale(1); box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.7); }} 70% {{ transform: scale(1.02); box-shadow: 0 0 0 15px rgba(37, 211, 102, 0); }} 100% {{ transform: scale(1); box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }} }}</style>
-        """, unsafe_allow_html=True)
-        
-        if st.button("Vaciar Carrito", use_container_width=True): st.session_state.cart = []; st.rerun()
-
-# --- SCRIPT AUTO-SCROLL (ARREGLADO) ---
-components.html("""
-    <script>
-        function scrollDown() {
-            var body = window.parent.document.querySelector(".stAppDeployButton").parentElement;
-            if(!body) body = window.parent.document.querySelector(".main");
-            if(body) body.scrollTop = body.scrollHeight;
-        }
-        setInterval(scrollDown, 1000);
-    </script>
-""", height=0)
-
-if st.session_state.admin_mode: st.dataframe(pd.DataFrame(st.session_state.log_data))
+                    if "chat_
