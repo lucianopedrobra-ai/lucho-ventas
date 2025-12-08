@@ -13,7 +13,7 @@ from PIL import Image
 from bs4 import BeautifulSoup
 
 # ==========================================
-# 1. CONFIGURACIÓN DE LA PÁGINA
+# 1. CONFIGURACIÓN
 # ==========================================
 st.set_page_config(
     page_title="Pedro Bravin S.A.",
@@ -22,13 +22,13 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 🎯 METAS DE VENTA (BASE POR VOLUMEN)
-META_MAXIMA = 2500000   # 15% Base
-META_MEDIA  = 1500000   # 12% Base
-META_BASE   = 800000    # 10% Base
+# 🎯 METAS DE VENTA
+META_MAXIMA = 2500000
+META_MEDIA  = 1500000
+META_BASE   = 800000
 
 # ==========================================
-# 2. MOTOR INVISIBLE (DATOS + LÓGICA)
+# 2. MOTOR INVISIBLE
 # ==========================================
 @st.cache_data(ttl=3600)
 def obtener_dolar_bna():
@@ -57,7 +57,16 @@ URL_FORM_GOOGLE = ""
 
 MINUTOS_OFERTA = 10 
 
-CIUDADES_GRATIS = ["EL TREBOL", "LOS CARDOS", "LAS ROSAS", "SAN GENARO", "CENTENO", "CASAS", "CAÑADA ROSQUIN", "SAN VICENTE", "SAN MARTIN DE LAS ESCOBAS", "ANGELICA", "SUSANA", "RAFAELA", "SUNCHALES", "PRESIDENTE ROCA", "SA PEREIRA", "CLUCELLAS", "MARIA JUANA", "SASTRE", "SAN JORGE", "LAS PETACAS", "ZENON PEREYRA", "CARLOS PELLEGRINI", "LANDETA", "MARIA SUSANA", "PIAMONTE", "VILA", "SAN FRANCISCO"]
+# LISTA COMPLETA DE CIUDADES BONIFICADAS
+CIUDADES_GRATIS = [
+    "EL TREBOL", "LOS CARDOS", "LAS ROSAS", "SAN GENARO", "CENTENO", "CASAS", 
+    "CAÑADA ROSQUIN", "SAN VICENTE", "SAN MARTIN DE LAS ESCOBAS", "ANGELICA", 
+    "SUSANA", "RAFAELA", "SUNCHALES", "PRESIDENTE ROCA", "SA PEREIRA", 
+    "CLUCELLAS", "MARIA JUANA", "SASTRE", "SAN JORGE", "LAS PETACAS", 
+    "ZENON PEREYRA", "CARLOS PELLEGRINI", "LANDETA", "MARIA SUSANA", 
+    "PIAMONTE", "VILA", "SAN FRANCISCO"
+]
+
 TOASTS_EXITO = ["✨ ¡Excelente elección!", "🔥 ¡Te congelé este precio!", "💎 ¡Producto reservado!", "🚀 ¡Sumamos puntos!"]
 
 # ==========================================
@@ -161,7 +170,7 @@ def generar_link_wa(total):
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 5. UI: HEADER Y ESTILOS (SOLUCIÓN DEFINITIVA)
+# 5. UI: HEADER Y ESTILOS
 # ==========================================
 subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer, reloj_python = calcular_negocio()
 porcentaje_barra = 100
@@ -174,21 +183,14 @@ subtext_badge = f"Ahorro Total: {desc_actual}%" if (oferta_viva and subtotal > 0
 
 header_html = f"""
     <style>
-    /* 1. OCULTAR ELEMENTOS NATIVOS DE STREAMLIT (ELIMINA LOS 3 PUNTOS) */
-    #MainMenu {{ visibility: hidden; }}
-    footer {{ visibility: hidden; }}
-    header {{ visibility: hidden; }} /* Oculta la barra superior nativa vacía */
-    [data-testid="stToolbar"] {{ display: none; }} /* Doble seguridad */
+    /* Ocultar elementos nativos */
+    #MainMenu {{ visibility: hidden; }} footer {{ visibility: hidden; }} header {{ visibility: hidden; }} [data-testid="stToolbar"] {{ display: none; }}
 
-    /* 2. ESPACIO SUPERIOR PARA QUE EL ENCABEZADO NO PISE NADA */
-    .block-container {{ 
-        padding-top: 140px !important; /* Ajuste preciso */
-        padding-bottom: 150px !important; 
-    }}
-    
+    /* Layout */
+    .block-container {{ padding-top: 220px !important; padding-bottom: 150px !important; }}
     [data-testid="stSidebar"] {{ display: none; }} 
     
-    /* 3. BARRA DE CHAT FIJA ABAJO */
+    /* Input Chat Fijo */
     [data-testid="stBottomBlock"], [data-testid="stChatInput"] {{
         position: fixed; bottom: 0; left: 0; width: 100%;
         background-color: white; padding: 10px;
@@ -196,17 +198,15 @@ header_html = f"""
         box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
     }}
 
-    /* 4. HEADER FIJO (ENCABEZADO DE LA APP) */
+    /* Header Fijo */
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; 
-        background: #ffffff; 
-        z-index: 99990; /* Z-Index alto pero menor al modal de la web si hubiera conflicto */
+        background: #ffffff; z-index: 99990;
         border-bottom: 4px solid {color_barra}; 
-        height: 110px; 
-        overflow: hidden;
+        height: 110px; overflow: hidden;
     }}
     
-    /* 5. TABS FLOTANTES */
+    /* Tabs */
     .stTabs [data-baseweb="tab-list"] {{
         position: fixed; top: 110px; left: 0; width: 100%; 
         background: #ffffff; z-index: 99980;
@@ -216,7 +216,6 @@ header_html = f"""
     }}
     .stTabs [data-baseweb="tab"] {{ flex: 1; text-align: center; padding: 8px; font-weight: bold; font-size: 0.8rem; }}
 
-    /* ESTILOS INTERNOS DEL HEADER */
     .top-strip {{ background: #111; color: #fff; padding: 8px 15px; display: flex; justify-content: space-between; font-size: 0.7rem; align-items: center; height: 35px; }}
     .cart-summary {{ padding: 5px 15px; display: flex; justify-content: space-between; align-items: center; height: 70px; }}
     .price-tag {{ font-weight: 900; color: #333; white-space: nowrap; font-size: 1.4rem; }}
@@ -274,7 +273,7 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA (GOOGLE CLOUD + LÓGICA DE PRODUCTO)
+# 6. CEREBRO IA (REGLAS DE NEGOCIO RESTAURADAS)
 # ==========================================
 try:
     api_key = os.environ.get("GOOGLE_API_KEY")
@@ -291,22 +290,28 @@ DB: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
 # DATO INTERNO: DOLAR = {DOLAR_BNA}
 
-📏 **CATÁLOGO TÉCNICO Y LARGOS DE VENTA (ESTRICTO):**
+📏 **CATÁLOGO TÉCNICO Y LARGOS DE VENTA (MEMORIZAR):**
 1. **CONSTRUCCIÓN (ADN) / PERFIL C / IPN / UPN:** Barras de **12 METROS**.
-2. **TUBOS ESTRUCTURALES / HIERROS / ÁNGULOS / PLANCHUELAS:** Barras de **6 METROS**.
+2. **TUBOS ESTRUCTURALES / HIERROS / ÁNGULOS:** Barras de **6 METROS**.
 3. **CAÑOS (Uso Mecánico, Epoxi, Galvanizado, Schedule):** Barras de **6.40 METROS**.
 4. **CHAPA T90:** Única medida **13 METROS** (Hoja cerrada).
 5. **CHAPA COLOR:** Venta por Metro Lineal.
-6. **CHAPA CINCALUM:** Cortes según lista o base 1 Metro.
+6. **CHAPA CINCALUM:** Códigos de cortes específicos o base 1 Metro (Cod 4/6).
 7. **PINTURERIA/ACCESORIOS:** Unidad.
+
+🚚 **LOGÍSTICA Y ENVÍOS:**
+1. **ZONA GRATIS:** Si la ciudad está en la lista {CIUDADES_GRATIS} -> ¡Envío SIN CARGO!
+2. **OTRAS ZONAS:** Costo aproximado = `Distancia_KM * 2 * {COSTO_FLETE_USD} * {DOLAR_BNA}`.
+3. **ACOPIO:** ¡Ofrecemos acopio gratuito por **6 MESES**! (Ideal para congelar precio).
 
 ⛔ **REGLAS DE ORO:**
 1. **NO AGREGAR SIN PERMISO:** Cotiza -> Sugiere combo -> Espera "Sí" -> Agrega.
-2. **ANTI-AMBIGÜEDAD:** - Si piden "Planchuela/Ángulo" sin medida -> PREGUNTA ancho y espesor.
-   - Si piden "Estructural" sin medida -> PREGUNTA (Ej: 100x100, 80x40).
+2. **ANTI-AMBIGÜEDAD:** Si piden "Planchuela" sin medida -> PREGUNTA ancho y espesor.
 3. **CLASIFICACIÓN TIPO:** Chapa->CHAPA, Perfil->PERFIL, Pintura->PINTURA, Hierro->HIERRO.
 
-💞 **PERSONALIDAD:** Sé concreto pero amable. Induce al cierre.
+💞 **PERSONALIDAD:**
+- Seductor comercial, amable pero técnico.
+- Usa el **ACOPIO** y los **DESCUENTOS** como cierre: "Aprovechá a congelar el precio y te lo guardamos 6 meses".
 
 SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
 """
