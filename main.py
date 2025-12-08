@@ -56,7 +56,7 @@ SHEET_ID = "2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvn
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/e/{SHEET_ID}/pub?gid=2029869540&single=true&output=csv"
 URL_FORM_GOOGLE = "" 
 
-MINUTOS_OFERTA = 5 
+MINUTOS_OFERTA = 5
 
 CIUDADES_GRATIS = [
     "EL TREBOL", "LOS CARDOS", "LAS ROSAS", "SAN GENARO", "CENTENO", "CASAS", 
@@ -82,11 +82,12 @@ if "expiry_time" not in st.session_state:
     st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
 
 if "messages" not in st.session_state:
+    # SALUDO "SNIPER"
     saludo = """
-🦁 **Soy Miguel.** Dólar actualizado y Stock listo.
+🦁 **Soy Miguel.** Dólar actualizado. Stock listo.
 
-👇 **PASAME TU PEDIDO YA** (Escribí o tocá **➕ Adjuntar** para subir foto).
-*¡Si estás en zona bonificada el envío es GRATIS!* 🚚
+👇 **PASAME TU PEDIDO YA** (Escribí o usá el botón **➕** para subir foto).
+*¡El precio se congela por 5 minutos!* ⏳
     """
     st.session_state.messages = [{"role": "assistant", "content": saludo}]
 
@@ -126,7 +127,9 @@ def calcular_negocio():
     if activa:
         m, s = divmod(segundos_restantes, 60)
         reloj_init = f"{m:02d}:{s:02d}"
-        color_reloj = "#2e7d32" if m > 2 else "#d32f2f"
+        color_reloj = "#2e7d32" if m > 2 else "#ff0000" # Rojo Temu
+        # Efecto parpadeo si falta menos de 1 min
+        if m < 1: color_reloj = "#ff0000; animation: blink 1s infinite"
     else:
         reloj_init = "00:00"
         color_reloj = "#b0bec5"
@@ -155,21 +158,19 @@ def calcular_negocio():
             nivel_texto = f"{nivel_texto} + {' '.join(boosters)}"
             if desc_total >= 15: color = "#6200ea" 
     else:
-        if bruto > META_MAXIMA: desc_total = 12; nivel_texto = "EXPIRADO"; color = "#455a64"
-        else: desc_total = 0; nivel_texto = "EXPIRADO"; color = "#455a64"
+        desc_total = 0; nivel_texto = "EXPIRADO"; color = "#455a64"
 
     neto = bruto * (1 - (desc_total/100))
     ahorro_total = bruto - neto
-    
     return bruto, neto, desc_total, color, nivel_texto, meta, segundos_restantes, activa, color_reloj, reloj_init, ahorro_total
 
 def generar_link_wa(total):
-    txt = "HOLA, QUIERO CONGELAR PRECIO YA (Oferta Flash):\n" + "\n".join([f"▪ {i['cantidad']}x {i['producto']}" for i in st.session_state.cart])
+    txt = "HOLA, QUIERO CONGELAR PRECIO YA:\n" + "\n".join([f"▪ {i['cantidad']}x {i['producto']}" for i in st.session_state.cart])
     txt += f"\n💰 TOTAL FINAL: ${total:,.0f} + IVA"
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 5. UI: HEADER AGRESIVO "TEMU"
+# 5. UI: HEADER AGRESIVO
 # ==========================================
 subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer, reloj_python, dinero_ahorrado = calcular_negocio()
 porcentaje_barra = 100
@@ -177,7 +178,7 @@ if prox_meta > 0: porcentaje_barra = min((subtotal / prox_meta) * 100, 100)
 
 display_precio = f"${total_final:,.0f}" if subtotal > 0 else "COTIZAR"
 display_iva = "+IVA" if subtotal > 0 else ""
-display_badge = nombre_nivel[:25] + "..." if len(nombre_nivel) > 25 and subtotal > 0 else (nombre_nivel if subtotal > 0 else "⚡ 3% OFF YA")
+display_badge = nombre_nivel[:20] + "..." if len(nombre_nivel) > 20 and subtotal > 0 else (nombre_nivel if subtotal > 0 else "⚡ 3% OFF")
 
 if dinero_ahorrado > 0:
     subtext_badge = f"🔥 AHORRAS: ${dinero_ahorrado:,.0f}"
@@ -186,13 +187,15 @@ else:
 
 header_html = f"""
     <style>
+    /* LIMPIEZA */
     #MainMenu, footer, header {{ visibility: hidden !important; }}
     [data-testid="stToolbar"] {{ display: none !important; }}
     
-    .block-container {{ padding-top: 150px !important; padding-bottom: 120px !important; }}
+    /* LAYOUT OPTIMIZADO PARA MÓVIL */
+    .block-container {{ padding-top: 130px !important; padding-bottom: 120px !important; }}
     [data-testid="stSidebar"] {{ display: none; }} 
     
-    /* CHAT ABAJO FINO */
+    /* INPUT CHAT SLIM */
     [data-testid="stBottomBlock"], [data-testid="stChatInput"] {{ 
         position: fixed; bottom: 0; left: 0; width: 100%; 
         background: white; padding: 5px 10px !important; 
@@ -201,30 +204,35 @@ header_html = f"""
     .stChatInputContainer textarea {{ min-height: 38px !important; height: 38px !important; padding: 8px !important; }}
 
     /* HEADER */
-    .fixed-header {{ position: fixed; top: 0; left: 0; width: 100%; background: #fff; z-index: 99990; border-bottom: 4px solid {color_barra}; height: 110px; overflow: hidden; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }}
+    .fixed-header {{ position: fixed; top: 0; left: 0; width: 100%; background: #fff; z-index: 99990; border-bottom: 4px solid {color_barra}; height: 95px; overflow: hidden; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }}
     
+    /* ANIMACIONES */
     @keyframes heartbeat {{ 0% {{ transform: scale(1); }} 15% {{ transform: scale(1.05); }} 30% {{ transform: scale(1); }} 45% {{ transform: scale(1.05); }} 60% {{ transform: scale(1); }} }}
-    .price-tag {{ font-weight: 900; color: #111; font-size: 1.6rem; animation: heartbeat 2s infinite; }}
+    @keyframes blink {{ 50% {{ opacity: 0; }} }}
     
-    .progress-container {{ width: 100%; height: 8px; background: #eee; position: absolute; bottom: 0; }}
+    .price-tag {{ font-weight: 900; color: #111; font-size: 1.4rem; animation: heartbeat 2s infinite; }}
+    .badge {{ background: {color_barra}; color: white; padding: 3px 8px; border-radius: 4px; font-weight: 900; font-size: 0.75rem; text-transform: uppercase; }}
+    
+    /* BARRA PROGRESO */
+    .progress-container {{ width: 100%; height: 6px; background: #eee; position: absolute; bottom: 0; }}
     .progress-bar {{ 
         height: 100%; width: {porcentaje_barra}%; background: {color_barra}; transition: width 0.5s ease-out; 
-        background-image: linear-gradient(45deg,rgba(255,255,255,.2) 25%,transparent 25%,transparent 50%,rgba(255,255,255,.2) 50%,rgba(255,255,255,.2) 75%,transparent 75%,transparent);
+        background-image: linear-gradient(45deg,rgba(255,255,255,.3) 25%,transparent 25%,transparent 50%,rgba(255,255,255,.3) 50%,rgba(255,255,255,.3) 75%,transparent 75%,transparent);
         background-size: 1rem 1rem; animation: progress-stripes 0.5s linear infinite;
     }}
     @keyframes progress-stripes {{ from {{ background-position: 1rem 0; }} to {{ background-position: 0 0; }} }}
 
-    .top-strip {{ background: #000; color: #fff; padding: 5px 15px; display: flex; justify-content: space-between; font-size: 0.75rem; align-items: center; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }}
-    .cart-summary {{ padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; height: 75px; }}
-    .badge {{ background: {color_barra}; color: white; padding: 5px 12px; border-radius: 4px; font-weight: 900; text-transform: uppercase; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }}
-    .timer-box {{ color: {color_timer}; background: #fff; padding: 2px 8px; border-radius: 4px; font-weight: 900; }}
+    .top-strip {{ background: #000; color: #fff; padding: 4px 10px; display: flex; justify-content: space-between; font-size: 0.7rem; align-items: center; font-weight: bold; letter-spacing: 0.5px; }}
+    .cart-summary {{ padding: 5px 15px; display: flex; justify-content: space-between; align-items: center; height: 60px; }}
+    .timer-box {{ color: {color_timer}; background: #fff; padding: 1px 6px; border-radius: 3px; font-weight: 900; }}
     
-    .stTabs [data-baseweb="tab-list"] {{ position: fixed; top: 110px; left: 0; width: 100%; background: #fff; z-index: 99980; padding-top: 5px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }}
-    .stTabs [data-baseweb="tab"] {{ flex: 1; text-align: center; padding: 8px; font-weight: bold; font-size: 0.8rem; }}
+    /* TABS */
+    .stTabs [data-baseweb="tab-list"] {{ position: fixed; top: 95px; left: 0; width: 100%; background: #ffffff; z-index: 99980; padding-top: 2px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }}
+    .stTabs [data-baseweb="tab"] {{ flex: 1; text-align: center; padding: 6px; font-weight: bold; font-size: 0.75rem; }}
     
-    /* BOTÓN FLOTANTE ESTILO WHATSAPP (EL +) */
+    /* BOTÓN FLOTANTE ESTILO WHATSAPP (EL +) CON PULSO */
     div[data-testid="stPopover"] {{
-        position: fixed; bottom: 70px; left: 15px; z-index: 200000;
+        position: fixed; bottom: 65px; left: 10px; z-index: 200000;
         width: auto;
     }}
     div[data-testid="stPopover"] button {{
@@ -232,7 +240,9 @@ header_html = f"""
         background-color: #25D366; color: white; border: 2px solid white;
         box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         display: flex; align-items: center; justify-content: center; font-size: 20px;
+        animation: pulse-green-btn 2s infinite;
     }}
+    @keyframes pulse-green-btn {{ 0% {{ box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.7); }} 70% {{ box-shadow: 0 0 0 10px rgba(37, 211, 102, 0); }} 100% {{ box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }} }}
     </style>
     
     <div class="fixed-header">
@@ -243,7 +253,7 @@ header_html = f"""
         <div class="cart-summary">
             <div>
                 <span class="badge">{display_badge}</span>
-                <div style="font-size:0.7rem; color:{color_barra}; font-weight:800; margin-top:4px;">{subtext_badge}</div>
+                <div style="font-size:0.7rem; color:{color_barra}; font-weight:800; margin-top:2px; animation: heartbeat 1.5s infinite;">{subtext_badge}</div>
             </div>
             <div class="price-tag">{display_precio}<span style="font-size:0.8rem; font-weight:400; color:#666;">{display_iva}</span></div>
         </div>
@@ -264,7 +274,7 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA (REGLAS Y PREGUNTAS INTELIGENTES)
+# 6. CEREBRO IA (REGLAS + LOGÍSTICA CORREGIDA)
 # ==========================================
 try:
     api_key = os.environ.get("GOOGLE_API_KEY")
@@ -281,26 +291,23 @@ ZONA GRATIS: {CIUDADES_GRATIS}
 DOLAR: {DOLAR_BNA}
 
 📏 **CATÁLOGO TÉCNICO (ESTRICTO):**
-- 12 METROS: Perfil C, IPN, UPN, ADN.
-- 6.40 METROS: Caños (Mecánico, Epoxi, Galvanizado, Schedule).
-- 6 METROS: Tubos Estructurales, Hierros, Ángulos, Planchuelas.
-- CHAPA T90: Única medida 13 METROS.
-- CHAPA COLOR: Venta por metro.
-- CINCALUM: Por metro (Ref Cod 4/6).
+- **12m:** Perfil C, IPN, UPN, ADN.
+- **6.40m:** Caños (Mecánico, Epoxi, Galvanizado).
+- **6m:** Tubos Estructurales, Hierros, Ángulos.
+- **CHAPA T90:** Única medida 13m.
+- **CHAPA COLOR:** Por metro.
+- **CINCALUM:** Por metro (Ref Cod 4/6).
 
 🚚 **LOGÍSTICA:**
-1. **ZONA GRATIS:** {CIUDADES_GRATIS} -> $0 Envío.
-2. **OTRAS:** Costo = `KM * 2 * 0.85 USD * DOLAR * 1.21`.
-3. **ACOPIO:** 6 Meses Gratis.
+1. **ZONA GRATIS:** Si la ciudad está en {CIUDADES_GRATIS} -> ENVÍO $0.
+2. **OTRAS ZONAS:** Costo = `KM_TOTAL (IDA+VUELTA) * 0.85 USD * {DOLAR_BNA} * 1.21 (IVA)`.
+3. **ACOPIO:** "Comprá hoy, retirá en **6 MESES** sin cargo".
 
-⛔ **REGLA DE ORO (PREGUNTAR ANTES DE ASUMIR):**
-Si el cliente dice "Planchuela" o "Perfil" SIN MEDIDA -> **NO COTICES UN PRECIO AL AZAR.**
-❌ Mal: "La planchuela de 1 pulgada sale $X". (¿Y si quería de 2 pulgadas?).
-✅ Bien: "Tengo muchas medidas. ¿De qué ancho y espesor buscás? (Ej: 1x3/16)".
-
-⛔ **REGLA DE CONFIRMACIÓN:**
-- Solo agrega `[ADD:...]` si el cliente confirma la compra.
-- Si solo pide precio, da el precio y pregunta: "¿Te lo separo?".
+⛔ **PROTOCOLO SNIPER:**
+1. **BREVEDAD:** Max 15 palabras. Directo.
+2. **CONFIRMACIÓN:** SOLO agrega `[ADD:...]` si el cliente dice "SÍ". Primero cotiza.
+3. **UPSELL:** "Te faltan $X para el descuento. ¿Agrego pintura?".
+4. **ANTI-AMBIGÜEDAD:** Si falta medida, PREGUNTA.
 
 SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
 """
@@ -312,8 +319,8 @@ def procesar_input(contenido, es_imagen=False):
     if "chat_session" in st.session_state:
         msg = contenido
         prefix = ""
-        if es_imagen: msg = ["COTIZA ESTO. SI FALTAN MEDIDAS, PREGUNTA.", contenido]
-        prompt = f"{prefix}{msg}. (NOTA: Sé breve. Si es ambiguo, pregunta. No agregues sin confirmar)." if not es_imagen else msg
+        if es_imagen: msg = ["COTIZA ESTO RÁPIDO. DETECTA OPORTUNIDADES DE COMBO.", contenido]
+        prompt = f"{prefix}{msg}. (NOTA: Sé breve. Cotiza precios. NO AGREGUES sin confirmación)." if not es_imagen else msg
         return st.session_state.chat_session.send_message(prompt).text
     return "Error: Chat off."
 
@@ -323,18 +330,19 @@ def procesar_input(contenido, es_imagen=False):
 tab1, tab2 = st.tabs(["💬 COTIZAR", f"🛒 MI PEDIDO ({len(st.session_state.cart)})"])
 spacer = '<div style="height: 20px;"></div>'
 
-# BOTÓN FLOTANTE "FINALIZAR"
+# --- 💡 "STICKY FOOTER" DE PAGO (SOLO APARECE SI HAY $ EN JUEGO) ---
 if len(st.session_state.cart) > 0 and oferta_viva:
     st.markdown(f"""
-    <div style="position:fixed; bottom:80px; right:15px; z-index:99999;">
-        <a href="#mi-pedido" onclick="document.getElementsByTagName('button')[1].click();" style="
-            background: #ff0000; color: white; padding: 12px 20px; border-radius: 50px; 
-            font-weight: bold; text-decoration: none; box-shadow: 0 5px 20px rgba(255,0,0,0.5);
-            display: flex; align-items: center; gap: 8px; animation: pulse-red 1s infinite; font-size: 0.9rem;">
-            🛒 FINALIZAR (${total_final:,.0f}) 
+    <div style="position:fixed; bottom:75px; right:10px; left:10px; z-index:200000; display:flex; justify-content:center;">
+        <a href="{generar_link_wa(total_final)}" target="_blank" style="
+            background: linear-gradient(90deg, #ff0000, #ff4d4d); color: white; 
+            padding: 12px 30px; border-radius: 50px; width: 100%; text-align:center;
+            font-weight: 900; text-decoration: none; box-shadow: 0 5px 20px rgba(255,0,0,0.6);
+            border: 2px solid #fff; font-size: 1rem; animation: pulse-red 1.5s infinite;">
+            🔥 PAGAR AHORA: ${total_final:,.0f} ➔
         </a>
     </div>
-    <style>@keyframes pulse-red {{ 0% {{ transform: scale(1); }} 50% {{ transform: scale(1.05); }} 100% {{ transform: scale(1); }} }}</style>
+    <style>@keyframes pulse-red {{ 0% {{ transform: scale(1); }} 50% {{ transform: scale(1.02); }} 100% {{ transform: scale(1); }} }}</style>
     """, unsafe_allow_html=True)
 
 with tab1:
@@ -345,6 +353,7 @@ with tab1:
             st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
             st.rerun()
 
+    # POP-UP AGRESIVO DE OPORTUNIDAD
     if 0 < prox_meta - subtotal < 150000 and oferta_viva:
         st.toast(f"🚨 ¡FALTAN ${prox_meta - subtotal:,.0f} PARA DESCUENTO! SUMÁ ALGO CHICO.", icon="🔥")
 
@@ -356,6 +365,7 @@ with tab1:
     with st.container():
         c1, c2 = st.columns([1.5, 8.5])
         with c1:
+            # BOTÓN + CON ESTILO WHATSAPP
             with st.popover("➕", use_container_width=False):
                 st.caption("Subir Foto")
                 img = st.file_uploader("", type=["jpg","png","jpeg"], label_visibility="collapsed")
@@ -382,9 +392,11 @@ with tab1:
                         news = parsear_ordenes_bot(res)
                         display = re.sub(r'\[ADD:.*?\]', '', res)
                         st.markdown(display)
+                        
                         if news: 
                             st.toast(random.choice(TOASTS_EXITO), icon='🔥')
                             if desc_actual >= 12: st.balloons()
+                        
                         st.session_state.messages.append({"role": "assistant", "content": res})
                         if news: time.sleep(1); st.rerun()
                 except: st.error("Error.")
@@ -404,7 +416,7 @@ with tab2:
                 if item['cantidad'] == 0: st.session_state.cart.pop(i); st.rerun()
                 st.markdown("---")
         
-        # BOTÓN DE PAGO GIGANTE
+        # BOTÓN DE PAGO GIGANTE EN PESTAÑA CARRITO (Backup)
         st.markdown(f"""
         <a href="{generar_link_wa(total_final)}" target="_blank" style="
             display:block; width:100%; background: linear-gradient(45deg, #25D366, #128C7E); 
