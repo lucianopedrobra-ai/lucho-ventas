@@ -22,10 +22,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 🎯 METAS DE VENTA
-META_MAXIMA = 2500000
-META_MEDIA  = 1500000
-META_BASE   = 800000
+# 🎯 METAS DE VENTA (GAMIFICACIÓN)
+META_MAXIMA = 2500000   # 15% Nivel Dios
+META_MEDIA  = 1500000   # 12% Nivel Constructor
+META_BASE   = 800000    # 10% Nivel Obra
 
 # ==========================================
 # 2. MOTOR INVISIBLE
@@ -56,8 +56,17 @@ SHEET_URL = f"https://docs.google.com/spreadsheets/d/e/{SHEET_ID}/pub?gid=202986
 URL_FORM_GOOGLE = "" 
 
 MINUTOS_OFERTA = 10 
-CIUDADES_GRATIS = ["EL TREBOL", "LOS CARDOS", "LAS ROSAS", "SAN GENARO", "CENTENO", "CASAS", "CAÑADA ROSQUIN", "SAN VICENTE", "SAN MARTIN DE LAS ESCOBAS", "ANGELICA", "SUSANA", "RAFAELA", "SUNCHALES", "PRESIDENTE ROCA", "SA PEREIRA", "CLUCELLAS", "MARIA JUANA", "SASTRE", "SAN JORGE", "LAS PETACAS", "ZENON PEREYRA", "CARLOS PELLEGRINI", "LANDETA", "MARIA SUSANA", "PIAMONTE", "VILA", "SAN FRANCISCO"]
-TOASTS_EXITO = ["✨ ¡Excelente elección!", "🔥 ¡Te congelé este precio!", "💎 ¡Producto reservado!", "🚀 ¡Sumamos puntos!"]
+
+CIUDADES_GRATIS = [
+    "EL TREBOL", "LOS CARDOS", "LAS ROSAS", "SAN GENARO", "CENTENO", "CASAS", 
+    "CAÑADA ROSQUIN", "SAN VICENTE", "SAN MARTIN DE LAS ESCOBAS", "ANGELICA", 
+    "SUSANA", "RAFAELA", "SUNCHALES", "PRESIDENTE ROCA", "SA PEREIRA", 
+    "CLUCELLAS", "MARIA JUANA", "SASTRE", "SAN JORGE", "LAS PETACAS", 
+    "ZENON PEREYRA", "CARLOS PELLEGRINI", "LANDETA", "MARIA SUSANA", 
+    "PIAMONTE", "VILA", "SAN FRANCISCO"
+]
+
+TOASTS_EXITO = ["✨ ¡Excelente elección!", "🔥 ¡Precio congelado!", "💎 ¡Producto reservado!", "🚀 ¡Ahorro desbloqueado!"]
 
 # ==========================================
 # 3. ESTADO DE LA SESIÓN
@@ -74,13 +83,13 @@ if "expiry_time" not in st.session_state:
 if "messages" not in st.session_state:
     saludo_inicial = """
 👋 **¡Hola! Soy Miguel, tu asistente experto.**
-Estoy conectado al stock en tiempo real y tengo el dólar actualizado.
+Tengo el stock abierto y el dólar actualizado.
 
-🚀 **¿CÓMO PODEMOS COTIZAR?**
-1. ✍️ **Escribime** la lista de materiales aquí abajo.
-2. 📸 **Subí una foto** de tu papel escrito a mano (Tocá el botón **➕ Adjuntar**).
+🚀 **PARA COTIZAR RÁPIDO:**
+1. ✍️ **Escribime** la lista de materiales.
+2. 📸 **Subí una foto** de tu lista (Botón **➕ Adjuntar**).
 
-*¡Probá subir una foto, soy muy rápido!* 😉
+*¡Aprovechá los descuentos por volumen y el acopio gratis!* 😉
     """
     st.session_state.messages = [{"role": "assistant", "content": saludo_inicial}]
 
@@ -96,7 +105,12 @@ csv_context = load_data()
 
 def enviar_a_google_form_background(cliente, monto, oportunidad):
     if URL_FORM_GOOGLE:
-        try: requests.post(URL_FORM_GOOGLE, data={'entry.xxxxxx': str(cliente), 'entry.xxxxxx': str(monto), 'entry.xxxxxx': str(oportunidad)}, timeout=1)
+        try: 
+            requests.post(URL_FORM_GOOGLE, data={
+                ID_CAMPO_CLIENTE: str(cliente), 
+                ID_CAMPO_MONTO: str(monto), 
+                ID_CAMPO_OPORTUNIDAD: str(oportunidad)
+            }, timeout=1)
         except: pass
 
 def log_interaction(user_text, monto):
@@ -106,11 +120,18 @@ def log_interaction(user_text, monto):
 def parsear_ordenes_bot(texto):
     items_nuevos = []
     for cant, prod, precio, tipo in re.findall(r'\[ADD:([\d\.]+):([^:]+):([\d\.]+):([^\]]+)\]', texto):
-        item = {"cantidad": float(cant), "producto": prod.strip(), "precio_unit": float(precio), "subtotal": float(cant)*float(precio), "tipo": tipo.strip().upper()}
+        item = {
+            "cantidad": float(cant), 
+            "producto": prod.strip(), 
+            "precio_unit": float(precio), 
+            "subtotal": float(cant)*float(precio), 
+            "tipo": tipo.strip().upper()
+        }
         st.session_state.cart.append(item)
         items_nuevos.append(item)
     return items_nuevos
 
+# --- LÓGICA DE NEGOCIO (BASE + BOOSTERS + ACOPIO) ---
 def calcular_negocio():
     now = datetime.datetime.now()
     tiempo_restante = st.session_state.expiry_time - now
@@ -128,6 +149,7 @@ def calcular_negocio():
     bruto = sum(i['subtotal'] for i in st.session_state.cart)
     desc_base = 0; desc_extra = 0; nivel_texto = "PRECIO LISTA"; color = "#546e7a"; meta = META_BASE
     
+    # Detección de tipos para combos
     tipos_en_carrito = [x['tipo'] for x in st.session_state.cart]
     tiene_chapa = any("CHAPA" in t for t in tipos_en_carrito)
     tiene_perfil = any("PERFIL" in t for t in tipos_en_carrito)
@@ -135,24 +157,36 @@ def calcular_negocio():
     tiene_pintura = any("PINTURA" in t or "ACCESORIO" in t or "ELECTRODO" in t for t in tipos_en_carrito)
 
     if activa:
-        if bruto > META_MAXIMA: desc_base = 15; nivel_texto = "PARTNER (15%)"; color = "#6200ea"; meta = 0
-        elif bruto > META_MEDIA: desc_base = 12; nivel_texto = "CONSTRUCTOR (12%)"; color = "#d32f2f"; meta = META_MAXIMA
-        elif bruto > META_BASE: desc_base = 10; nivel_texto = "OBRA (10%)"; color = "#f57c00"; meta = META_MEDIA
-        else: desc_base = 3; nivel_texto = "CONTADO (3%)"; color = "#2e7d32"; meta = META_BASE
+        # A. CALCULO BASE
+        if bruto > META_MAXIMA: 
+            desc_base = 15; nivel_texto = "PARTNER (15%)"; color = "#6200ea"; meta = 0
+        elif bruto > META_MEDIA: 
+            desc_base = 12; nivel_texto = "CONSTRUCTOR (12%)"; color = "#d32f2f"; meta = META_MAXIMA
+        elif bruto > META_BASE: 
+            desc_base = 10; nivel_texto = "OBRA (10%)"; color = "#f57c00"; meta = META_MEDIA
+        else: 
+            desc_base = 3; nivel_texto = "CONTADO (3%)"; color = "#2e7d32"; meta = META_BASE
 
+        # B. BOOSTERS (Combos)
         boosters_activos = []
-        if tiene_chapa and tiene_perfil: desc_extra += 3; boosters_activos.append("🏠 KIT TECHO")
-        elif tiene_acero and tiene_pintura: desc_extra += 2; boosters_activos.append("🎨 PACK TERM.")
+        if tiene_chapa and tiene_perfil:
+            desc_extra += 3; boosters_activos.append("🏠 KIT TECHO")
+        elif tiene_acero and tiene_pintura: 
+            desc_extra += 2; boosters_activos.append("🎨 PACK TERM.")
             
         desc_total = min(desc_base + desc_extra, 18)
-        if desc_extra > 0: nivel_texto = f"{nivel_texto} + {' '.join(boosters_activos)}"; 
-        if desc_total >= 15: color = "#6200ea"
+        
+        if desc_extra > 0:
+            nivel_texto = f"{nivel_texto} + {' '.join(boosters_activos)}"
+            if desc_total >= 15: color = "#6200ea" 
     else:
         if bruto > META_MAXIMA: desc_total = 12; nivel_texto = "OFERTA EXPIRADA"; color = "#455a64"
         else: desc_total = 0; nivel_texto = "PRECIO LISTA"; color = "#455a64"
 
     neto = bruto * (1 - (desc_total/100))
-    return bruto, neto, desc_total, color, nivel_texto, meta, segundos_restantes, activa, color_reloj, reloj_init
+    ahorro_total = bruto - neto
+    
+    return bruto, neto, desc_total, color, nivel_texto, meta, segundos_restantes, activa, color_reloj, reloj_init, ahorro_total
 
 def generar_link_wa(total):
     txt = "Hola Martín, confirmar pedido:\n" + "\n".join([f"▪ {i['cantidad']}x {i['producto']}" for i in st.session_state.cart])
@@ -160,27 +194,35 @@ def generar_link_wa(total):
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 5. UI: HEADER Y ESTILOS
+# 5. UI: HEADER "TEMU ELEGANTE"
 # ==========================================
-subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer, reloj_python = calcular_negocio()
+subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer, reloj_python, dinero_ahorrado = calcular_negocio()
 porcentaje_barra = 100
 if prox_meta > 0: porcentaje_barra = min((subtotal / prox_meta) * 100, 100)
 
 display_precio = f"${total_final:,.0f}" if subtotal > 0 else "🛒 COTIZAR"
 display_iva = "+IVA" if subtotal > 0 else ""
 display_badge = nombre_nivel[:25] + "..." if len(nombre_nivel) > 25 and subtotal > 0 else (nombre_nivel if subtotal > 0 else "⚡ 3% OFF YA")
-subtext_badge = f"Ahorro Total: {desc_actual}%" if (oferta_viva and subtotal > 0) else "TIEMPO LIMITADO"
+
+# TEXTO DE AHORRO DINÁMICO (CLAVE TEMU)
+if dinero_ahorrado > 0:
+    subtext_badge = f"🔥 Ahorraste: ${dinero_ahorrado:,.0f}"
+else:
+    subtext_badge = "TIEMPO LIMITADO"
 
 header_html = f"""
     <style>
+    /* LIMPIEZA DE INTERFAZ */
     #MainMenu {{ visibility: hidden !important; }}
     footer {{ visibility: hidden !important; }}
     header {{ visibility: hidden !important; }}
     [data-testid="stToolbar"] {{ display: none !important; }}
 
+    /* LAYOUT */
     .block-container {{ padding-top: 140px !important; padding-bottom: 150px !important; }}
     [data-testid="stSidebar"] {{ display: none; }} 
     
+    /* CHAT ABAJO */
     [data-testid="stBottomBlock"], [data-testid="stChatInput"] {{
         position: fixed; bottom: 0; left: 0; width: 100%;
         background-color: white; padding: 10px;
@@ -188,6 +230,7 @@ header_html = f"""
         box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
     }}
 
+    /* HEADER */
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; 
         background: #ffffff; z-index: 99990;
@@ -195,6 +238,7 @@ header_html = f"""
         height: 110px; overflow: hidden;
     }}
     
+    /* TABS */
     .stTabs [data-baseweb="tab-list"] {{
         position: fixed; top: 110px; left: 0; width: 100%; 
         background: #ffffff; z-index: 99980;
@@ -217,7 +261,7 @@ header_html = f"""
     
     .timer-container {{ display: flex; align-items: center; gap: 5px; }}
     .timer-box {{ color: {color_timer}; font-weight: 900; font-size: 0.8rem; background: #fff; padding: 1px 6px; border-radius: 4px; border: 1px solid {color_timer}; min-width: 45px; text-align: center; }}
-    .progress-container {{ width: 100%; height: 5px; background: #eee; position: absolute; bottom: 0; }}
+    .progress-container {{ width: 100%; height: 6px; background: #eee; position: absolute; bottom: 0; }}
     .progress-bar {{ height: 100%; width: {porcentaje_barra}%; background: {color_barra}; transition: width 0.8s ease-out; }}
     </style>
     
@@ -232,7 +276,7 @@ header_html = f"""
         <div class="cart-summary">
             <div>
                 <span class="badge">{display_badge}</span>
-                <div style="font-size:0.6rem; color:#666; margin-top:2px; white-space:nowrap;">
+                <div style="font-size:0.65rem; color:{color_barra}; font-weight:bold; margin-top:2px; white-space:nowrap;">
                     {subtext_badge}
                 </div>
             </div>
@@ -261,7 +305,7 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA (REGLAS ESTRICTAS DE CONFIRMACIÓN)
+# 6. CEREBRO IA (ESTRATEGIA ASESORÍA FINANCIERA)
 # ==========================================
 try:
     api_key = os.environ.get("GOOGLE_API_KEY")
@@ -273,7 +317,7 @@ try:
 except Exception as e: st.error(f"Error IA: {e}")
 
 sys_prompt = f"""
-ROL: Miguel, ejecutivo comercial de Pedro Bravin S.A.
+ROL: Miguel, asesor comercial experto de Pedro Bravin S.A.
 DB: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
 # DATO INTERNO: DOLAR = {DOLAR_BNA}
@@ -284,28 +328,25 @@ ZONA GRATIS: {CIUDADES_GRATIS}
 3. **CAÑOS (Uso Mecánico, Epoxi, Galvanizado, Schedule):** Barras de **6.40 METROS**.
 4. **CHAPA T90:** Única medida **13 METROS** (Hoja cerrada).
 5. **CHAPA COLOR:** Venta por Metro Lineal.
-6. **CHAPA CINCALUM:** Códigos de cortes específicos o base 1 Metro (Cod 4/6).
+6. **CHAPA CINCALUM:** Cortes específicos o base 1 Metro (Cod 4/6).
 7. **PINTURERIA/ACCESORIOS:** Unidad.
 
-🚚 **LOGÍSTICA Y ENVÍOS:**
-1. **ZONA GRATIS:** Si la ciudad está en {CIUDADES_GRATIS} -> Envío $0.
-2. **OTRAS ZONAS:** Costo = `KM * 2 * {COSTO_FLETE_USD} * {DOLAR_BNA}`.
-3. **ACOPIO:** 6 Meses Gratis.
+🚚 **LOGÍSTICA Y BENEFICIOS:**
+1. **ZONA GRATIS:** Si la ciudad está en la lista {CIUDADES_GRATIS} -> ¡Envío $0!
+2. **OTRAS ZONAS:** Costo = `Distancia_KM * 2 * {COSTO_FLETE_USD} * {DOLAR_BNA}`.
+3. **ACOPIO GRATIS:** "Podés comprar hoy para congelar precio y retirar hasta en **6 MESES** sin cargo".
 
-⛔ **REGLAS DE ORO (CONFIRMACIÓN):**
-1. **PROHIBIDO AGREGAR AUTOMÁTICAMENTE:**
-   - Si el usuario pregunta "¿Cuánto vale?" o dice "Necesito X", **SOLO COTIZA verbalmente**.
-   - **NO generes el comando [ADD:...] todavía.**
-   - Pregunta: "¿Te lo cargo al pedido?" o "¿Confirmamos?".
-   - **SOLO** si responde "Sí", "Agregalo", "Dale", ENTONCES genera `[ADD:...]`.
+⛔ **PROTOCOLO DE CONFIRMACIÓN (ÉTICA):**
+1. **NO AGREGAR AUTOMÁTICAMENTE:**
+   - Si el cliente solo pregunta precio, **COTIZA verbalmente**.
+   - Pregunta: "¿Te lo cargo al pedido?" o "¿Avanzamos con esto?".
+   - **SOLO SI DICE SÍ/AGREGAR:** Genera `[ADD:...]`.
 
-2. **ANTI-AMBIGÜEDAD:** Si piden "Planchuela" sin medida -> PREGUNTA antes de cotizar.
+2. **ANTI-AMBIGÜEDAD:** Si faltan medidas, PREGUNTA.
 
-3. **CLASIFICACIÓN TIPO:** Chapa->CHAPA, Perfil->PERFIL, Pintura->PINTURA, Hierro->HIERRO.
-
-💞 **PERSONALIDAD:**
-- Seductor comercial, amable pero técnico.
-- Usa el **ACOPIO** y los **DESCUENTOS** como cierre.
+3. **ESTRATEGIA TEMU (ASESORÍA):**
+   - No digas "comprá más". Di: "**Si sumás X cosa, saltás de nivel de descuento y te ahorrás $Y en el total**".
+   - Muestra el ahorro potencial.
 
 SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
 """
@@ -319,9 +360,9 @@ def procesar_input(contenido, es_imagen=False):
         msg = contenido
         prefix = ""
         if es_imagen: 
-            msg = ["Analiza lista. COTIZA SOLO LO QUE VES.", contenido]
+            msg = ["Analiza lista. COTIZA SOLO LO QUE VES. NO INVENTES ITEMS.", contenido]
         
-        prompt_final = f"{prefix}{msg}. (NOTA INTERNA: Cotiza precios primero. SOLO agrega al carro si el usuario CONFIRMA explícitamente)." if not es_imagen else msg
+        prompt_final = f"{prefix}{msg}. (NOTA INTERNA: Cotiza precios. NO AGREGUES al carro sin confirmación explícita)." if not es_imagen else msg
         return st.session_state.chat_session.send_message(prompt_final).text
     return "Error: Chat no iniciado."
 
@@ -429,6 +470,9 @@ with tab2:
         <div style="background:{color_barra}; color:white; padding:20px; border-radius:15px; text-align:center; margin-top:15px; box-shadow: 0 4px 15px {color_barra}66; border: 2px solid #fff;">
             <div style="font-size:0.8rem; opacity:0.9;">TOTAL FINAL CONTADO (+IVA)</div>
             <div style="font-size:2.2rem; font-weight:900;">${total_final:,.0f}</div>
+            <div style="font-size:0.8rem; margin-top:5px; background:rgba(0,0,0,0.2); padding:4px 10px; border-radius:10px; display:inline-block;">
+                { '⚡ DESCUENTO APLICADO' if oferta_viva else '❌ PRECIO LISTA' }
+            </div>
         </div>
         """, unsafe_allow_html=True)
         
