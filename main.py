@@ -13,7 +13,7 @@ from PIL import Image
 from bs4 import BeautifulSoup
 
 # ==========================================
-# 1. CONFIGURACIÓN
+# 1. CONFIGURACIÓN DE LA PÁGINA
 # ==========================================
 st.set_page_config(
     page_title="Pedro Bravin S.A.",
@@ -22,13 +22,13 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 🎯 METAS DE VENTA
-META_MAXIMA = 2500000
-META_MEDIA  = 1500000
-META_BASE   = 800000
+# 🎯 METAS DE VENTA (BASE POR VOLUMEN)
+META_MAXIMA = 2500000   # 15% Base
+META_MEDIA  = 1500000   # 12% Base
+META_BASE   = 800000    # 10% Base
 
 # ==========================================
-# 2. MOTOR INVISIBLE
+# 2. MOTOR INVISIBLE (DATOS + LÓGICA)
 # ==========================================
 @st.cache_data(ttl=3600)
 def obtener_dolar_bna():
@@ -56,6 +56,7 @@ SHEET_URL = f"https://docs.google.com/spreadsheets/d/e/{SHEET_ID}/pub?gid=202986
 URL_FORM_GOOGLE = "" 
 
 MINUTOS_OFERTA = 10 
+
 CIUDADES_GRATIS = ["EL TREBOL", "LOS CARDOS", "LAS ROSAS", "SAN GENARO", "CENTENO", "CASAS", "CAÑADA ROSQUIN", "SAN VICENTE", "SAN MARTIN DE LAS ESCOBAS", "ANGELICA", "SUSANA", "RAFAELA", "SUNCHALES", "PRESIDENTE ROCA", "SA PEREIRA", "CLUCELLAS", "MARIA JUANA", "SASTRE", "SAN JORGE", "LAS PETACAS", "ZENON PEREYRA", "CARLOS PELLEGRINI", "LANDETA", "MARIA SUSANA", "PIAMONTE", "VILA", "SAN FRANCISCO"]
 TOASTS_EXITO = ["✨ ¡Excelente elección!", "🔥 ¡Te congelé este precio!", "💎 ¡Producto reservado!", "🚀 ¡Sumamos puntos!"]
 
@@ -160,7 +161,7 @@ def generar_link_wa(total):
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 5. UI: HEADER Y ESTILOS
+# 5. UI: HEADER Y ESTILOS (SOLUCIÓN DEFINITIVA)
 # ==========================================
 subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer, reloj_python = calcular_negocio()
 porcentaje_barra = 100
@@ -173,15 +174,21 @@ subtext_badge = f"Ahorro Total: {desc_actual}%" if (oferta_viva and subtotal > 0
 
 header_html = f"""
     <style>
-    /* ESPACIO SUPERIOR PARA NO PISAR */
+    /* 1. OCULTAR ELEMENTOS NATIVOS DE STREAMLIT (ELIMINA LOS 3 PUNTOS) */
+    #MainMenu {{ visibility: hidden; }}
+    footer {{ visibility: hidden; }}
+    header {{ visibility: hidden; }} /* Oculta la barra superior nativa vacía */
+    [data-testid="stToolbar"] {{ display: none; }} /* Doble seguridad */
+
+    /* 2. ESPACIO SUPERIOR PARA QUE EL ENCABEZADO NO PISE NADA */
     .block-container {{ 
-        padding-top: 220px !important; 
+        padding-top: 140px !important; /* Ajuste preciso */
         padding-bottom: 150px !important; 
     }}
     
     [data-testid="stSidebar"] {{ display: none; }} 
     
-    /* CHAT ABAJO */
+    /* 3. BARRA DE CHAT FIJA ABAJO */
     [data-testid="stBottomBlock"], [data-testid="stChatInput"] {{
         position: fixed; bottom: 0; left: 0; width: 100%;
         background-color: white; padding: 10px;
@@ -189,22 +196,27 @@ header_html = f"""
         box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
     }}
 
+    /* 4. HEADER FIJO (ENCABEZADO DE LA APP) */
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; 
-        background: #ffffff; z-index: 100000;
+        background: #ffffff; 
+        z-index: 99990; /* Z-Index alto pero menor al modal de la web si hubiera conflicto */
         border-bottom: 4px solid {color_barra}; 
-        height: 110px; overflow: hidden;
+        height: 110px; 
+        overflow: hidden;
     }}
     
+    /* 5. TABS FLOTANTES */
     .stTabs [data-baseweb="tab-list"] {{
         position: fixed; top: 110px; left: 0; width: 100%; 
-        background: #ffffff; z-index: 99990;
+        background: #ffffff; z-index: 99980;
         display: flex; justify-content: space-around;
         box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); 
         padding-bottom: 2px; padding-top: 5px;
     }}
     .stTabs [data-baseweb="tab"] {{ flex: 1; text-align: center; padding: 8px; font-weight: bold; font-size: 0.8rem; }}
 
+    /* ESTILOS INTERNOS DEL HEADER */
     .top-strip {{ background: #111; color: #fff; padding: 8px 15px; display: flex; justify-content: space-between; font-size: 0.7rem; align-items: center; height: 35px; }}
     .cart-summary {{ padding: 5px 15px; display: flex; justify-content: space-between; align-items: center; height: 70px; }}
     .price-tag {{ font-weight: 900; color: #333; white-space: nowrap; font-size: 1.4rem; }}
@@ -214,10 +226,6 @@ header_html = f"""
         .price-tag {{ font-size: 1.2rem; }}
         .badge {{ font-size: 0.65rem; padding: 3px 6px; }}
         .cart-summary {{ padding: 5px 10px; }}
-    }}
-    @media only screen and (min-width: 601px) {{
-        .price-tag {{ font-size: 1.5rem; }}
-        .badge {{ font-size: 0.75rem; padding: 4px 12px; }}
     }}
     
     .timer-container {{ display: flex; align-items: center; gap: 5px; }}
@@ -266,7 +274,7 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA (GOOGLE CLOUD + LÓGICA DE PRODUCTO REVISADA)
+# 6. CEREBRO IA (GOOGLE CLOUD + LÓGICA DE PRODUCTO)
 # ==========================================
 try:
     api_key = os.environ.get("GOOGLE_API_KEY")
