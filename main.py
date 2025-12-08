@@ -22,7 +22,7 @@ st.set_page_config(
 )
 
 # ==========================================
-# 2. MOTOR INVISIBLE (DATO + LOGICA)
+# 2. MOTOR INVISIBLE (DATOS + LÓGICA)
 # ==========================================
 @st.cache_data(ttl=3600)
 def obtener_dolar_bna():
@@ -47,7 +47,7 @@ COSTO_FLETE_USD = 0.85
 CONDICION_PAGO = "Contado/Transferencia"
 SHEET_ID = "2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvnarDQ"
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/e/{SHEET_ID}/pub?gid=2029869540&single=true&output=csv"
-URL_FORM_GOOGLE = "" # 🔴 PEGAR LINK AQUI SI LO TIENES
+URL_FORM_GOOGLE = "" # 🔴 PEGAR LINK AQUÍ SI LO TIENES
 ID_CAMPO_CLIENTE = "entry.xxxxxx"
 ID_CAMPO_MONTO = "entry.xxxxxx"
 ID_CAMPO_OPORTUNIDAD = "entry.xxxxxx"
@@ -63,7 +63,7 @@ CIUDADES_GRATIS = [
     "PIAMONTE", "VILA", "SAN FRANCISCO"
 ]
 
-# MENSAJES DE ÉXITO (SUAVIZADOS)
+# MENSAJES DE ÉXITO (SUAVIZADOS PARA CLIENTE)
 TOASTS_EXITO = ["🛒 ¡Agregado!", "✅ Precio Confirmado", "📋 Ítem sumado", "👍 ¡Listo!"]
 
 # ==========================================
@@ -78,7 +78,7 @@ if "expiry_time" not in st.session_state:
     st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
 
 if "messages" not in st.session_state:
-    # SALUDO INICIAL PROFESIONAL (CAMBIO SOLICITADO)
+    # SALUDO INICIAL AMABLE PERO DIRECTO
     st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola.** Soy Miguel. Pasame tu lista de materiales y te preparo el presupuesto con las mejores condiciones ahora mismo."}]
 
 # ==========================================
@@ -162,7 +162,7 @@ def generar_link_wa(total):
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 5. UI: HEADER (RESPONSIVE MÓVIL/WEB)
+# 5. UI: HEADER (RESPONSIVE + RELOJ FIXED)
 # ==========================================
 subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer, reloj_python = calcular_negocio()
 porcentaje_barra = 100
@@ -176,11 +176,7 @@ subtext_badge = f"Ahorro: {desc_actual}%" if (oferta_viva and subtotal > 0) else
 header_html = f"""
     <style>
     /* AJUSTE PARA QUE EL CONTENIDO NO QUEDE TAPADO POR EL HEADER FIJO */
-    .block-container {{ 
-        padding-top: 130px !important; 
-        padding-bottom: 120px !important; 
-    }}
-    
+    .block-container {{ padding-top: 130px !important; padding-bottom: 120px !important; }}
     [data-testid="stSidebar"] {{ display: none; }} 
     
     /* TABS FIJOS DEBAJO DEL HEADER */
@@ -189,8 +185,7 @@ header_html = f"""
         background: white; z-index: 99990;
         display: flex; justify-content: space-around;
         box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
-        padding-bottom: 2px;
-        padding-top: 5px;
+        padding-bottom: 2px; padding-top: 5px;
     }}
     .stTabs [data-baseweb="tab"] {{ flex: 1; text-align: center; padding: 8px; font-weight: bold; font-size: 0.8rem; }}
     
@@ -199,47 +194,32 @@ header_html = f"""
         position: fixed; top: 0; left: 0; width: 100%; 
         background: white; z-index: 100000;
         border-bottom: 4px solid {color_barra}; 
-        height: 90px; /* Altura fija controlada */
-        overflow: hidden;
+        height: 90px; overflow: hidden;
     }}
     
     .top-strip {{ 
-        background: #111; color: #fff; 
-        padding: 8px 15px; 
+        background: #111; color: #fff; padding: 8px 15px; 
         display: flex; justify-content: space-between; 
-        font-size: 0.7rem; align-items: center; 
-        height: 30px;
+        font-size: 0.7rem; align-items: center; height: 30px;
     }}
     
     /* CONTENEDOR FLEXIBLE PARA PRECIO Y BADGE */
     .cart-summary {{ 
-        padding: 5px 15px; 
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center; 
-        height: 56px;
+        padding: 5px 15px; display: flex; justify-content: space-between; 
+        align-items: center; height: 56px;
     }}
     
-    .price-tag {{ 
-        font-weight: 900; 
-        color: #333; 
-        white-space: nowrap; /* IMPORTANTE: NO ROMPER LINEA */
-    }}
+    .price-tag {{ font-weight: 900; color: #333; white-space: nowrap; }}
     
     .badge {{ 
-        background: {color_barra}; 
-        color: white; 
-        padding: 3px 8px; 
-        border-radius: 4px; 
-        font-weight: 900; 
-        text-transform: uppercase; 
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
-        white-space: nowrap;
+        background: {color_barra}; color: white; padding: 3px 8px; 
+        border-radius: 4px; font-weight: 900; text-transform: uppercase; 
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2); white-space: nowrap;
     }}
 
     /* MEDIA QUERY: REGLAS ESPECIFICAS PARA CELULAR */
     @media only screen and (max-width: 600px) {{
-        .price-tag {{ font-size: 1.1rem; }} /* Texto más chico en celular */
+        .price-tag {{ font-size: 1.1rem; }}
         .badge {{ font-size: 0.65rem; padding: 3px 6px; }}
         .cart-summary {{ padding: 5px 10px; }}
     }}
@@ -254,7 +234,7 @@ header_html = f"""
     .timer-box {{ 
         color: {color_timer}; font-weight: 900; font-size: 0.8rem; 
         background: #fff; padding: 1px 6px; border-radius: 4px; 
-        border: 1px solid {color_timer};
+        border: 1px solid {color_timer}; min-width: 45px; text-align: center;
     }}
     
     .progress-container {{ width: 100%; height: 4px; background: #eee; position: absolute; bottom: 0; }}
@@ -280,25 +260,38 @@ header_html = f"""
         </div>
         <div class="progress-container"><div class="progress-bar"></div></div>
     </div>
+    
     <script>
-        function startTimer(duration, display) {{
-            var timer = duration, minutes, seconds;
-            var interval = setInterval(function () {{
-                minutes = parseInt(timer / 60, 10);
-                seconds = parseInt(timer % 60, 10);
-                minutes = minutes < 10 ? "0" + minutes : minutes;
-                seconds = seconds < 10 ? "0" + seconds : seconds;
+    (function() {{
+        // LIMPIAR INTERVALO ANTERIOR PARA EVITAR CONFLICTOS
+        if (window.miIntervalo) clearInterval(window.miIntervalo);
+
+        var duration = {seg_restantes};
+        var display = document.getElementById("countdown_display");
+
+        function updateTimer() {{
+            var minutes = parseInt(duration / 60, 10);
+            var seconds = parseInt(duration % 60, 10);
+
+            minutes = minutes < 10 ? "0" + minutes : minutes;
+            seconds = seconds < 10 ? "0" + seconds : seconds;
+
+            if (display) {{
                 display.textContent = minutes + ":" + seconds;
-                if (--timer < 0) {{
-                    clearInterval(interval);
-                    display.textContent = "00:00";
-                }}
-            }}, 1000);
+            }}
+
+            if (--duration < 0) {{
+                duration = 0;
+                if (window.miIntervalo) clearInterval(window.miIntervalo);
+            }}
         }}
-        setTimeout(function() {{
-            var display = document.getElementById("countdown_display");
-            if (display) {{ startTimer({seg_restantes}, display); }}
-        }}, 500);
+
+        // INICIAR SI HAY TIEMPO
+        if (duration > 0) {{
+            updateTimer(); // Ejecutar 1 vez ya mismo para no esperar
+            window.miIntervalo = setInterval(updateTimer, 1000);
+        }}
+    }})();
     </script>
 """
 
