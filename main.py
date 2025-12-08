@@ -9,6 +9,7 @@ import threading
 import time
 import random
 import os
+import streamlit.components.v1 as components # <--- NUEVO: Para el Auto-Scroll
 from PIL import Image
 from bs4 import BeautifulSoup
 # SIN AUDIO
@@ -56,7 +57,7 @@ SHEET_ID = "2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvn
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/e/{SHEET_ID}/pub?gid=2029869540&single=true&output=csv"
 URL_FORM_GOOGLE = "" 
 
-# ⏱️ TIEMPO CORTO (3 MINUTOS) -> PRESIÓN TEMU
+# ⏱️ TIEMPO CORTO (3 MINUTOS)
 MINUTOS_OFERTA = 3
 
 CIUDADES_GRATIS = [
@@ -190,7 +191,7 @@ header_html = f"""
     [data-testid="stToolbar"] {{ display: none !important; }}
     
     /* LAYOUT OPTIMIZADO PARA MÓVIL */
-    .block-container {{ padding-top: 130px !important; padding-bottom: 100px !important; }}
+    .block-container {{ padding-top: 130px !important; padding-bottom: 120px !important; }}
     [data-testid="stSidebar"] {{ display: none; }} 
     
     /* INPUT CHAT SLIM */
@@ -290,8 +291,8 @@ DOLAR: {DOLAR_BNA}
 
 📏 **CATÁLOGO TÉCNICO (ESTRICTO):**
 - **12m:** Perfil C, IPN, UPN, ADN.
-- **6.40m:** Caños (Mecánico, Epoxi, Galvanizado, Schedule).
-- **6m:** Tubos Estructurales, Hierros, Ángulos, Planchuelas.
+- **6.40m:** Caños (Mecánico, Epoxi, Galvanizado).
+- **6m:** Tubos Estructurales, Hierros, Ángulos.
 - **CHAPA T90:** Única medida 13m.
 - **CHAPA COLOR:** Por metro.
 - **CINCALUM:** Por metro (Ref Cod 4/6).
@@ -301,12 +302,11 @@ DOLAR: {DOLAR_BNA}
 2. **OTRAS ZONAS:** Costo = `KM_TOTAL (IDA+VUELTA) * 0.85 USD * {DOLAR_BNA} * 1.21 (IVA)`.
 3. **ACOPIO:** "Comprá hoy, retirá en **6 MESES** sin cargo".
 
-⛔ **PROTOCOLO DE ATENCIÓN:**
-1. **BREVEDAD:** Directo al grano.
-2. **CONFIRMACIÓN:** SOLO agrega `[ADD:...]` si el cliente dice "SÍ/CARGALO".
-   - *Ejemplo:* Si piden "Precio perfil C 100", responde el precio y pregunta "¿Te lo separo?".
-3. **UPSELL:** "Te faltan $X para el descuento. ¿Agrego pintura/electrodos?".
-4. **ANTI-AMBIGÜEDAD:** Si falta medida, PREGUNTA antes de cotizar.
+⛔ **PROTOCOLO SNIPER:**
+1. **BREVEDAD:** Max 15 palabras. Directo.
+2. **CONFIRMACIÓN:** SOLO agrega `[ADD:...]` si el cliente dice "SÍ". Primero cotiza.
+3. **UPSELL:** "Te faltan $X para el descuento. ¿Agrego pintura?".
+4. **ANTI-AMBIGÜEDAD:** Si falta medida, PREGUNTA.
 
 SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
 """
@@ -354,9 +354,9 @@ with tab1:
             st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
             st.rerun()
 
-    # POP-UP DE OPORTUNIDAD (TOAST AGRESIVO)
+    # POP-UP AGRESIVO DE OPORTUNIDAD
     if 0 < prox_meta - subtotal < 150000 and oferta_viva:
-        st.toast(f"🚨 ¡ESTÁS A ${prox_meta - subtotal:,.0f} DEL PRÓXIMO DESCUENTO! AGREGÁ ALGO CHICO.", icon="🔥")
+        st.toast(f"🚨 ¡FALTAN ${prox_meta - subtotal:,.0f} PARA DESCUENTO! SUMÁ ALGO CHICO.", icon="🔥")
 
     for m in st.session_state.messages:
         if m["role"] != "system":
@@ -431,5 +431,19 @@ with tab2:
         """, unsafe_allow_html=True)
         
         if st.button("Vaciar Carrito", use_container_width=True): st.session_state.cart = []; st.rerun()
+
+# -----------------------------------------------------------
+# SCRIPT DE AUTO-SCROLL (Último paso para que baje solo)
+# -----------------------------------------------------------
+components.html("""
+    <script>
+        function scrollDown() {
+            var body = window.parent.document.querySelector(".main");
+            if (body) body.scrollTop = body.scrollHeight;
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+        setInterval(scrollDown, 1000); // Intenta bajar cada segundo (Brutal pero efectivo en Cloud Run)
+    </script>
+""", height=0)
 
 if st.session_state.admin_mode: st.dataframe(pd.DataFrame(st.session_state.log_data))
