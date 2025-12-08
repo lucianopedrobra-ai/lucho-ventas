@@ -8,7 +8,7 @@ import requests
 import threading
 import time
 import random
-import os  # <--- NUEVO: Para leer variables de Google Cloud
+import os  # <--- CRÍTICO PARA GOOGLE CLOUD
 from PIL import Image
 from bs4 import BeautifulSoup
 
@@ -23,9 +23,10 @@ st.set_page_config(
 )
 
 # 🎯 METAS DE VENTA (BASE POR VOLUMEN)
-META_MAXIMA = 2500000   # Base 15%
-META_MEDIA  = 1500000   # Base 12%
-META_BASE   = 800000    # Base 10%
+# Ajustadas para ser alcanzables y motivar
+META_MAXIMA = 2500000   # 15% Base
+META_MEDIA  = 1500000   # 12% Base
+META_BASE   = 800000    # 10% Base
 
 # ==========================================
 # 2. MOTOR INVISIBLE (DATOS + LÓGICA)
@@ -51,9 +52,10 @@ def obtener_dolar_bna():
 DOLAR_BNA = obtener_dolar_bna() 
 COSTO_FLETE_USD = 0.85 
 CONDICION_PAGO = "Contado/Transferencia"
+# ID PÚBLICO DEL CSV (No requiere credenciales)
 SHEET_ID = "2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvnarDQ"
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/e/{SHEET_ID}/pub?gid=2029869540&single=true&output=csv"
-URL_FORM_GOOGLE = "" 
+URL_FORM_GOOGLE = "" # PEGAR LINK SI LO TIENES
 ID_CAMPO_CLIENTE = "entry.xxxxxx"
 ID_CAMPO_MONTO = "entry.xxxxxx"
 ID_CAMPO_OPORTUNIDAD = "entry.xxxxxx"
@@ -119,6 +121,7 @@ def log_interaction(user_text, monto):
 
 def parsear_ordenes_bot(texto):
     items_nuevos = []
+    # Regex flexible para capturar output del bot
     for cant, prod, precio, tipo in re.findall(r'\[ADD:([\d\.]+):([^:]+):([\d\.]+):([^\]]+)\]', texto):
         item = {
             "cantidad": float(cant), 
@@ -131,7 +134,7 @@ def parsear_ordenes_bot(texto):
         items_nuevos.append(item)
     return items_nuevos
 
-# --- NUEVA LÓGICA DE NEGOCIO (BASE + BOOSTERS) ---
+# --- LÓGICA DE NEGOCIO (BASE + BOOSTERS) ---
 def calcular_negocio():
     now = datetime.datetime.now()
     tiempo_restante = st.session_state.expiry_time - now
@@ -198,7 +201,7 @@ def generar_link_wa(total):
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 5. UI: HEADER
+# 5. UI: HEADER (RESPONSIVE + CHAT FIXED)
 # ==========================================
 subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer, reloj_python = calcular_negocio()
 porcentaje_barra = 100
@@ -212,7 +215,7 @@ subtext_badge = f"Ahorro Total: {desc_actual}%" if (oferta_viva and subtotal > 0
 header_html = f"""
     <style>
     /* AJUSTE RESPONSIVE GLOBAL */
-    .block-container {{ padding-top: 120px !important; padding-bottom: 150px !important; }}
+    .block-container {{ padding-top: 130px !important; padding-bottom: 150px !important; }}
     [data-testid="stSidebar"] {{ display: none; }} 
     
     /* INPUT DEL CHAT FIJO ABAJO Y LIMPIO */
@@ -222,6 +225,15 @@ header_html = f"""
         z-index: 99999; border-top: 1px solid #eee;
     }}
     
+    /* HEADER FIJO */
+    .fixed-header {{
+        position: fixed; top: 0; left: 0; width: 100%; 
+        background: white; z-index: 100000;
+        border-bottom: 4px solid {color_barra}; 
+        height: 90px; overflow: hidden;
+    }}
+    
+    /* TABS */
     .stTabs [data-baseweb="tab-list"] {{
         position: fixed; top: 90px; left: 0; width: 100%; 
         background: white; z-index: 99990;
@@ -230,12 +242,7 @@ header_html = f"""
         padding-bottom: 2px; padding-top: 5px;
     }}
     .stTabs [data-baseweb="tab"] {{ flex: 1; text-align: center; padding: 8px; font-weight: bold; font-size: 0.8rem; }}
-    .fixed-header {{
-        position: fixed; top: 0; left: 0; width: 100%; 
-        background: white; z-index: 100000;
-        border-bottom: 4px solid {color_barra}; 
-        height: 90px; overflow: hidden;
-    }}
+
     .top-strip {{ 
         background: #111; color: #fff; padding: 8px 15px; 
         display: flex; justify-content: space-between; 
@@ -251,6 +258,7 @@ header_html = f"""
         border-radius: 4px; font-weight: 900; text-transform: uppercase; 
         box-shadow: 0 2px 5px rgba(0,0,0,0.2); white-space: nowrap;
     }}
+    
     @media only screen and (max-width: 600px) {{
         .price-tag {{ font-size: 1.1rem; }}
         .badge {{ font-size: 0.6rem; padding: 3px 6px; }}
@@ -260,6 +268,7 @@ header_html = f"""
         .price-tag {{ font-size: 1.5rem; }}
         .badge {{ font-size: 0.75rem; padding: 4px 12px; }}
     }}
+    
     .timer-container {{ display: flex; align-items: center; gap: 5px; }}
     .timer-box {{ 
         color: {color_timer}; font-weight: 900; font-size: 0.8rem; 
@@ -319,21 +328,21 @@ st.markdown(header_html, unsafe_allow_html=True)
 # ==========================================
 # 6. CEREBRO IA (CONFIGURACIÓN API KEY ROBUSTA)
 # ==========================================
-# 💡 AQUÍ ESTÁ EL ARREGLO IMPORTANTE:
 try:
-    # Intenta leer de la variable de entorno (Cloud Run)
+    # 1. Intentamos leer de la Nube (Google Cloud Run)
     api_key = os.environ.get("GOOGLE_API_KEY")
-    # Si no está, intenta leer de los secretos (Streamlit Local)
+    
+    # 2. Si falla, intentamos leer local (Streamlit Secrets)
     if not api_key:
         try: api_key = st.secrets["GOOGLE_API_KEY"]
         except: pass
         
     if not api_key:
-        st.error("🚨 ERROR CRÍTICO: No se encontró la API KEY. Verificá la configuración en Cloud Run.")
+        st.error("🚨 FALTA API KEY: Configurala en 'Variables & Secrets' de Cloud Run.")
     else:
         genai.configure(api_key=api_key)
 except Exception as e:
-    st.error(f"Error al configurar IA: {e}")
+    st.error(f"Error al conectar con IA: {e}")
 
 sys_prompt = f"""
 ROL: Miguel, ejecutivo comercial de Pedro Bravin S.A.
@@ -377,8 +386,6 @@ SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
 if "chat_session" not in st.session_state:
     if "api_key" in locals() and api_key:
         st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
-    else:
-        st.warning("⚠️ El chat no puede iniciar sin API KEY.")
 
 def procesar_vision(img):
     if "chat_session" in st.session_state:
