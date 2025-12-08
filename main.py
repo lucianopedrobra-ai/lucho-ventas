@@ -162,7 +162,7 @@ def generar_link_wa(total):
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 5. UI: HEADER (RESPONSIVE + RELOJ FIXED)
+# 5. UI: HEADER (RESPONSIVE + RELOJ FIXED + CHAT CORREGIDO)
 # ==========================================
 subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer, reloj_python = calcular_negocio()
 porcentaje_barra = 100
@@ -175,9 +175,26 @@ subtext_badge = f"Ahorro: {desc_actual}%" if (oferta_viva and subtotal > 0) else
 
 header_html = f"""
     <style>
-    /* AJUSTE PARA QUE EL CONTENIDO NO QUEDE TAPADO POR EL HEADER FIJO */
-    .block-container {{ padding-top: 130px !important; padding-bottom: 120px !important; }}
+    /* AJUSTE PARA QUE EL CONTENIDO NO QUEDE TAPADO POR EL HEADER FIJO NI EL INPUT DE CHAT */
+    .block-container {{ 
+        padding-top: 130px !important; 
+        padding-bottom: 150px !important; /* Aumentado para dejar espacio al chat input */
+    }}
+    
     [data-testid="stSidebar"] {{ display: none; }} 
+    
+    /* FORZAR LA BARRA DE ENTRADA DE CHAT ABAJO Y QUE NO FLOTE */
+    [data-testid="stBottomBlock"], [data-testid="stChatInput"] {{
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background-color: white; /* Fondo blanco para que no se trasluzca el texto */
+        padding-top: 10px;
+        padding-bottom: 10px;
+        z-index: 99999; /* Z-Index alto para estar sobre el contenido pero bajo alertas */
+        border-top: 1px solid #eee;
+    }}
     
     /* TABS FIJOS DEBAJO DEL HEADER */
     .stTabs [data-baseweb="tab-list"] {{
@@ -263,7 +280,6 @@ header_html = f"""
     
     <script>
     (function() {{
-        // LIMPIAR INTERVALO ANTERIOR PARA EVITAR CONFLICTOS
         if (window.miIntervalo) clearInterval(window.miIntervalo);
 
         var duration = {seg_restantes};
@@ -286,9 +302,8 @@ header_html = f"""
             }}
         }}
 
-        // INICIAR SI HAY TIEMPO
         if (duration > 0) {{
-            updateTimer(); // Ejecutar 1 vez ya mismo para no esperar
+            updateTimer();
             window.miIntervalo = setInterval(updateTimer, 1000);
         }}
     }})();
