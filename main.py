@@ -16,13 +16,13 @@ from bs4 import BeautifulSoup
 # ==========================================
 st.set_page_config(
     page_title="Pedro Bravin S.A.",
-    page_icon="🦁", # Icono de LEÓN
+    page_icon="🦁", 
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 # ==========================================
-# 2. MOTOR INVISIBLE
+# 2. MOTOR INVISIBLE (DATO + LOGICA)
 # ==========================================
 @st.cache_data(ttl=3600)
 def obtener_dolar_bna():
@@ -47,7 +47,7 @@ COSTO_FLETE_USD = 0.85
 CONDICION_PAGO = "Contado/Transferencia"
 SHEET_ID = "2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvnarDQ"
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/e/{SHEET_ID}/pub?gid=2029869540&single=true&output=csv"
-URL_FORM_GOOGLE = "" # 🔴 PEGAR LINK AQUI
+URL_FORM_GOOGLE = "" # 🔴 PEGAR LINK AQUI SI LO TIENES
 ID_CAMPO_CLIENTE = "entry.xxxxxx"
 ID_CAMPO_MONTO = "entry.xxxxxx"
 ID_CAMPO_OPORTUNIDAD = "entry.xxxxxx"
@@ -63,10 +63,11 @@ CIUDADES_GRATIS = [
     "PIAMONTE", "VILA", "SAN FRANCISCO"
 ]
 
-TOASTS_EXITO = ["🛒 ¡ES TUYO!", "🔥 PRECIO CONGELADO", "✅ STOCK RESERVADO", "🏃‍♂️ ¡APURATE!"]
+# MENSAJES DE ÉXITO (SUAVIZADOS)
+TOASTS_EXITO = ["🛒 ¡Agregado!", "✅ Precio Confirmado", "📋 Ítem sumado", "👍 ¡Listo!"]
 
 # ==========================================
-# 3. ESTADO
+# 3. ESTADO DE LA SESIÓN
 # ==========================================
 if "cart" not in st.session_state: st.session_state.cart = []
 if "log_data" not in st.session_state: st.session_state.log_data = []
@@ -77,11 +78,11 @@ if "expiry_time" not in st.session_state:
     st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
 
 if "messages" not in st.session_state:
-    # SALUDO INICIAL AGRESIVO
-    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola.** Soy Miguel. Veo que buscás acero.\nPasame la lista YA MISMO que tengo un **lote con precio viejo** a punto de agotarse."}]
+    # SALUDO INICIAL PROFESIONAL (CAMBIO SOLICITADO)
+    st.session_state.messages = [{"role": "assistant", "content": "👋 **Hola.** Soy Miguel. Pasame tu lista de materiales y te preparo el presupuesto con las mejores condiciones ahora mismo."}]
 
 # ==========================================
-# 4. BACKEND
+# 4. FUNCIONES BACKEND
 # ==========================================
 @st.cache_data(ttl=600)
 def load_data():
@@ -161,7 +162,7 @@ def generar_link_wa(total):
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 5. UI: HEADER (ESTILO FINAL)
+# 5. UI: HEADER (RESPONSIVE MÓVIL/WEB)
 # ==========================================
 subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer, reloj_python = calcular_negocio()
 porcentaje_barra = 100
@@ -169,54 +170,94 @@ if prox_meta > 0: porcentaje_barra = min((subtotal / prox_meta) * 100, 100)
 
 display_precio = f"${total_final:,.0f}" if subtotal > 0 else "🛒 COTIZAR AHORA"
 display_iva = "+IVA" if subtotal > 0 else ""
-display_badge = nombre_nivel if subtotal > 0 else "⚡ 3% EXTRA YA"
-subtext_badge = f"Ahorro extra: {desc_actual}%" if (oferta_viva and subtotal > 0) else "OFERTA POR TIEMPO LIMITADO"
+display_badge = nombre_nivel if subtotal > 0 else "⚡ 3% OFF YA"
+subtext_badge = f"Ahorro: {desc_actual}%" if (oferta_viva and subtotal > 0) else "TIEMPO LIMITADO"
 
 header_html = f"""
     <style>
-    .block-container {{ padding-top: 170px !important; padding-bottom: 120px !important; }}
+    /* AJUSTE PARA QUE EL CONTENIDO NO QUEDE TAPADO POR EL HEADER FIJO */
+    .block-container {{ 
+        padding-top: 130px !important; 
+        padding-bottom: 120px !important; 
+    }}
+    
     [data-testid="stSidebar"] {{ display: none; }} 
     
+    /* TABS FIJOS DEBAJO DEL HEADER */
     .stTabs [data-baseweb="tab-list"] {{
-        position: fixed; top: 110px; left: 0; width: 100%; 
-        background: white; z-index: 99999;
+        position: fixed; top: 90px; left: 0; width: 100%; 
+        background: white; z-index: 99990;
         display: flex; justify-content: space-around;
         box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
-        padding-bottom: 5px;
+        padding-bottom: 2px;
+        padding-top: 5px;
     }}
-    .stTabs [data-baseweb="tab"] {{ flex: 1; text-align: center; padding: 10px; font-weight: bold; font-size: 0.9rem; }}
+    .stTabs [data-baseweb="tab"] {{ flex: 1; text-align: center; padding: 8px; font-weight: bold; font-size: 0.8rem; }}
     
+    /* HEADER PRINCIPAL FIJO */
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; 
         background: white; z-index: 100000;
         border-bottom: 4px solid {color_barra}; 
-        height: 110px;
-    }}
-    
-    [data-testid="stChatInput"] {{
-        position: fixed; bottom: 0; left: 0; width: 100%; padding: 10px; background: white; z-index: 100000;
-        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        height: 90px; /* Altura fija controlada */
+        overflow: hidden;
     }}
     
     .top-strip {{ 
         background: #111; color: #fff; 
-        padding: 15px 15px 5px 15px; 
+        padding: 8px 15px; 
         display: flex; justify-content: space-between; 
-        font-size: 0.75rem; align-items: center; 
+        font-size: 0.7rem; align-items: center; 
+        height: 30px;
     }}
     
-    .cart-summary {{ padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; }}
-    .price-tag {{ font-size: 1.5rem; font-weight: 900; color: #333; }}
-    .badge {{ background: {color_barra}; color: white; padding: 4px 12px; border-radius: 4px; font-size: 0.75rem; font-weight: 900; text-transform: uppercase; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }}
+    /* CONTENEDOR FLEXIBLE PARA PRECIO Y BADGE */
+    .cart-summary {{ 
+        padding: 5px 15px; 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        height: 56px;
+    }}
+    
+    .price-tag {{ 
+        font-weight: 900; 
+        color: #333; 
+        white-space: nowrap; /* IMPORTANTE: NO ROMPER LINEA */
+    }}
+    
+    .badge {{ 
+        background: {color_barra}; 
+        color: white; 
+        padding: 3px 8px; 
+        border-radius: 4px; 
+        font-weight: 900; 
+        text-transform: uppercase; 
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
+        white-space: nowrap;
+    }}
+
+    /* MEDIA QUERY: REGLAS ESPECIFICAS PARA CELULAR */
+    @media only screen and (max-width: 600px) {{
+        .price-tag {{ font-size: 1.1rem; }} /* Texto más chico en celular */
+        .badge {{ font-size: 0.65rem; padding: 3px 6px; }}
+        .cart-summary {{ padding: 5px 10px; }}
+    }}
+
+    /* REGLAS PARA PC */
+    @media only screen and (min-width: 601px) {{
+        .price-tag {{ font-size: 1.5rem; }}
+        .badge {{ font-size: 0.75rem; padding: 4px 12px; }}
+    }}
     
     .timer-container {{ display: flex; align-items: center; gap: 5px; }}
     .timer-box {{ 
-        color: {color_timer}; font-weight: 900; font-size: 0.9rem; 
-        background: #fff; padding: 2px 8px; border-radius: 4px; 
+        color: {color_timer}; font-weight: 900; font-size: 0.8rem; 
+        background: #fff; padding: 1px 6px; border-radius: 4px; 
         border: 1px solid {color_timer};
     }}
     
-    .progress-container {{ width: 100%; height: 6px; background: #eee; position: absolute; bottom: 0; }}
+    .progress-container {{ width: 100%; height: 4px; background: #eee; position: absolute; bottom: 0; }}
     .progress-bar {{ height: 100%; width: {porcentaje_barra}%; background: {color_barra}; transition: width 0.8s ease-out; }}
     </style>
     
@@ -226,12 +267,12 @@ header_html = f"""
                 <span>⏱️ EXPIRA:</span>
                 <span id="countdown_display" class="timer-box">{reloj_python}</span>
             </div>
-            <span style="margin-right: 30px;">🔥 PEDRO BRAVIN S.A.</span>
+            <span style="font-weight:bold;">PEDRO BRAVIN S.A.</span>
         </div>
         <div class="cart-summary">
             <div>
                 <span class="badge">{display_badge}</span>
-                <div style="font-size:0.65rem; color:#666; margin-top:3px;">
+                <div style="font-size:0.6rem; color:#666; margin-top:2px; white-space:nowrap;">
                     {subtext_badge}
                 </div>
             </div>
@@ -264,33 +305,34 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA (MODO LEÓN DEPREDADOR)
+# 6. CEREBRO IA (MODO: CONSULTOR ESTRATÉGICO CON URGENCIA)
 # ==========================================
 try: genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 except: st.error("Falta API KEY")
 
 sys_prompt = f"""
-ROL: Miguel, vendedor agresivo "Lobo de Wall Street" de Pedro Bravin S.A.
+ROL: Miguel, ejecutivo comercial de alto nivel de Pedro Bravin S.A.
 DB: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
 # DATO INTERNO: DOLAR = {DOLAR_BNA}
 
-🧮 **REGLAS MATEMÁTICAS INMUTABLES:**
+🧮 **REGLAS MATEMÁTICAS INMUTABLES (NO INVENTAR):**
 1. IPN/UPN/PERFIL C (12m): `(Peso_metro * 12) * Precio_CSV * {DOLAR_BNA}`
 2. TREFILADOS (6m): `Peso_Total_Barra * Precio_CSV * {DOLAR_BNA}`
 3. CAÑOS (6.40m): `(Peso_metro * 6.40) * Precio_CSV * {DOLAR_BNA}`
 4. TUBOS ESTRUCTURALES (6m): `Precio_CSV * {DOLAR_BNA}`
 5. FLETE: Lejos = `(KM * 2 * {COSTO_FLETE_USD} * {DOLAR_BNA})`.
 
-🦁 **PERSONALIDAD DEPREDADORA (CIERRE):**
-- **ACTITUD:** No pidas permiso. ASUME LA VENTA.
-- **PROHIBIDO:** Decir "Aquí tienes el presupuesto".
-- **OBLIGATORIO:** Decir "¡Listo! Ya te separé el material. ¿Te lo facturo ahora para congelar el precio?".
-- **URGENCIA:** "Me queda poco stock de este lote, confirmame YA".
-- **CIERRE DOBLE ALTERNATIVA:** "¿Te lo envío o lo pasás a buscar?".
+⚡ **PERSONALIDAD "EFECTO TEMU" (AMABLE PERO URGENTE):**
+- **TONO:** Profesional, dinámico y servicial. NUNCA agresivo.
+- **ESTRATEGIA:** Usa la cuenta regresiva y los descuentos de la interfaz como palanca.
+- **FRASES CLAVE:** - "Te cargué el pedido. Aprovechá que el contador sigue activo para congelar este precio."
+  - "Te faltan pocos pesos para desbloquear el siguiente nivel de descuento en la barra superior."
+  - "Excelente elección. Confimemos antes de que el reloj llegue a cero para asegurar el stock."
+- **OBJETIVO:** Guiar al usuario a completar la barra de progreso.
 
 🕵️‍♂️ AMBIGÜEDAD:
-- Si falta variante (Negro/Galv) -> PREGUNTA SECA: "¿Negro o Galvanizado?".
+- Si falta variante (Negro/Galv) -> PREGUNTA: "¿Preferís terminación Negro o Galvanizado?".
 
 SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_PESOS_BARRA:TIPO]
 """
@@ -299,7 +341,7 @@ if "chat_session" not in st.session_state:
     st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
 
 def procesar_vision(img):
-    return st.session_state.chat_session.send_message(["Analiza lista. COTIZA Y PRESIONA EL CIERRE YA MISMO.", img]).text
+    return st.session_state.chat_session.send_message(["Analiza lista. COTIZA CON PRECISIÓN Y AYUDA AL CIERRE.", img]).text
 
 # ==========================================
 # 7. INTERFAZ TABS
@@ -319,7 +361,7 @@ with tab1:
         if img_val is not None:
             file_id = f"{img_val.name}_{img_val.size}"
             if st.session_state.last_processed_file != file_id:
-                with st.spinner("👀 Analizando y cerrando venta..."):
+                with st.spinner("👀 Analizando y cargando items..."):
                     full_text = procesar_vision(Image.open(img_val))
                     news = parsear_ordenes_bot(full_text)
                     st.session_state.messages.append({"role": "assistant", "content": full_text})
@@ -342,8 +384,8 @@ with tab1:
         with st.chat_message("assistant", avatar="👷‍♂️"):
             with st.spinner("Cotizando..."):
                 try:
-                    # PROMPT INYECTADO PARA FORZAR CIERRE EN CADA TURNO
-                    prompt_con_presion = f"{prompt}. (NOTA INTERNA: Cierra la venta YA. Usa técnica de doble alternativa o escasez. NO seas pasivo)."
+                    # PROMPT INYECTADO PARA MANTENER EL FOCO COMERCIAL (SUAVE)
+                    prompt_con_presion = f"{prompt}. (NOTA INTERNA: Cotiza con precisión matemática según la DB. Sé cordial, breve y profesional. Invita a confirmar)."
                     
                     response = st.session_state.chat_session.send_message(prompt_con_presion)
                     full_text = response.text
