@@ -24,12 +24,12 @@ st.set_page_config(
 )
 
 # 🎯 METAS DE VENTA (BASE POR VOLUMEN)
-META_MAXIMA = 2500000
-META_MEDIA  = 1500000
-META_BASE   = 800000
+META_MAXIMA = 2500000   # 15% Base
+META_MEDIA  = 1500000   # 12% Base
+META_BASE   = 800000    # 10% Base
 
 # ==========================================
-# 2. MOTOR INVISIBLE
+# 2. MOTOR INVISIBLE (DATOS + LÓGICA)
 # ==========================================
 @st.cache_data(ttl=3600)
 def obtener_dolar_bna():
@@ -58,7 +58,6 @@ URL_FORM_GOOGLE = ""
 
 MINUTOS_OFERTA = 10 
 
-# Lista expandida para verificar que no falte ninguna
 CIUDADES_GRATIS = [
     "EL TREBOL", "LOS CARDOS", "LAS ROSAS", "SAN GENARO", "CENTENO", "CASAS", 
     "CAÑADA ROSQUIN", "SAN VICENTE", "SAN MARTIN DE LAS ESCOBAS", "ANGELICA", 
@@ -141,56 +140,35 @@ def calcular_negocio():
         color_reloj = "#b0bec5"
 
     bruto = sum(i['subtotal'] for i in st.session_state.cart)
-    desc_base = 0
-    desc_extra = 0
-    nivel_texto = "PRECIO LISTA"
-    color = "#546e7a"
-    meta = META_BASE
+    desc_base = 0; desc_extra = 0; nivel_texto = "PRECIO LISTA"; color = "#546e7a"; meta = META_BASE
     
-    # 1. DETECCIÓN DE TIPOS EN CARRITO
+    # Detección de tipos para combos
     tipos_en_carrito = [x['tipo'] for x in st.session_state.cart]
-    
     tiene_chapa = any("CHAPA" in t for t in tipos_en_carrito)
     tiene_perfil = any("PERFIL" in t for t in tipos_en_carrito)
     tiene_acero = any(t in ["HIERRO", "MALLA", "CLAVOS", "ALAMBRE", "PERFIL", "CHAPA", "TUBO", "CAÑO"] for t in tipos_en_carrito)
     tiene_pintura = any("PINTURA" in t or "ACCESORIO" in t or "ELECTRODO" in t for t in tipos_en_carrito)
 
     if activa:
-        # A. CALCULO BASE POR VOLUMEN
-        if bruto > META_MAXIMA:
-            desc_base = 15; nivel_texto = "PARTNER (15%)"; color = "#6200ea"; meta = 0
-        elif bruto > META_MEDIA:
-            desc_base = 12; nivel_texto = "CONSTRUCTOR (12%)"; color = "#d32f2f"; meta = META_MAXIMA
-        elif bruto > META_BASE:
-            desc_base = 10; nivel_texto = "OBRA (10%)"; color = "#f57c00"; meta = META_MEDIA
-        else:
-            desc_base = 3; nivel_texto = "CONTADO (3%)"; color = "#2e7d32"; meta = META_BASE
+        # A. CALCULO BASE
+        if bruto > META_MAXIMA: desc_base = 15; nivel_texto = "PARTNER (15%)"; color = "#6200ea"; meta = 0
+        elif bruto > META_MEDIA: desc_base = 12; nivel_texto = "CONSTRUCTOR (12%)"; color = "#d32f2f"; meta = META_MAXIMA
+        elif bruto > META_BASE: desc_base = 10; nivel_texto = "OBRA (10%)"; color = "#f57c00"; meta = META_MEDIA
+        else: desc_base = 3; nivel_texto = "CONTADO (3%)"; color = "#2e7d32"; meta = META_BASE
 
-        # B. BOOSTERS (CROSS-SELLING)
+        # B. BOOSTERS
         boosters_activos = []
-        
-        # Booster 1: Kit Techo
-        if tiene_chapa and tiene_perfil:
-            desc_extra += 3
-            boosters_activos.append("🏠 KIT TECHO")
+        if tiene_chapa and tiene_perfil: desc_extra += 3; boosters_activos.append("🏠 KIT TECHO")
+        elif tiene_acero and tiene_pintura: desc_extra += 2; boosters_activos.append("🎨 PACK TERM.")
             
-        # Booster 2: Terminación
-        elif tiene_acero and tiene_pintura: 
-            desc_extra += 2
-            boosters_activos.append("🎨 PACK TERM.")
-            
-        # C. SUMA FINAL
         desc_total = min(desc_base + desc_extra, 18)
         
         if desc_extra > 0:
             nivel_texto = f"{nivel_texto} + {' '.join(boosters_activos)}"
             if desc_total >= 15: color = "#6200ea" 
-            
     else:
-        if bruto > META_MAXIMA: 
-            desc_total = 12; nivel_texto = "OFERTA EXPIRADA"; color = "#455a64"
-        else: 
-            desc_total = 0; nivel_texto = "PRECIO LISTA"; color = "#455a64"
+        if bruto > META_MAXIMA: desc_total = 12; nivel_texto = "OFERTA EXPIRADA"; color = "#455a64"
+        else: desc_total = 0; nivel_texto = "PRECIO LISTA"; color = "#455a64"
 
     neto = bruto * (1 - (desc_total/100))
     return bruto, neto, desc_total, color, nivel_texto, meta, segundos_restantes, activa, color_reloj, reloj_init
@@ -214,15 +192,15 @@ subtext_badge = f"Ahorro Total: {desc_actual}%" if (oferta_viva and subtotal > 0
 
 header_html = f"""
     <style>
-    /* 1. SOLUCIÓN AL ENCABEZADO CORTADO */
+    /* 1. ESPACIO SUPERIOR (Padding) PARA EVITAR QUE SE PISE */
     .block-container {{ 
-        padding-top: 190px !important; 
+        padding-top: 220px !important; 
         padding-bottom: 150px !important; 
     }}
     
     [data-testid="stSidebar"] {{ display: none; }} 
     
-    /* 2. BARRA DE CHAT AL ESTILO WHATSAPP (FIJA ABAJO) */
+    /* 2. BARRA DE CHAT FIJA ABAJO */
     [data-testid="stBottomBlock"], [data-testid="stChatInput"] {{
         position: fixed; bottom: 0; left: 0; width: 100%;
         background-color: white; padding: 10px;
@@ -230,28 +208,26 @@ header_html = f"""
         box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
     }}
 
-    /* 3. ENCABEZADO FIJO BLINDADO */
+    /* 3. HEADER FIJO */
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; 
-        background: white; z-index: 100000;
+        background: #ffffff; z-index: 100000;
         border-bottom: 4px solid {color_barra}; 
-        height: 100px; 
-        overflow: hidden;
+        height: 110px; overflow: hidden;
     }}
     
-    /* 4. TABS FLOTANTES DEBAJO DEL HEADER */
+    /* 4. TABS FLOTANTES */
     .stTabs [data-baseweb="tab-list"] {{
-        position: fixed; top: 100px; left: 0; width: 100%; 
-        background: white; z-index: 99990;
+        position: fixed; top: 110px; left: 0; width: 100%; 
+        background: #ffffff; z-index: 99990;
         display: flex; justify-content: space-around;
         box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); 
         padding-bottom: 2px; padding-top: 5px;
     }}
     .stTabs [data-baseweb="tab"] {{ flex: 1; text-align: center; padding: 8px; font-weight: bold; font-size: 0.8rem; }}
 
-    /* ESTILOS INTERNOS DEL HEADER */
     .top-strip {{ background: #111; color: #fff; padding: 8px 15px; display: flex; justify-content: space-between; font-size: 0.7rem; align-items: center; height: 35px; }}
-    .cart-summary {{ padding: 5px 15px; display: flex; justify-content: space-between; align-items: center; height: 60px; }}
+    .cart-summary {{ padding: 5px 15px; display: flex; justify-content: space-between; align-items: center; height: 70px; }}
     .price-tag {{ font-weight: 900; color: #333; white-space: nowrap; font-size: 1.4rem; }}
     .badge {{ background: {color_barra}; color: white; padding: 4px 10px; border-radius: 6px; font-weight: 900; text-transform: uppercase; box-shadow: 0 2px 5px rgba(0,0,0,0.2); white-space: nowrap; }}
     
@@ -259,10 +235,6 @@ header_html = f"""
         .price-tag {{ font-size: 1.2rem; }}
         .badge {{ font-size: 0.65rem; padding: 3px 6px; }}
         .cart-summary {{ padding: 5px 10px; }}
-    }}
-    @media only screen and (min-width: 601px) {{
-        .price-tag {{ font-size: 1.5rem; }}
-        .badge {{ font-size: 0.75rem; padding: 4px 12px; }}
     }}
     
     .timer-container {{ display: flex; align-items: center; gap: 5px; }}
@@ -311,22 +283,19 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA (CONFIGURACIÓN NUBE)
+# 6. CEREBRO IA (API KEY GOOGLE CLOUD)
 # ==========================================
 try:
-    # 1. Cloud Run Variable
     api_key = os.environ.get("GOOGLE_API_KEY")
-    
-    # 2. Fallback Local
     if not api_key:
         try: api_key = st.secrets["GOOGLE_API_KEY"]
         except: pass
-        
-    if not api_key:
+    
+    if not api_key: 
         st.error("🚨 FALTA API KEY: Configurar en Cloud Run.")
-    else:
+    else: 
         genai.configure(api_key=api_key)
-except Exception as e:
+except Exception as e: 
     st.error(f"Error IA: {e}")
 
 sys_prompt = f"""
@@ -335,35 +304,31 @@ DB: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
 # DATO INTERNO: DOLAR = {DOLAR_BNA}
 
-📏 **CATÁLOGO TÉCNICO Y LARGOS DE VENTA:**
+📏 **CATÁLOGO TÉCNICO Y LARGOS DE VENTA (REGLAS DE ORO):**
 1. **PERFILES/HIERROS/TUBO/IPN/UPN:** Barras enteras (12m o 6m según tipo).
 2. **CAÑOS:** Barras de 6.40m.
-3. **CHAPA T90:** Hoja cerrada de 13m.
+3. **CHAPA T90:** Hoja cerrada de 13m (ÚNICA MEDIDA).
 4. **CHAPA COLOR:** Por Metro Lineal.
-5. **CHAPA CINCALUM:** Códigos de cortes o base 1 Metro.
-6. **PINTURERIA/ACCESORIOS:** Unidad.
+5. **CHAPA CINCALUM:** Códigos de cortes específicos o base 1 Metro (Código 4/6).
+6. **PINTURERIA/ACCESORIOS:** Por Unidad.
 
-⛔ **REGLAS DE ORO (SEGURIDAD Y VENTAS):**
+⛔ **PROTOCOLO DE SEGURIDAD (ANTI-AMBIGÜEDAD):**
 1. **NO AGREGAR SIN PERMISO:**
-   - **SOLO** agrega al carrito `[ADD:...]` los productos que el usuario pidió EXPLÍCITAMENTE.
-   - **PROHIBIDO** agregar items de cross-selling AUTOMÁTICAMENTE.
-   - **ESTRATEGIA:** Cotiza -> Sugiere combo verbalmente -> Espera el "Sí" -> Agrega el extra.
+   - **SOLO** agrega al carrito `[ADD:...]` productos pedidos EXPLÍCITAMENTE.
+   - **CROSS-SELLING:** Sugiere verbalmente ("¿Te agrego perfiles?"), espera el "Sí" y luego agrega.
+   
+2. **MEDIDAS CLARAS:**
+   - Si piden "Planchuela" o "Ángulo" SIN MEDIDAS -> ❌ NO COTIZAR. ✅ PREGUNTAR: "¿Qué ancho y espesor buscás?".
 
-2. **ANTI-AMBIGÜEDAD:**
-   - Si piden "Planchuela", "Ángulo" o "Hierro" SIN MEDIDA:
-     ❌ NO inventes medidas.
-     ✅ PREGUNTA: "Tengo muchas medidas. ¿Qué ancho y espesor buscás?".
-
-3. **CLASIFICACIÓN TIPO (Para Descuentos):**
+3. **CLASIFICACIÓN PARA DESCUENTOS:**
    - Chapa -> TIPO: **CHAPA**
    - Perfil -> TIPO: **PERFIL**
    - Pintura/Accesorios -> TIPO: **PINTURA**
    - Hierro/Caño -> TIPO: **HIERRO**
 
-💞 **PERSONALIDAD "SEDUCTOR COMERCIAL":**
-- Sé concreto pero amable.
-- Si ves oportunidad de combo, **SUGIERE** verbalmente.
-- Induce al cierre con preguntas: "¿Te parece bien esta cotización?".
+💞 **PERSONALIDAD:**
+- Seductor comercial, amable pero técnico.
+- Usa el reloj y los descuentos como palanca de cierre.
 
 SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
 """
@@ -377,14 +342,13 @@ def procesar_input(contenido, es_imagen=False, es_audio=False):
         msg = contenido
         prefix = ""
         if es_imagen: 
-            msg = ["Analiza lista. COTIZA SOLO LO QUE VES. NO INVENTES ITEMS.", contenido]
+            msg = ["Analiza lista. COTIZA SOLO LO QUE VES.", contenido]
         elif es_audio:
-            # Aquí idealmente iría transcripción real. 
-            # Como Cloud Run no tiene disco persistente fácil, simulamos la recepción.
-            # El usuario ve que el audio se envió y Miguel responde.
-            return "🎤 (Audio recibido) - Dame un segundo que reviso lo que me pediste en el audio..."
+            # Simulación: En un futuro aquí integraríamos Whisper para STT.
+            # Por ahora, usamos el modelo para recibir el evento.
+            return "🎤 (Audio recibido) - Dame un momento para escuchar y procesar tu pedido..."
         
-        prompt_final = f"{prefix}{msg}. (NOTA INTERNA: Cotiza SOLO lo pedido. Sugiere combos verbalmente)." if not es_imagen else msg
+        prompt_final = f"{prefix}{msg}. (NOTA INTERNA: Cotiza SOLO lo pedido. Sugiere combos)." if not es_imagen else msg
         return st.session_state.chat_session.send_message(prompt_final).text
     return "Error: Chat no iniciado."
 
@@ -393,29 +357,32 @@ def procesar_input(contenido, es_imagen=False, es_audio=False):
 # ==========================================
 tab1, tab2 = st.tabs(["💬 COTIZAR", f"🛒 MI PEDIDO ({len(st.session_state.cart)})"])
 
+# ESPACIADOR INVISIBLE (SOLUCIÓN DEFINITIVA AL PISADO)
+spacer_html = '<div style="height: 30px;"></div>'
+
 with tab1:
+    st.markdown(spacer_html, unsafe_allow_html=True)
+    
     if not oferta_viva:
         st.error("⚠️ SE ACABÓ EL TIEMPO. PRECIOS ACTUALIZADOS.")
         if st.button("🔄 REACTIVAR BENEFICIO", type="primary", use_container_width=True):
             st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
             st.rerun()
 
-    # --- MENSAJES DEL CHAT ---
     for m in st.session_state.messages:
         if m["role"] != "system":
             clean = re.sub(r'\[ADD:.*?\]', '', m["content"]).strip()
             if clean: st.chat_message(m["role"], avatar="👷‍♂️" if m["role"]=="assistant" else "👤").markdown(clean)
 
-    # --- BARRA MULTIMEDIA ESTILO WHATSAPP (ENCIMA DEL CHAT) ---
+    # --- BARRA MULTIMEDIA FLOTANTE (ESTILO WHATSAPP/GEMINI) ---
     with st.container():
-        # Usamos columnas para que el botón "Adjuntar" quede chiquito a la izquierda
         col_pop, col_spacer = st.columns([1.5, 8.5])
         with col_pop:
-            # Popover para menú limpio
+            # Botón "➕" con menú desplegable
             with st.popover("➕ Adjuntar", use_container_width=True):
                 st.caption("Selecciona una opción:")
                 
-                # 1. CAMARA / FOTO
+                # FOTO
                 img_val = st.file_uploader("📸 Foto de lista", type=["jpg","png","jpeg"])
                 if img_val is not None:
                     file_id = f"{img_val.name}_{img_val.size}"
@@ -427,27 +394,24 @@ with tab1:
                             st.session_state.last_processed_file = file_id
                             if news: st.balloons()
                             st.rerun()
-
+                
                 st.divider()
-
-                # 2. MICROFONO
-                audio = audiorecorder("🔴 Grabar Voz", "⏹️ Enviar")
+                
+                # AUDIO
+                audio = audiorecorder("🔴 Grabar Audio", "⏹️ Enviar")
                 if len(audio) > 0:
-                    # Simulación de respuesta inmediata
                     st.info("🎤 Audio enviado.")
                     time.sleep(1)
                     st.session_state.messages.append({"role": "user", "content": "🎤 (Mensaje de voz enviado)"})
-                    respuesta_audio = procesar_input(None, es_audio=True)
-                    st.session_state.messages.append({"role": "assistant", "content": respuesta_audio})
+                    res = procesar_input(None, es_audio=True)
+                    st.session_state.messages.append({"role": "assistant", "content": res})
                     st.rerun()
 
-    # --- INPUT DE CHAT (FIJO ABAJO) ---
+    # INPUT DE CHAT
     if prompt := st.chat_input("Escribí tu pedido acá..."):
         if prompt == "#admin-miguel": st.session_state.admin_mode = not st.session_state.admin_mode; st.rerun()
-        
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.chat_message("user").markdown(prompt)
-
         with st.chat_message("assistant", avatar="👷‍♂️"):
             with st.spinner("Consultando stock..."):
                 try:
@@ -465,11 +429,11 @@ with tab1:
                         
                         st.session_state.messages.append({"role": "assistant", "content": full_text})
                         if news: time.sleep(1.5); st.rerun()
-                    else:
-                        st.error("Error: Cerebro desconectado.")
+                    else: st.error("Cerebro desconectado.")
                 except Exception as e: st.error(f"Error: {e}")
 
 with tab2:
+    st.markdown(spacer_html, unsafe_allow_html=True)
     if not st.session_state.cart:
         st.info("Tu carrito está esperando ofertas...")
     else:
@@ -499,22 +463,16 @@ with tab2:
             col_res1.markdown(f"**Beneficio:**")
             col_res2.markdown(f"**-${subtotal * (desc_actual/100):,.0f} ({desc_actual}%)**")
             st.caption(f"Aplicado: {nombre_nivel}")
-        elif not oferta_viva:
-            st.warning("⚠️ DESCUENTO EXPIRADO.")
         
         st.markdown(f"""
         <div style="background:{color_barra}; color:white; padding:20px; border-radius:15px; text-align:center; margin-top:15px; box-shadow: 0 4px 15px {color_barra}66; border: 2px solid #fff;">
             <div style="font-size:0.8rem; opacity:0.9;">TOTAL FINAL CONTADO (+IVA)</div>
             <div style="font-size:2.2rem; font-weight:900;">${total_final:,.0f}</div>
-            <div style="font-size:0.8rem; margin-top:5px; background:rgba(0,0,0,0.2); padding:4px 10px; border-radius:10px; display:inline-block;">
-                { '⚡ DESCUENTO APLICADO' if oferta_viva else '❌ PRECIO LISTA' }
-            </div>
         </div>
         """, unsafe_allow_html=True)
         
         st.markdown(f"""
         <a href="{generar_link_wa(total_final)}" target="_blank" style="display:block; width:100%; background-color:#25D366; color:white; margin-top:15px; text-align:center; padding:18px; border-radius:50px; text-decoration:none; font-weight:bold; font-size:1.2rem; box-shadow: 0 4px 15px rgba(37,211,102,0.5); animation: pulse-green 2s infinite;">🚀 ENVIAR PEDIDO AHORA</a>
-        <style>@keyframes pulse-green {{ 0% {{ transform: scale(1); }} 50% {{ transform: scale(1.02); }} 100% {{ transform: scale(1); }} }}</style>
         """, unsafe_allow_html=True)
         
         st.write("")
