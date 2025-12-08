@@ -21,6 +21,11 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# 🎯 METAS DE VENTA (BASE POR VOLUMEN)
+META_MAXIMA = 2500000   # Base 15%
+META_MEDIA  = 1500000   # Base 12%
+META_BASE   = 800000    # Base 10%
+
 # ==========================================
 # 2. MOTOR INVISIBLE (DATOS + LÓGICA)
 # ==========================================
@@ -47,7 +52,7 @@ COSTO_FLETE_USD = 0.85
 CONDICION_PAGO = "Contado/Transferencia"
 SHEET_ID = "2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvnarDQ"
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/e/{SHEET_ID}/pub?gid=2029869540&single=true&output=csv"
-URL_FORM_GOOGLE = "" # 🔴 PEGAR LINK AQUÍ
+URL_FORM_GOOGLE = "" 
 ID_CAMPO_CLIENTE = "entry.xxxxxx"
 ID_CAMPO_MONTO = "entry.xxxxxx"
 ID_CAMPO_OPORTUNIDAD = "entry.xxxxxx"
@@ -63,7 +68,6 @@ CIUDADES_GRATIS = [
     "PIAMONTE", "VILA", "SAN FRANCISCO"
 ]
 
-# FRASES DE "FRANEO" Y FOMO
 TOASTS_EXITO = [
     "✨ ¡Excelente elección!", 
     "🔥 ¡Te congelé este precio!", 
@@ -84,7 +88,6 @@ if "expiry_time" not in st.session_state:
     st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
 
 if "messages" not in st.session_state:
-    # SALUDO INICIAL SEDUCTOR
     st.session_state.messages = [{"role": "assistant", "content": "👋 **¡Hola!** Soy Miguel. Tengo la lista de precios abierta y el dólar actualizado. \n\nPasame tu pedido ahora y **vemos qué atención especial te puedo hacer** en el final. 😉"}]
 
 # ==========================================
@@ -109,13 +112,12 @@ def enviar_a_google_form_background(cliente, monto, oportunidad):
 
 def log_interaction(user_text, monto):
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    op = "ALTA" if monto > 1500000 else "MEDIA" if monto > 500000 else "BAJA"
+    op = "ALTA" if monto > META_MEDIA else "MEDIA" if monto > META_BASE else "BAJA"
     st.session_state.log_data.append({"Fecha": ts, "Usuario": user_text[:50], "Monto": monto})
     threading.Thread(target=enviar_a_google_form_background, args=(user_text, monto, op)).start()
 
 def parsear_ordenes_bot(texto):
     items_nuevos = []
-    # Regex flexible para capturar output del bot
     for cant, prod, precio, tipo in re.findall(r'\[ADD:([\d\.]+):([^:]+):([\d\.]+):([^\]]+)\]', texto):
         item = {
             "cantidad": float(cant), 
@@ -128,6 +130,7 @@ def parsear_ordenes_bot(texto):
         items_nuevos.append(item)
     return items_nuevos
 
+# --- NUEVA LÓGICA DE NEGOCIO (BASE + BOOSTERS) ---
 def calcular_negocio():
     now = datetime.datetime.now()
     tiempo_restante = st.session_state.expiry_time - now
@@ -143,25 +146,79 @@ def calcular_negocio():
         color_reloj = "#b0bec5"
 
     bruto = sum(i['subtotal'] for i in st.session_state.cart)
-    desc = 0; color = "#546e7a"; nivel = "PRECIO LISTA"; meta = 1500000
+    desc_base = 0
+    desc_extra = 0
+    nivel_texto = "PRECIO LISTA"
+    color = "#546e7a"
+    meta = META_BASE
     
-    gancho = any(x['tipo'] in ['CHAPA', 'PERFIL', 'HIERRO', 'CAÑO'] for x in st.session_state.cart)
+    # 1. DETECCIÓN DE TIPOS EN CARRITO
+    tipos_en_carrito = [x['tipo'] for x in st.session_state.cart]
     
-    if activa:
-        if bruto > 5000000: desc = 18; nivel = "👑 PARTNER MAX (18%)"; color = "#6200ea"; meta = 0
-        elif bruto > 3000000: desc = 15; nivel = "🏗️ CONSTRUCTOR (15%)"; color = "#d32f2f"; meta = 5000000
-        elif bruto > 1500000:
-            if gancho: desc = 15; nivel = "🔥 MAYORISTA (15%)"; color = "#d32f2f"; meta = 5000000
-            else: desc = 10; nivel = "🏢 OBRA (10%)"; color = "#f57c00"; meta = 3000000
-        else:
-            if gancho: desc = 15; nivel = "🔥 MAYORISTA (15%)"; color = "#d32f2f"; meta = 5000000
-            else: desc = 3; nivel = "⚡ 3% EXTRA CONTADO"; color = "#2e7d32"; meta = 1500000
-    else:
-        if bruto > 5000000: desc = 15; nivel = "PARTNER (SIN BONUS)"; color = "#6200ea"
-        else: desc = 0; nivel = "⚠️ OFERTA CADUCADA"; color = "#455a64"
+    # Lógica de categorías
+    tiene_chapa = any("CHAPA" in t for t in tipos_en_carrito)
+    tiene_perfil = any("PERFIL" in t for t in tipos_en_carrito)
+    tiene_acero = any(t in ["HIERRO", "MALLA", "CLAVOS", "ALAMBRE", "PERFIL", "CHAPA", "TUBO", "CAÑO"] for t in tipos_en_carrito)
+    tiene_pintura = any("PINTURA" in t or "ACCESORIO" in t or "ELECTRODO" in t for t in tipos_en_carrito)
 
-    neto = bruto * (1 - (desc/100))
-    return bruto, neto, desc, color, nivel, meta, segundos_restantes, activa, color_reloj, reloj_init
+    if activa:
+        # A. CALCULO BASE POR VOLUMEN
+        if bruto > META_MAXIMA:
+            desc_base = 15
+            nivel_texto = "PARTNER (15%)"
+            color = "#6200ea" # Violeta
+            meta = 0
+        elif bruto > META_MEDIA:
+            desc_base = 12
+            nivel_texto = "CONSTRUCTOR (12%)"
+            color = "#d32f2f" # Rojo
+            meta = META_MAXIMA
+        elif bruto > META_BASE:
+            desc_base = 10
+            nivel_texto = "OBRA (10%)"
+            color = "#f57c00" # Naranja
+            meta = META_MEDIA
+        else:
+            desc_base = 3
+            nivel_texto = "CONTADO (3%)"
+            color = "#2e7d32" # Verde
+            meta = META_BASE
+
+        # B. BOOSTERS (CROSS-SELLING) - ACUMULABLES HASTA TOPE
+        boosters_activos = []
+        
+        # Booster 1: Kit Techo (Chapa + Perfil)
+        if tiene_chapa and tiene_perfil:
+            desc_extra += 3
+            boosters_activos.append("🏠 KIT TECHO (+3%)")
+            
+        # Booster 2: Terminación (Acero + Pintura/Consumibles)
+        elif tiene_acero and tiene_pintura: # Usamos elif para no regalar todo junto tan fácil, o if para acumular
+            desc_extra += 2
+            boosters_activos.append("🎨 PACK TERM. (+2%)")
+            
+        # C. SUMA FINAL Y TOPE (MAX 18%)
+        desc_total = min(desc_base + desc_extra, 18)
+        
+        # D. GENERACIÓN DE ETIQUETA FINAL
+        if desc_extra > 0:
+            nivel_texto = f"{nivel_texto} + {' '.join(boosters_activos)}"
+            # Si hay booster, color especial
+            if desc_total >= 15: color = "#6200ea" 
+            
+    else:
+        # Oferta caducada
+        if bruto > META_MAXIMA: 
+            desc_total = 12 # Castigo por demora, baja del 15/18 al 12
+            nivel_texto = "OFERTA EXPIRADA"
+            color = "#455a64"
+        else: 
+            desc_total = 0
+            nivel_texto = "PRECIO LISTA"
+            color = "#455a64"
+
+    neto = bruto * (1 - (desc_total/100))
+    return bruto, neto, desc_total, color, nivel_texto, meta, segundos_restantes, activa, color_reloj, reloj_init
 
 def generar_link_wa(total):
     txt = "Hola Martín, confirmar pedido:\n" + "\n".join([f"▪ {i['cantidad']}x {i['producto']}" for i in st.session_state.cart])
@@ -169,7 +226,7 @@ def generar_link_wa(total):
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 5. UI: HEADER (RESPONSIVE + RELOJ FIXED + CHAT CORREGIDO)
+# 5. UI: HEADER
 # ==========================================
 subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer, reloj_python = calcular_negocio()
 porcentaje_barra = 100
@@ -177,27 +234,21 @@ if prox_meta > 0: porcentaje_barra = min((subtotal / prox_meta) * 100, 100)
 
 display_precio = f"${total_final:,.0f}" if subtotal > 0 else "🛒 COTIZAR"
 display_iva = "+IVA" if subtotal > 0 else ""
-display_badge = nombre_nivel if subtotal > 0 else "⚡ 3% OFF YA"
-subtext_badge = f"Ahorro: {desc_actual}%" if (oferta_viva and subtotal > 0) else "TIEMPO LIMITADO"
+# Ajuste de Badge para que entren los textos largos de los boosters
+display_badge = nombre_nivel[:25] + "..." if len(nombre_nivel) > 25 and subtotal > 0 else (nombre_nivel if subtotal > 0 else "⚡ 3% OFF YA")
+subtext_badge = f"Ahorro Total: {desc_actual}%" if (oferta_viva and subtotal > 0) else "TIEMPO LIMITADO"
 
 header_html = f"""
     <style>
-    /* AJUSTE PARA QUE EL CONTENIDO NO QUEDE TAPADO */
-    .block-container {{ 
-        padding-top: 130px !important; 
-        padding-bottom: 150px !important; 
-    }}
-    
+    .block-container {{ padding-top: 130px !important; padding-bottom: 150px !important; }}
     [data-testid="stSidebar"] {{ display: none; }} 
     
-    /* INPUT DEL CHAT FIJO ABAJO */
     [data-testid="stBottomBlock"], [data-testid="stChatInput"] {{
         position: fixed; bottom: 0; left: 0; width: 100%;
         background-color: white; padding-top: 10px; padding-bottom: 10px;
         z-index: 99999; border-top: 1px solid #eee;
     }}
     
-    /* TABS */
     .stTabs [data-baseweb="tab-list"] {{
         position: fixed; top: 90px; left: 0; width: 100%; 
         background: white; z-index: 99990;
@@ -207,7 +258,6 @@ header_html = f"""
     }}
     .stTabs [data-baseweb="tab"] {{ flex: 1; text-align: center; padding: 8px; font-weight: bold; font-size: 0.8rem; }}
     
-    /* HEADER */
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; 
         background: white; z-index: 100000;
@@ -236,7 +286,7 @@ header_html = f"""
 
     @media only screen and (max-width: 600px) {{
         .price-tag {{ font-size: 1.1rem; }}
-        .badge {{ font-size: 0.65rem; padding: 3px 6px; }}
+        .badge {{ font-size: 0.6rem; padding: 3px 6px; }}
         .cart-summary {{ padding: 5px 10px; }}
     }}
 
@@ -303,53 +353,45 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA (MODO: SEDUCTOR COMERCIAL + REGLAS TÉCNICAS)
+# 6. CEREBRO IA (MODO: EXPERTO + CLASIFICADOR DE PRODUCTOS)
 # ==========================================
 try: genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 except: st.error("Falta API KEY")
 
 sys_prompt = f"""
-ROL: Miguel, vendedor estrella de Pedro Bravin S.A.
+ROL: Miguel, ejecutivo comercial de Pedro Bravin S.A.
 DB: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
 # DATO INTERNO: DOLAR = {DOLAR_BNA}
 
-📏 **CATÁLOGO TÉCNICO Y LARGOS DE VENTA (MEMORIZAR):**
-1. **CONSTRUCCIÓN (ADN) / PERFIL C / IPN / UPN:** Barras de **12 METROS**.
-2. **HIERROS / ÁNGULOS / PLANCHUELAS / TUBOS:** Barras de **6 METROS**.
-3. **CAÑOS (Epoxi, Galv, Schedule, Mecánico):** Barras de **6.40 METROS**.
-4. **PINTURERIA/SOLDADURA/CLAVOS:** Por Unidad, Lata, Kg o Rollo.
+📏 **CATÁLOGO TÉCNICO Y LARGOS DE VENTA:**
+1. **PERFILES/HIERROS/TUBO/IPN/UPN:** Barras enteras (12m o 6m según tipo).
+2. **CAÑOS:** Barras de 6.40m.
+3. **CHAPA T90:** Hoja cerrada de 13m.
+4. **CHAPA COLOR:** Por Metro Lineal.
+5. **CHAPA CINCALUM:** Códigos de cortes o base 1 Metro.
+6. **PINTURERIA/ACCESORIOS:** Unidad.
 
-🏠 **REGLAS ESPECÍFICAS PARA CHAPAS DE TECHO (CRÍTICO):**
-A. **CHAPA T90 CINCALUM:** ÚNICA medida disponible: **13 METROS**. Se vende por hoja cerrada.
-B. **CHAPA COLOR (Pre-pintada):** Se vende por **METRO LINEAL**.
-   `Precio = Metros_Solicitados * Precio_Metro_Color * {DOLAR_BNA}`
-C. **CHAPA CINCALUM (T101 y ACANALADA):**
-   - Si no hay corte exacto, usa el precio del "1 METRO" como base.
-   - **ACANALADA**: Referencia **CÓDIGO 4** (1 metro).
-   - **T101**: Referencia **CÓDIGO 6** (1 metro).
-   - `Precio = Metros_Totales * Precio_Base_1_Metro * {DOLAR_BNA}`
+🏷️ **IMPORTANTE: CLASIFICACIÓN DE TIPOS PARA DESCUENTOS**
+Al generar la salida [ADD:...], en el campo 'TIPO' debes ser preciso para que el sistema active los descuentos combinados:
+- Si es Chapa (Techo) -> TIPO: **CHAPA**
+- Si es Perfil C/U/I -> TIPO: **PERFIL**
+- Si es Pintura, Solvente, Pincel, Disco, Electrodo -> TIPO: **PINTURA**
+- Si es Hierro, Malla, Clavos, Alambre, Caño, Tubo -> TIPO: **HIERRO** (O el específico).
 
-🧮 **LÓGICA GENERAL:**
-- **BARRA/PERFIL/CAÑO**: Precio del CSV es por la UNIDAD COMPLETA (Barra/Hoja).
-- **CHAPA**: Aplica reglas A, B o C.
-- **FLETE**: Si no es Zona Gratis -> `(KM * 2 * {COSTO_FLETE_USD} * {DOLAR_BNA})`.
-
-💞 **PERSONALIDAD "SEDUCTOR COMERCIAL" (INDUCE AL CIERRE):**
-- **ACTITUD:** "Franelea" al cliente. Hazle sentir que está ganando. Usa emojis.
-- **FOMO:** "Te congelé este precio pero el reloj corre", "Mirá que te separé el stock especialmente".
-- **CIERRE:** SIEMPRE termina invitando a tocar el botón verde. "¿Te parece bien así confirmamos ahora?". "Dale que llegamos al descuento".
-- **PROHIBIDO:** Ser seco o pasivo.
+💞 **PERSONALIDAD "SEDUCTOR COMERCIAL":**
+- **ACTITUD:** "Franelea" al cliente. Hazle notar si activa un combo.
+- **CROSS-SELLING:** Si lleva chapa, sugiérele Perfil C para activar el "Descuento Kit Techo". Si lleva hierro, sugiérele antióxido para el "Descuento Terminación".
+- **CIERRE:** Induce al botón verde.
 
 SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
-NOTA: [PRECIO_UNITARIO_FINAL_PESOS] es el valor final en pesos de la unidad vendida.
 """
 
 if "chat_session" not in st.session_state:
     st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
 
 def procesar_vision(img):
-    return st.session_state.chat_session.send_message(["Analiza lista. COTIZA CON PRECISIÓN, SEDUCE Y CIERRA LA VENTA.", img]).text
+    return st.session_state.chat_session.send_message(["Analiza lista. COTIZA, CLASIFICA BIEN LOS TIPOS Y SEDUCE.", img]).text
 
 # ==========================================
 # 7. INTERFAZ TABS
@@ -369,14 +411,14 @@ with tab1:
         if img_val is not None:
             file_id = f"{img_val.name}_{img_val.size}"
             if st.session_state.last_processed_file != file_id:
-                with st.spinner("👀 Analizando y buscando descuentos..."):
+                with st.spinner("👀 Analizando combos..."):
                     full_text = procesar_vision(Image.open(img_val))
                     news = parsear_ordenes_bot(full_text)
                     st.session_state.messages.append({"role": "assistant", "content": full_text})
                     st.session_state.last_processed_file = file_id
                     if news: 
                         st.toast("🔥 Productos Cargados", icon='✅')
-                        st.balloons() # Efecto WOW al subir foto
+                        st.balloons()
                     log_interaction("FOTO AUTO", total_final)
                     st.rerun()
 
@@ -392,10 +434,9 @@ with tab1:
         st.chat_message("user").markdown(prompt)
 
         with st.chat_message("assistant", avatar="👷‍♂️"):
-            with st.spinner("Calculando mejor oferta..."):
+            with st.spinner("Buscando descuentos..."):
                 try:
-                    # PROMPT INYECTADO: FRANELEO MÁXIMO
-                    prompt_con_presion = f"{prompt}. (NOTA INTERNA: Cotiza exacto. Sé seductor, usa FOMO. Dile que el precio es exclusivo. Induce a confirmar YA)."
+                    prompt_con_presion = f"{prompt}. (NOTA INTERNA: Cotiza exacto. Clasifica bien el TIPO para los descuentos. Seduce con el ahorro)."
                     
                     response = st.session_state.chat_session.send_message(prompt_con_presion)
                     full_text = response.text
@@ -406,24 +447,18 @@ with tab1:
                     if news:
                         st.toast(random.choice(TOASTS_EXITO), icon='🎉')
                         
-                        # LOGICA DE GLOBOS POR NIVELES
-                        if total_final > 5000000 and st.session_state.discount_tier_reached < 3:
+                        # LOGICA DE GLOBOS Y ALERTAS SEGUN DESCUENTOS OBTENIDOS
+                        if desc_actual >= 15 and st.session_state.discount_tier_reached < 3:
                             st.session_state.discount_tier_reached = 3
                             st.balloons()
-                            st.toast("👑 ¡NIVEL MÁXIMO ALCANZADO!", icon='👑')
-                        elif total_final > 3000000 and st.session_state.discount_tier_reached < 2:
+                        elif desc_actual >= 12 and st.session_state.discount_tier_reached < 2:
                             st.session_state.discount_tier_reached = 2
                             st.snow()
-                            st.toast("🚀 ¡DESCUENTO CONSTRUCTOR DESBLOQUEADO!", icon='🏗️')
-                        elif total_final > 1500000 and st.session_state.discount_tier_reached < 1:
-                            st.session_state.discount_tier_reached = 1
-                            st.toast("🔥 ¡YA TENÉS PRECIO MAYORISTA!", icon='🔥')
 
-                        # MENSAJE DE REFUERZO VISUAL
                         st.markdown(f"""
                         <div style="background:#e8f5e9; padding:10px; border-radius:10px; border:1px solid #25D366; margin-top:5px; animation: pulse-green 2s infinite;">
-                            <strong>✅ {len(news)} items reservados con éxito.</strong><br>
-                            <span style="font-size:0.85rem">💰 Total Acumulado: ${total_final:,.0f}</span><br>
+                            <strong>✅ {len(news)} items reservados.</strong><br>
+                            <span style="font-size:0.85rem">💰 Total: ${total_final:,.0f}</span><br>
                             <span style="font-size:0.8rem; color:#d32f2f;">⏳ Confirmá antes de que cambie el dólar ({reloj_python})</span>
                         </div>
                         <style>@keyframes pulse-green {{ 0% {{ box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.7); }} 70% {{ box-shadow: 0 0 0 10px rgba(37, 211, 102, 0); }} 100% {{ box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }} }}</style>
@@ -463,8 +498,9 @@ with tab2:
         col_res2.write(f"${subtotal:,.0f}")
         
         if oferta_viva and desc_actual > 0:
-            col_res1.markdown(f"**Beneficio {nombre_nivel}:**")
-            col_res2.markdown(f"**-${subtotal * (desc_actual/100):,.0f}**")
+            col_res1.markdown(f"**Beneficio:**")
+            col_res2.markdown(f"**-${subtotal * (desc_actual/100):,.0f} ({desc_actual}%)**")
+            st.caption(f"Aplicado: {nombre_nivel}")
         elif not oferta_viva:
             st.warning("⚠️ DESCUENTO EXPIRADO.")
             
@@ -473,7 +509,7 @@ with tab2:
             <div style="font-size:0.8rem; opacity:0.9;">TOTAL FINAL CONTADO (+IVA)</div>
             <div style="font-size:2.2rem; font-weight:900;">${total_final:,.0f}</div>
             <div style="font-size:0.8rem; margin-top:5px; background:rgba(0,0,0,0.2); padding:4px 10px; border-radius:10px; display:inline-block;">
-                { '⚡ 3% EXTRA APLICADO' if oferta_viva else '❌ PRECIO LISTA' }
+                { '⚡ DESCUENTO APLICADO' if oferta_viva else '❌ PRECIO LISTA' }
             </div>
         </div>
         """, unsafe_allow_html=True)
