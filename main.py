@@ -160,7 +160,7 @@ def generar_link_wa(total):
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 5. UI: HEADER Y ESTILOS (CCS NUCLEAR PARA BORRAR BARRA BLANCA)
+# 5. UI: HEADER Y ESTILOS
 # ==========================================
 subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer, reloj_python = calcular_negocio()
 porcentaje_barra = 100
@@ -173,21 +173,14 @@ subtext_badge = f"Ahorro Total: {desc_actual}%" if (oferta_viva and subtotal > 0
 
 header_html = f"""
     <style>
-    /* 1. ELIMINAR BARRA BLANCA Y 3 PUNTOS (CRÍTICO) */
-    header {{ visibility: hidden !important; }}
-    [data-testid="stHeader"] {{ display: none !important; }}
     #MainMenu {{ visibility: hidden !important; }}
     footer {{ visibility: hidden !important; }}
-    
-    /* 2. ESPACIO SUPERIOR EXTREMO (Para que la app baje y no la tape el modal web) */
-    .block-container {{ 
-        padding-top: 140px !important; 
-        padding-bottom: 150px !important; 
-    }}
-    
+    header {{ visibility: hidden !important; }}
+    [data-testid="stToolbar"] {{ display: none !important; }}
+
+    .block-container {{ padding-top: 140px !important; padding-bottom: 150px !important; }}
     [data-testid="stSidebar"] {{ display: none; }} 
     
-    /* 3. BARRA CHAT ESTILO WHATSAPP */
     [data-testid="stBottomBlock"], [data-testid="stChatInput"] {{
         position: fixed; bottom: 0; left: 0; width: 100%;
         background-color: white; padding: 10px;
@@ -195,7 +188,6 @@ header_html = f"""
         box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
     }}
 
-    /* 4. HEADER APP FIJO */
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; 
         background: #ffffff; z-index: 99990;
@@ -203,7 +195,6 @@ header_html = f"""
         height: 110px; overflow: hidden;
     }}
     
-    /* 5. TABS FLOTANTES */
     .stTabs [data-baseweb="tab-list"] {{
         position: fixed; top: 110px; left: 0; width: 100%; 
         background: #ffffff; z-index: 99980;
@@ -270,7 +261,7 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA (REGLAS DE NEGOCIO RESTAURADAS)
+# 6. CEREBRO IA (REGLAS ESTRICTAS DE CONFIRMACIÓN)
 # ==========================================
 try:
     api_key = os.environ.get("GOOGLE_API_KEY")
@@ -287,7 +278,7 @@ DB: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
 # DATO INTERNO: DOLAR = {DOLAR_BNA}
 
-📏 **CATÁLOGO TÉCNICO Y LARGOS DE VENTA (MEMORIZAR):**
+📏 **CATÁLOGO TÉCNICO Y LARGOS DE VENTA (ESTRICTO):**
 1. **CONSTRUCCIÓN (ADN) / PERFIL C / IPN / UPN:** Barras de **12 METROS**.
 2. **TUBOS ESTRUCTURALES / HIERROS / ÁNGULOS:** Barras de **6 METROS**.
 3. **CAÑOS (Uso Mecánico, Epoxi, Galvanizado, Schedule):** Barras de **6.40 METROS**.
@@ -297,18 +288,24 @@ ZONA GRATIS: {CIUDADES_GRATIS}
 7. **PINTURERIA/ACCESORIOS:** Unidad.
 
 🚚 **LOGÍSTICA Y ENVÍOS:**
-1. **ZONA GRATIS:** Si la ciudad está en la lista {CIUDADES_GRATIS} -> ¡Envío SIN CARGO!
-2. **OTRAS ZONAS:** Costo aproximado = `Distancia_KM * 2 * {COSTO_FLETE_USD} * {DOLAR_BNA}`.
-3. **ACOPIO:** ¡Ofrecemos acopio gratuito por **6 MESES**! (Ideal para congelar precio).
+1. **ZONA GRATIS:** Si la ciudad está en {CIUDADES_GRATIS} -> Envío $0.
+2. **OTRAS ZONAS:** Costo = `KM * 2 * {COSTO_FLETE_USD} * {DOLAR_BNA}`.
+3. **ACOPIO:** 6 Meses Gratis.
 
-⛔ **REGLAS DE ORO:**
-1. **NO AGREGAR SIN PERMISO:** Cotiza -> Sugiere combo -> Espera "Sí" -> Agrega.
-2. **ANTI-AMBIGÜEDAD:** Si piden "Planchuela" sin medida -> PREGUNTA ancho y espesor.
+⛔ **REGLAS DE ORO (CONFIRMACIÓN):**
+1. **PROHIBIDO AGREGAR AUTOMÁTICAMENTE:**
+   - Si el usuario pregunta "¿Cuánto vale?" o dice "Necesito X", **SOLO COTIZA verbalmente**.
+   - **NO generes el comando [ADD:...] todavía.**
+   - Pregunta: "¿Te lo cargo al pedido?" o "¿Confirmamos?".
+   - **SOLO** si responde "Sí", "Agregalo", "Dale", ENTONCES genera `[ADD:...]`.
+
+2. **ANTI-AMBIGÜEDAD:** Si piden "Planchuela" sin medida -> PREGUNTA antes de cotizar.
+
 3. **CLASIFICACIÓN TIPO:** Chapa->CHAPA, Perfil->PERFIL, Pintura->PINTURA, Hierro->HIERRO.
 
 💞 **PERSONALIDAD:**
 - Seductor comercial, amable pero técnico.
-- Usa el **ACOPIO** y los **DESCUENTOS** como cierre: "Aprovechá a congelar el precio y te lo guardamos 6 meses".
+- Usa el **ACOPIO** y los **DESCUENTOS** como cierre.
 
 SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
 """
@@ -324,7 +321,7 @@ def procesar_input(contenido, es_imagen=False):
         if es_imagen: 
             msg = ["Analiza lista. COTIZA SOLO LO QUE VES.", contenido]
         
-        prompt_final = f"{prefix}{msg}. (NOTA INTERNA: Cotiza SOLO lo pedido. Sugiere combos)." if not es_imagen else msg
+        prompt_final = f"{prefix}{msg}. (NOTA INTERNA: Cotiza precios primero. SOLO agrega al carro si el usuario CONFIRMA explícitamente)." if not es_imagen else msg
         return st.session_state.chat_session.send_message(prompt_final).text
     return "Error: Chat no iniciado."
 
@@ -380,7 +377,7 @@ with tab1:
             with st.spinner("Consultando stock..."):
                 try:
                     if "chat_session" in st.session_state:
-                        prompt_con_presion = f"{prompt}. (NOTA: Cotiza SOLO lo pedido. Sugiere combos)."
+                        prompt_con_presion = f"{prompt}. (NOTA: Cotiza precios. NO AGREGUES al carro salvo confirmación 'SI/DALE/AGREGA')."
                         response = st.session_state.chat_session.send_message(prompt_con_presion)
                         full_text = response.text
                         news = parsear_ordenes_bot(full_text)
@@ -400,3 +397,46 @@ with tab2:
     st.markdown(spacer_html, unsafe_allow_html=True)
     if not st.session_state.cart:
         st.info("Tu carrito está esperando ofertas...")
+    else:
+        st.markdown(f"### 📋 Confirmar Pedido ({len(st.session_state.cart)} items)")
+        for i, item in enumerate(st.session_state.cart):
+            with st.container():
+                c1, c2, c3 = st.columns([3, 1.5, 0.5])
+                with c1:
+                    st.markdown(f"**{item['producto']}**")
+                    st.caption(f"C/U: ${item['precio_unit']:,.0f}")
+                with c2:
+                    nueva_cant = st.number_input("Cant", min_value=0.0, value=float(item['cantidad']), step=1.0, key=f"qty_{i}", label_visibility="collapsed")
+                    if nueva_cant != item['cantidad']:
+                        if nueva_cant == 0: st.session_state.cart.pop(i)
+                        else:
+                            st.session_state.cart[i]['cantidad'] = nueva_cant
+                            st.session_state.cart[i]['subtotal'] = nueva_cant * item['precio_unit']
+                        st.rerun()
+                with c3:
+                    if st.button("🗑️", key=f"del_{i}"): st.session_state.cart.pop(i); st.rerun()
+                st.markdown("---")
+        
+        col_res1, col_res2 = st.columns(2)
+        col_res1.write("Subtotal Lista:")
+        col_res2.write(f"${subtotal:,.0f}")
+        if oferta_viva and desc_actual > 0:
+            col_res1.markdown(f"**Beneficio:**")
+            col_res2.markdown(f"**-${subtotal * (desc_actual/100):,.0f} ({desc_actual}%)**")
+            st.caption(f"Aplicado: {nombre_nivel}")
+        
+        st.markdown(f"""
+        <div style="background:{color_barra}; color:white; padding:20px; border-radius:15px; text-align:center; margin-top:15px; box-shadow: 0 4px 15px {color_barra}66; border: 2px solid #fff;">
+            <div style="font-size:0.8rem; opacity:0.9;">TOTAL FINAL CONTADO (+IVA)</div>
+            <div style="font-size:2.2rem; font-weight:900;">${total_final:,.0f}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <a href="{generar_link_wa(total_final)}" target="_blank" style="display:block; width:100%; background-color:#25D366; color:white; margin-top:15px; text-align:center; padding:18px; border-radius:50px; text-decoration:none; font-weight:bold; font-size:1.2rem; box-shadow: 0 4px 15px rgba(37,211,102,0.5); animation: pulse-green 2s infinite;">🚀 ENVIAR PEDIDO AHORA</a>
+        """, unsafe_allow_html=True)
+        
+        st.write("")
+        if st.button("🗑️ VACIAR CARRITO", type="secondary", use_container_width=True): st.session_state.cart = []; st.rerun()
+
+if st.session_state.admin_mode: st.dataframe(pd.DataFrame(st.session_state.log_data))
