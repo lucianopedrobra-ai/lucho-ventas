@@ -73,6 +73,7 @@ if "expiry_time" not in st.session_state:
     st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
 
 if "messages" not in st.session_state:
+    # --- RECUPERADO: SALUDO EDUCATIVO ---
     saludo_inicial = """
 👋 **¡Hola! Soy Miguel, tu asistente experto.**
 Estoy conectado al stock en tiempo real y tengo el dólar actualizado.
@@ -174,15 +175,13 @@ subtext_badge = f"Ahorro Total: {desc_actual}%" if (oferta_viva and subtotal > 0
 
 header_html = f"""
     <style>
-    /* ESPACIO SUPERIOR PARA NO PISAR */
+    /* --- RECUPERADO: PADDING CORRECTO PARA QUE NO SE TAPE --- */
     .block-container {{ 
         padding-top: 220px !important; 
         padding-bottom: 150px !important; 
     }}
-    
     [data-testid="stSidebar"] {{ display: none; }} 
     
-    /* CHAT ABAJO */
     [data-testid="stBottomBlock"], [data-testid="stChatInput"] {{
         position: fixed; bottom: 0; left: 0; width: 100%;
         background-color: white; padding: 10px;
@@ -215,10 +214,6 @@ header_html = f"""
         .price-tag {{ font-size: 1.2rem; }}
         .badge {{ font-size: 0.65rem; padding: 3px 6px; }}
         .cart-summary {{ padding: 5px 10px; }}
-    }}
-    @media only screen and (min-width: 601px) {{
-        .price-tag {{ font-size: 1.5rem; }}
-        .badge {{ font-size: 0.75rem; padding: 4px 12px; }}
     }}
     
     .timer-container {{ display: flex; align-items: center; gap: 5px; }}
@@ -267,14 +262,13 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA (GOOGLE CLOUD)
+# 6. CEREBRO IA
 # ==========================================
 try:
     api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
         try: api_key = st.secrets["GOOGLE_API_KEY"]
         except: pass
-    
     if not api_key: st.error("🚨 FALTA API KEY: Configurar en Cloud Run.")
     else: genai.configure(api_key=api_key)
 except Exception as e: st.error(f"Error IA: {e}")
@@ -334,7 +328,7 @@ with tab1:
             st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
             st.rerun()
 
-    # ZERO STATE
+    # --- RECUPERADO: ZERO STATE (AYUDA INICIAL) ---
     if len(st.session_state.messages) == 1:
         st.info("💡 **TIP:** Tocá el botón **'➕ Adjuntar'** para subir una foto de tu lista.")
 
@@ -348,6 +342,7 @@ with tab1:
         col_pop, col_spacer = st.columns([1.5, 8.5])
         with col_pop:
             with st.popover("➕ Adjuntar", use_container_width=True):
+                st.caption("Selecciona:")
                 img_val = st.file_uploader("📸 Foto de lista", type=["jpg","png","jpeg"])
                 if img_val is not None:
                     file_id = f"{img_val.name}_{img_val.size}"
