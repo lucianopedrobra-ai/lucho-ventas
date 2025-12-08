@@ -8,6 +8,7 @@ import requests
 import threading
 import time
 import random
+import os  # <--- NUEVO: Para leer variables de Google Cloud
 from PIL import Image
 from bs4 import BeautifulSoup
 
@@ -155,7 +156,6 @@ def calcular_negocio():
     # 1. DETECCIÓN DE TIPOS EN CARRITO
     tipos_en_carrito = [x['tipo'] for x in st.session_state.cart]
     
-    # Lógica de categorías
     tiene_chapa = any("CHAPA" in t for t in tipos_en_carrito)
     tiene_perfil = any("PERFIL" in t for t in tipos_en_carrito)
     tiene_acero = any(t in ["HIERRO", "MALLA", "CLAVOS", "ALAMBRE", "PERFIL", "CHAPA", "TUBO", "CAÑO"] for t in tipos_en_carrito)
@@ -164,58 +164,30 @@ def calcular_negocio():
     if activa:
         # A. CALCULO BASE POR VOLUMEN
         if bruto > META_MAXIMA:
-            desc_base = 15
-            nivel_texto = "PARTNER (15%)"
-            color = "#6200ea" # Violeta
-            meta = 0
+            desc_base = 15; nivel_texto = "PARTNER (15%)"; color = "#6200ea"; meta = 0
         elif bruto > META_MEDIA:
-            desc_base = 12
-            nivel_texto = "CONSTRUCTOR (12%)"
-            color = "#d32f2f" # Rojo
-            meta = META_MAXIMA
+            desc_base = 12; nivel_texto = "CONSTRUCTOR (12%)"; color = "#d32f2f"; meta = META_MAXIMA
         elif bruto > META_BASE:
-            desc_base = 10
-            nivel_texto = "OBRA (10%)"
-            color = "#f57c00" # Naranja
-            meta = META_MEDIA
+            desc_base = 10; nivel_texto = "OBRA (10%)"; color = "#f57c00"; meta = META_MEDIA
         else:
-            desc_base = 3
-            nivel_texto = "CONTADO (3%)"
-            color = "#2e7d32" # Verde
-            meta = META_BASE
+            desc_base = 3; nivel_texto = "CONTADO (3%)"; color = "#2e7d32"; meta = META_BASE
 
-        # B. BOOSTERS (CROSS-SELLING) - ACUMULABLES HASTA TOPE
+        # B. BOOSTERS (CROSS-SELLING)
         boosters_activos = []
-        
-        # Booster 1: Kit Techo (Chapa + Perfil)
         if tiene_chapa and tiene_perfil:
-            desc_extra += 3
-            boosters_activos.append("🏠 KIT TECHO (+3%)")
-            
-        # Booster 2: Terminación (Acero + Pintura/Consumibles)
+            desc_extra += 3; boosters_activos.append("🏠 KIT TECHO (+3%)")
         elif tiene_acero and tiene_pintura: 
-            desc_extra += 2
-            boosters_activos.append("🎨 PACK TERM. (+2%)")
+            desc_extra += 2; boosters_activos.append("🎨 PACK TERM. (+2%)")
             
-        # C. SUMA FINAL Y TOPE (MAX 18%)
         desc_total = min(desc_base + desc_extra, 18)
         
-        # D. GENERACIÓN DE ETIQUETA FINAL
         if desc_extra > 0:
             nivel_texto = f"{nivel_texto} + {' '.join(boosters_activos)}"
-            # Si hay booster, color especial
             if desc_total >= 15: color = "#6200ea" 
             
     else:
-        # Oferta caducada
-        if bruto > META_MAXIMA: 
-            desc_total = 12 # Castigo por demora
-            nivel_texto = "OFERTA EXPIRADA"
-            color = "#455a64"
-        else: 
-            desc_total = 0
-            nivel_texto = "PRECIO LISTA"
-            color = "#455a64"
+        if bruto > META_MAXIMA: desc_total = 12; nivel_texto = "OFERTA EXPIRADA"; color = "#455a64"
+        else: desc_total = 0; nivel_texto = "PRECIO LISTA"; color = "#455a64"
 
     neto = bruto * (1 - (desc_total/100))
     return bruto, neto, desc_total, color, nivel_texto, meta, segundos_restantes, activa, color_reloj, reloj_init
@@ -239,12 +211,14 @@ subtext_badge = f"Ahorro Total: {desc_actual}%" if (oferta_viva and subtotal > 0
 
 header_html = f"""
     <style>
-    .block-container {{ padding-top: 130px !important; padding-bottom: 150px !important; }}
+    /* AJUSTE RESPONSIVE GLOBAL */
+    .block-container {{ padding-top: 120px !important; padding-bottom: 150px !important; }}
     [data-testid="stSidebar"] {{ display: none; }} 
     
+    /* INPUT DEL CHAT FIJO ABAJO Y LIMPIO */
     [data-testid="stBottomBlock"], [data-testid="stChatInput"] {{
         position: fixed; bottom: 0; left: 0; width: 100%;
-        background-color: white; padding-top: 10px; padding-bottom: 10px;
+        background-color: white; padding: 10px;
         z-index: 99999; border-top: 1px solid #eee;
     }}
     
@@ -256,51 +230,42 @@ header_html = f"""
         padding-bottom: 2px; padding-top: 5px;
     }}
     .stTabs [data-baseweb="tab"] {{ flex: 1; text-align: center; padding: 8px; font-weight: bold; font-size: 0.8rem; }}
-    
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; 
         background: white; z-index: 100000;
         border-bottom: 4px solid {color_barra}; 
         height: 90px; overflow: hidden;
     }}
-    
     .top-strip {{ 
         background: #111; color: #fff; padding: 8px 15px; 
         display: flex; justify-content: space-between; 
         font-size: 0.7rem; align-items: center; height: 30px;
     }}
-    
     .cart-summary {{ 
         padding: 5px 15px; display: flex; justify-content: space-between; 
         align-items: center; height: 56px;
     }}
-    
     .price-tag {{ font-weight: 900; color: #333; white-space: nowrap; }}
-    
     .badge {{ 
         background: {color_barra}; color: white; padding: 3px 8px; 
         border-radius: 4px; font-weight: 900; text-transform: uppercase; 
         box-shadow: 0 2px 5px rgba(0,0,0,0.2); white-space: nowrap;
     }}
-
     @media only screen and (max-width: 600px) {{
         .price-tag {{ font-size: 1.1rem; }}
         .badge {{ font-size: 0.6rem; padding: 3px 6px; }}
         .cart-summary {{ padding: 5px 10px; }}
     }}
-
     @media only screen and (min-width: 601px) {{
         .price-tag {{ font-size: 1.5rem; }}
         .badge {{ font-size: 0.75rem; padding: 4px 12px; }}
     }}
-    
     .timer-container {{ display: flex; align-items: center; gap: 5px; }}
     .timer-box {{ 
         color: {color_timer}; font-weight: 900; font-size: 0.8rem; 
         background: #fff; padding: 1px 6px; border-radius: 4px; 
         border: 1px solid {color_timer}; min-width: 45px; text-align: center;
     }}
-    
     .progress-container {{ width: 100%; height: 4px; background: #eee; position: absolute; bottom: 0; }}
     .progress-bar {{ height: 100%; width: {porcentaje_barra}%; background: {color_barra}; transition: width 0.8s ease-out; }}
     </style>
@@ -352,10 +317,23 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA (MODO: EXPERTO + ANTI-AMBIGÜEDAD)
+# 6. CEREBRO IA (CONFIGURACIÓN API KEY ROBUSTA)
 # ==========================================
-try: genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-except: st.error("Falta API KEY")
+# 💡 AQUÍ ESTÁ EL ARREGLO IMPORTANTE:
+try:
+    # Intenta leer de la variable de entorno (Cloud Run)
+    api_key = os.environ.get("GOOGLE_API_KEY")
+    # Si no está, intenta leer de los secretos (Streamlit Local)
+    if not api_key:
+        try: api_key = st.secrets["GOOGLE_API_KEY"]
+        except: pass
+        
+    if not api_key:
+        st.error("🚨 ERROR CRÍTICO: No se encontró la API KEY. Verificá la configuración en Cloud Run.")
+    else:
+        genai.configure(api_key=api_key)
+except Exception as e:
+    st.error(f"Error al configurar IA: {e}")
 
 sys_prompt = f"""
 ROL: Miguel, ejecutivo comercial de Pedro Bravin S.A.
@@ -371,33 +349,41 @@ ZONA GRATIS: {CIUDADES_GRATIS}
 5. **CHAPA CINCALUM:** Códigos de cortes o base 1 Metro.
 6. **PINTURERIA/ACCESORIOS:** Unidad.
 
-⛔ **PROTOCOLO DE SEGURIDAD (ANTI-AMBIGÜEDAD):**
-- **SI EL USUARIO PIDE "PLANCHUELA", "ÁNGULO" O "HIERRO" SIN ESPECIFICAR MEDIDA:**
-  - ❌ **PROHIBIDO** AGREGAR AL CARRITO (No inventes medidas).
-  - ✅ **RESPONDER:** "Tengo muchas medidas disponibles (desde 1/2 pulgada hasta 4 pulgadas). ¿Qué ancho y espesor estás buscando exactamente?".
+⛔ **REGLAS DE ORO (SEGURIDAD Y VENTAS):**
+1. **NO AGREGAR SIN PERMISO:**
+   - **SOLO** agrega al carrito `[ADD:...]` los productos que el usuario pidió EXPLÍCITAMENTE.
+   - **PROHIBIDO** agregar items de cross-selling AUTOMÁTICAMENTE.
+   - **ESTRATEGIA:** Cotiza -> Sugiere combo verbalmente -> Espera el "Sí" -> Agrega el extra.
 
-- **SI EL USUARIO PIDE "MALLA":**
-  - Preguntar si busca SIMA (Obra) o STANDARD, y qué medida (Q188, Q335, 15x15, etc).
+2. **ANTI-AMBIGÜEDAD:**
+   - Si piden "Planchuela", "Ángulo" o "Hierro" SIN MEDIDA:
+     ❌ NO inventes medidas.
+     ✅ PREGUNTA: "Tengo muchas medidas. ¿Qué ancho y espesor buscás?".
 
-🏷️ **CLASIFICACIÓN DE TIPOS PARA DESCUENTOS:**
-- Chapa (Techo) -> TIPO: **CHAPA**
-- Perfil C/U/I -> TIPO: **PERFIL**
-- Pintura/Accesorios/Electrodos -> TIPO: **PINTURA**
-- Hierro/Malla/Clavos/Alambre/Caño -> TIPO: **HIERRO**
+3. **CLASIFICACIÓN TIPO (Para Descuentos):**
+   - Chapa -> TIPO: **CHAPA**
+   - Perfil -> TIPO: **PERFIL**
+   - Pintura/Accesorios -> TIPO: **PINTURA**
+   - Hierro/Caño -> TIPO: **HIERRO**
 
 💞 **PERSONALIDAD "SEDUCTOR COMERCIAL":**
-- **ACTITUD:** Seductor pero Técnico. Si falta un dato, pídelo amablemente ("Para cotizarte el mejor precio necesito saber...").
-- **CROSS-SELLING:** Detecta oportunidades (Chapa->Perfil, Hierro->Pintura).
-- **CIERRE:** Induce al botón verde.
+- Sé concreto pero amable.
+- Si ves oportunidad de combo, **SUGIERE** verbalmente.
+- Induce al cierre con preguntas: "¿Te parece bien esta cotización?".
 
 SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
 """
 
 if "chat_session" not in st.session_state:
-    st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
+    if "api_key" in locals() and api_key:
+        st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
+    else:
+        st.warning("⚠️ El chat no puede iniciar sin API KEY.")
 
 def procesar_vision(img):
-    return st.session_state.chat_session.send_message(["Analiza lista. COTIZA CON PRECISIÓN. SI HAY AMBIGUEDAD, PREGUNTA.", img]).text
+    if "chat_session" in st.session_state:
+        return st.session_state.chat_session.send_message(["Analiza lista. COTIZA SOLO LO QUE VES. NO INVENTES ITEMS.", img]).text
+    return "Error: Chat no iniciado."
 
 # ==========================================
 # 7. INTERFAZ TABS
@@ -440,38 +426,41 @@ with tab1:
         st.chat_message("user").markdown(prompt)
 
         with st.chat_message("assistant", avatar="👷‍♂️"):
-            with st.spinner("Consultando stock y precios..."):
+            with st.spinner("Consultando stock..."):
                 try:
-                    prompt_con_presion = f"{prompt}. (NOTA INTERNA: Si es genérico PREGUNTA MEDIDAS. Si es claro, cotiza y SEDUCE para cerrar)."
+                    prompt_con_presion = f"{prompt}. (NOTA INTERNA: Cotiza SOLO lo pedido. Si falta info, pregunta. Si ves oportunidad de combo, SUGIERE verbalmente, NO agregues sin permiso)."
                     
-                    response = st.session_state.chat_session.send_message(prompt_con_presion)
-                    full_text = response.text
-                    news = parsear_ordenes_bot(full_text)
-                    display = re.sub(r'\[ADD:.*?\]', '', full_text)
-                    st.markdown(display)
-                    
-                    if news:
-                        st.toast(random.choice(TOASTS_EXITO), icon='🎉')
+                    if "chat_session" in st.session_state:
+                        response = st.session_state.chat_session.send_message(prompt_con_presion)
+                        full_text = response.text
+                        news = parsear_ordenes_bot(full_text)
+                        display = re.sub(r'\[ADD:.*?\]', '', full_text)
+                        st.markdown(display)
                         
-                        if desc_actual >= 15 and st.session_state.discount_tier_reached < 3:
-                            st.session_state.discount_tier_reached = 3
-                            st.balloons()
-                        elif desc_actual >= 12 and st.session_state.discount_tier_reached < 2:
-                            st.session_state.discount_tier_reached = 2
-                            st.snow()
+                        if news:
+                            st.toast(random.choice(TOASTS_EXITO), icon='🎉')
+                            
+                            if desc_actual >= 15 and st.session_state.discount_tier_reached < 3:
+                                st.session_state.discount_tier_reached = 3
+                                st.balloons()
+                            elif desc_actual >= 12 and st.session_state.discount_tier_reached < 2:
+                                st.session_state.discount_tier_reached = 2
+                                st.snow()
 
-                        st.markdown(f"""
-                        <div style="background:#e8f5e9; padding:10px; border-radius:10px; border:1px solid #25D366; margin-top:5px; animation: pulse-green 2s infinite;">
-                            <strong>✅ {len(news)} items reservados.</strong><br>
-                            <span style="font-size:0.85rem">💰 Total: ${total_final:,.0f}</span><br>
-                            <span style="font-size:0.8rem; color:#d32f2f;">⏳ Confirmá antes de que cambie el dólar ({reloj_python})</span>
-                        </div>
-                        <style>@keyframes pulse-green {{ 0% {{ box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.7); }} 70% {{ box-shadow: 0 0 0 10px rgba(37, 211, 102, 0); }} 100% {{ box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }} }}</style>
-                        """, unsafe_allow_html=True)
+                            st.markdown(f"""
+                            <div style="background:#e8f5e9; padding:10px; border-radius:10px; border:1px solid #25D366; margin-top:5px; animation: pulse-green 2s infinite;">
+                                <strong>✅ {len(news)} items reservados.</strong><br>
+                                <span style="font-size:0.85rem">💰 Total: ${total_final:,.0f}</span><br>
+                                <span style="font-size:0.8rem; color:#d32f2f;">⏳ Confirmá antes de que cambie el dólar ({reloj_python})</span>
+                            </div>
+                            <style>@keyframes pulse-green {{ 0% {{ box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.7); }} 70% {{ box-shadow: 0 0 0 10px rgba(37, 211, 102, 0); }} 100% {{ box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }} }}</style>
+                            """, unsafe_allow_html=True)
 
-                    st.session_state.messages.append({"role": "assistant", "content": full_text})
-                    log_interaction(prompt, total_final)
-                    if news: time.sleep(1.5); st.rerun()
+                        st.session_state.messages.append({"role": "assistant", "content": full_text})
+                        log_interaction(prompt, total_final)
+                        if news: time.sleep(1.5); st.rerun()
+                    else:
+                        st.error("Error: Cerebro IA desconectado (Falta API Key).")
                 except Exception as e: st.error(f"Error: {e}")
 
 with tab2:
