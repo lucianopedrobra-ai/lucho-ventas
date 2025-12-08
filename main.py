@@ -56,7 +56,7 @@ SHEET_ID = "2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvn
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/e/{SHEET_ID}/pub?gid=2029869540&single=true&output=csv"
 URL_FORM_GOOGLE = "" 
 
-MINUTOS_OFERTA = 5  # Tiempo corto para presión
+MINUTOS_OFERTA = 5 
 
 CIUDADES_GRATIS = [
     "EL TREBOL", "LOS CARDOS", "LAS ROSAS", "SAN GENARO", "CENTENO", "CASAS", 
@@ -126,7 +126,7 @@ def calcular_negocio():
     if activa:
         m, s = divmod(segundos_restantes, 60)
         reloj_init = f"{m:02d}:{s:02d}"
-        color_reloj = "#2e7d32" if m > 2 else "#d32f2f" # Rojo si falta poco
+        color_reloj = "#2e7d32" if m > 2 else "#d32f2f"
     else:
         reloj_init = "00:00"
         color_reloj = "#b0bec5"
@@ -192,27 +192,20 @@ header_html = f"""
     .block-container {{ padding-top: 150px !important; padding-bottom: 120px !important; }}
     [data-testid="stSidebar"] {{ display: none; }} 
     
-    /* CHAT ABAJO */
+    /* CHAT ABAJO FINO */
     [data-testid="stBottomBlock"], [data-testid="stChatInput"] {{ 
         position: fixed; bottom: 0; left: 0; width: 100%; 
-        background: white; padding: 10px; z-index: 99999; 
-        border-top: 1px solid #eee; 
+        background: white; padding: 5px 10px !important; 
+        z-index: 99999; border-top: 1px solid #eee; 
     }}
+    .stChatInputContainer textarea {{ min-height: 38px !important; height: 38px !important; padding: 8px !important; }}
 
-    /* HEADER ANIMADO */
-    .fixed-header {{ 
-        position: fixed; top: 0; left: 0; width: 100%; 
-        background: #fff; z-index: 99990; 
-        border-bottom: 4px solid {color_barra}; 
-        height: 110px; overflow: hidden; 
-        box-shadow: 0 5px 20px rgba(0,0,0,0.1); 
-    }}
+    /* HEADER */
+    .fixed-header {{ position: fixed; top: 0; left: 0; width: 100%; background: #fff; z-index: 99990; border-bottom: 4px solid {color_barra}; height: 110px; overflow: hidden; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }}
     
-    /* ANIMACIÓN LATIDO (HEARTBEAT) */
     @keyframes heartbeat {{ 0% {{ transform: scale(1); }} 15% {{ transform: scale(1.05); }} 30% {{ transform: scale(1); }} 45% {{ transform: scale(1.05); }} 60% {{ transform: scale(1); }} }}
     .price-tag {{ font-weight: 900; color: #111; font-size: 1.6rem; animation: heartbeat 2s infinite; }}
     
-    /* BARRA PROGRESO ELÉCTRICA */
     .progress-container {{ width: 100%; height: 8px; background: #eee; position: absolute; bottom: 0; }}
     .progress-bar {{ 
         height: 100%; width: {porcentaje_barra}%; background: {color_barra}; transition: width 0.5s ease-out; 
@@ -228,6 +221,18 @@ header_html = f"""
     
     .stTabs [data-baseweb="tab-list"] {{ position: fixed; top: 110px; left: 0; width: 100%; background: #fff; z-index: 99980; padding-top: 5px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }}
     .stTabs [data-baseweb="tab"] {{ flex: 1; text-align: center; padding: 8px; font-weight: bold; font-size: 0.8rem; }}
+    
+    /* BOTÓN FLOTANTE ESTILO WHATSAPP (EL +) */
+    div[data-testid="stPopover"] {{
+        position: fixed; bottom: 70px; left: 15px; z-index: 200000;
+        width: auto;
+    }}
+    div[data-testid="stPopover"] button {{
+        border-radius: 50%; width: 45px; height: 45px;
+        background-color: #25D366; color: white; border: 2px solid white;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        display: flex; align-items: center; justify-content: center; font-size: 20px;
+    }}
     </style>
     
     <div class="fixed-header">
@@ -259,7 +264,7 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA (REGLAS + LOGÍSTICA CORREGIDA)
+# 6. CEREBRO IA (REGLAS Y PREGUNTAS INTELIGENTES)
 # ==========================================
 try:
     api_key = os.environ.get("GOOGLE_API_KEY")
@@ -270,29 +275,32 @@ try:
 except: pass
 
 sys_prompt = f"""
-ROL: Miguel, vendedor agresivo pero experto de Pedro Bravin S.A.
+ROL: Miguel, vendedor experto de Pedro Bravin S.A.
 DB: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
 DOLAR: {DOLAR_BNA}
 
 📏 **CATÁLOGO TÉCNICO (ESTRICTO):**
-- **12m:** Perfil C, IPN, UPN, ADN.
-- **6.40m:** Caños (Mecánico, Epoxi, Galvanizado).
-- **6m:** Tubos Estructurales, Hierros, Ángulos.
-- **CHAPA T90:** Única medida 13m.
-- **CHAPA COLOR:** Por metro.
-- **CINCALUM:** Por metro (Ref Cod 4/6).
+- 12 METROS: Perfil C, IPN, UPN, ADN.
+- 6.40 METROS: Caños (Mecánico, Epoxi, Galvanizado, Schedule).
+- 6 METROS: Tubos Estructurales, Hierros, Ángulos, Planchuelas.
+- CHAPA T90: Única medida 13 METROS.
+- CHAPA COLOR: Venta por metro.
+- CINCALUM: Por metro (Ref Cod 4/6).
 
 🚚 **LOGÍSTICA:**
-1. **ZONA GRATIS:** Si la ciudad está en {CIUDADES_GRATIS} -> ENVÍO $0.
-2. **OTRAS ZONAS:** Costo = `KM_TOTAL (IDA+VUELTA) * 0.85 USD * {DOLAR_BNA} * 1.21 (IVA)`.
-3. **ACOPIO:** "Comprá hoy, retirá en **6 MESES** sin cargo".
+1. **ZONA GRATIS:** {CIUDADES_GRATIS} -> $0 Envío.
+2. **OTRAS:** Costo = `KM * 2 * 0.85 USD * DOLAR * 1.21`.
+3. **ACOPIO:** 6 Meses Gratis.
 
-⛔ **PROTOCOLO SNIPER:**
-1. **BREVEDAD:** Max 15 palabras. Directo.
-2. **CONFIRMACIÓN:** SOLO agrega `[ADD:...]` si el cliente dice "SÍ". Primero cotiza.
-3. **UPSELL:** "Te faltan $X para el descuento. ¿Agrego pintura?".
-4. **ANTI-AMBIGÜEDAD:** Si falta medida, PREGUNTA.
+⛔ **REGLA DE ORO (PREGUNTAR ANTES DE ASUMIR):**
+Si el cliente dice "Planchuela" o "Perfil" SIN MEDIDA -> **NO COTICES UN PRECIO AL AZAR.**
+❌ Mal: "La planchuela de 1 pulgada sale $X". (¿Y si quería de 2 pulgadas?).
+✅ Bien: "Tengo muchas medidas. ¿De qué ancho y espesor buscás? (Ej: 1x3/16)".
+
+⛔ **REGLA DE CONFIRMACIÓN:**
+- Solo agrega `[ADD:...]` si el cliente confirma la compra.
+- Si solo pide precio, da el precio y pregunta: "¿Te lo separo?".
 
 SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
 """
@@ -304,8 +312,8 @@ def procesar_input(contenido, es_imagen=False):
     if "chat_session" in st.session_state:
         msg = contenido
         prefix = ""
-        if es_imagen: msg = ["COTIZA ESTO RÁPIDO. DETECTA OPORTUNIDADES DE COMBO.", contenido]
-        prompt = f"{prefix}{msg}. (NOTA: Sé breve. Cotiza precios. NO AGREGUES sin confirmación)." if not es_imagen else msg
+        if es_imagen: msg = ["COTIZA ESTO. SI FALTAN MEDIDAS, PREGUNTA.", contenido]
+        prompt = f"{prefix}{msg}. (NOTA: Sé breve. Si es ambiguo, pregunta. No agregues sin confirmar)." if not es_imagen else msg
         return st.session_state.chat_session.send_message(prompt).text
     return "Error: Chat off."
 
@@ -313,16 +321,16 @@ def procesar_input(contenido, es_imagen=False):
 # 7. INTERFAZ TABS
 # ==========================================
 tab1, tab2 = st.tabs(["💬 COTIZAR", f"🛒 MI PEDIDO ({len(st.session_state.cart)})"])
-spacer = '<div style="height: 30px;"></div>'
+spacer = '<div style="height: 20px;"></div>'
 
-# --- 💡 BOTÓN FLOTANTE INDUCTOR AL CARRITO (NUEVO) ---
+# BOTÓN FLOTANTE "FINALIZAR"
 if len(st.session_state.cart) > 0 and oferta_viva:
     st.markdown(f"""
-    <div style="position:fixed; bottom:90px; right:20px; z-index:99999;">
+    <div style="position:fixed; bottom:80px; right:15px; z-index:99999;">
         <a href="#mi-pedido" onclick="document.getElementsByTagName('button')[1].click();" style="
-            background: #ff0000; color: white; padding: 15px 25px; border-radius: 50px; 
+            background: #ff0000; color: white; padding: 12px 20px; border-radius: 50px; 
             font-weight: bold; text-decoration: none; box-shadow: 0 5px 20px rgba(255,0,0,0.5);
-            display: flex; align-items: center; gap: 10px; animation: pulse-red 1s infinite;">
+            display: flex; align-items: center; gap: 8px; animation: pulse-red 1s infinite; font-size: 0.9rem;">
             🛒 FINALIZAR (${total_final:,.0f}) 
         </a>
     </div>
@@ -337,9 +345,8 @@ with tab1:
             st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
             st.rerun()
 
-    # POP-UP AGRESIVO DE OPORTUNIDAD
     if 0 < prox_meta - subtotal < 150000 and oferta_viva:
-        st.toast(f"🚨 ¡ESTÁS A ${prox_meta - subtotal:,.0f} DEL PRÓXIMO DESCUENTO! AGREGÁ ALGO CHICO.", icon="🔥")
+        st.toast(f"🚨 ¡FALTAN ${prox_meta - subtotal:,.0f} PARA DESCUENTO! SUMÁ ALGO CHICO.", icon="🔥")
 
     for m in st.session_state.messages:
         if m["role"] != "system":
@@ -349,7 +356,7 @@ with tab1:
     with st.container():
         c1, c2 = st.columns([1.5, 8.5])
         with c1:
-            with st.popover("➕", use_container_width=True):
+            with st.popover("➕", use_container_width=False):
                 st.caption("Subir Foto")
                 img = st.file_uploader("", type=["jpg","png","jpeg"], label_visibility="collapsed")
                 if img:
@@ -375,11 +382,9 @@ with tab1:
                         news = parsear_ordenes_bot(res)
                         display = re.sub(r'\[ADD:.*?\]', '', res)
                         st.markdown(display)
-                        
                         if news: 
                             st.toast(random.choice(TOASTS_EXITO), icon='🔥')
                             if desc_actual >= 12: st.balloons()
-                        
                         st.session_state.messages.append({"role": "assistant", "content": res})
                         if news: time.sleep(1); st.rerun()
                 except: st.error("Error.")
