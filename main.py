@@ -9,10 +9,9 @@ import threading
 import time
 import random
 import os
-import streamlit.components.v1 as components # <--- NUEVO: Para el Auto-Scroll
 from PIL import Image
 from bs4 import BeautifulSoup
-# SIN AUDIO
+import streamlit.components.v1 as components # Necesario para el scroll
 
 # ==========================================
 # 1. CONFIGURACIÓN
@@ -57,7 +56,7 @@ SHEET_ID = "2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvn
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/e/{SHEET_ID}/pub?gid=2029869540&single=true&output=csv"
 URL_FORM_GOOGLE = "" 
 
-# ⏱️ TIEMPO CORTO (3 MINUTOS)
+# ⏱️ TIEMPO CORTO (3 MINUTOS) -> PRESIÓN TEMU
 MINUTOS_OFERTA = 3
 
 CIUDADES_GRATIS = [
@@ -128,7 +127,7 @@ def calcular_negocio():
     if activa:
         m, s = divmod(segundos_restantes, 60)
         reloj_init = f"{m:02d}:{s:02d}"
-        color_reloj = "#2e7d32" if m > 1 else "#d32f2f" # Rojo si falta poco
+        color_reloj = "#2e7d32" if m > 1 else "#d32f2f" 
     else:
         reloj_init = "00:00"
         color_reloj = "#b0bec5"
@@ -169,7 +168,7 @@ def generar_link_wa(total):
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 5. UI: HEADER AGRESIVO Y ESTILOS
+# 5. UI: HEADER Y ESTILOS
 # ==========================================
 subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer, reloj_python, dinero_ahorrado = calcular_negocio()
 porcentaje_barra = 100
@@ -191,7 +190,7 @@ header_html = f"""
     [data-testid="stToolbar"] {{ display: none !important; }}
     
     /* LAYOUT OPTIMIZADO PARA MÓVIL */
-    .block-container {{ padding-top: 130px !important; padding-bottom: 120px !important; }}
+    .block-container {{ padding-top: 130px !important; padding-bottom: 100px !important; }}
     [data-testid="stSidebar"] {{ display: none; }} 
     
     /* INPUT CHAT SLIM */
@@ -273,7 +272,7 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA (REGLAS + LOGÍSTICA CORREGIDA)
+# 6. CEREBRO IA
 # ==========================================
 try:
     api_key = os.environ.get("GOOGLE_API_KEY")
@@ -330,14 +329,11 @@ tab1, tab2 = st.tabs(["💬 COTIZAR", f"🛒 MI PEDIDO ({len(st.session_state.ca
 spacer = '<div style="height: 20px;"></div>'
 
 # --- 💡 BOTÓN FLOTANTE "FINALIZAR" (SI HAY CARRITO) ---
-# Al hacer clic, lleva a la pestaña 2 simulando un clic en un link interno o simplemente mostrando el botón de WhatsApp directo aquí.
-# ESTRATEGIA TEMU: Directo a WhatsApp para cerrar.
 if len(st.session_state.cart) > 0 and oferta_viva:
     st.markdown(f"""
     <div style="position:fixed; bottom:75px; right:10px; left:10px; z-index:200000; display:flex; justify-content:center;">
-        <a href="{generar_link_wa(total_final)}" target="_blank" style="
-            background: linear-gradient(90deg, #ff0000, #ff4d4d); color: white; 
-            padding: 12px 30px; border-radius: 50px; width: 100%; text-align:center;
+        <a href="#mi-pedido" onclick="document.getElementsByTagName('button')[1].click();" style="
+            background: #ff0000; color: white; padding: 12px 30px; border-radius: 50px; width: 100%; text-align:center;
             font-weight: 900; text-decoration: none; box-shadow: 0 5px 20px rgba(255,0,0,0.6);
             border: 2px solid #fff; font-size: 1rem; animation: pulse-red 1.5s infinite;">
             🔥 PAGAR AHORA: ${total_final:,.0f} ➔
@@ -366,7 +362,6 @@ with tab1:
     with st.container():
         c1, c2 = st.columns([1.5, 8.5])
         with c1:
-            # BOTÓN + CON ESTILO WHATSAPP
             with st.popover("➕", use_container_width=False):
                 st.caption("Subir Foto")
                 img = st.file_uploader("", type=["jpg","png","jpeg"], label_visibility="collapsed")
@@ -432,17 +427,19 @@ with tab2:
         
         if st.button("Vaciar Carrito", use_container_width=True): st.session_state.cart = []; st.rerun()
 
-# -----------------------------------------------------------
-# SCRIPT DE AUTO-SCROLL (Último paso para que baje solo)
-# -----------------------------------------------------------
+# --- SCRIPT DE AUTO-SCROLL (ARREGLADO PARA CLOUD RUN) ---
 components.html("""
     <script>
         function scrollDown() {
-            var body = window.parent.document.querySelector(".main");
-            if (body) body.scrollTop = body.scrollHeight;
-            window.scrollTo(0, document.body.scrollHeight);
+            // Busca el contenedor principal de la app
+            const main = window.parent.document.querySelector('.main') || window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
+            if (main) {
+                // Forzar scroll al fondo
+                main.scrollTop = main.scrollHeight;
+            }
         }
-        setInterval(scrollDown, 1000); // Intenta bajar cada segundo (Brutal pero efectivo en Cloud Run)
+        // Ejecutar cada 800ms para asegurar que baje cuando llega un mensaje nuevo
+        setInterval(scrollDown, 800);
     </script>
 """, height=0)
 
