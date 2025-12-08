@@ -11,7 +11,7 @@ import random
 import os
 from PIL import Image
 from bs4 import BeautifulSoup
-from streamlit_audiorecorder import audiorecorder
+# ELIMINADO: import de audio para evitar errores en Cloud Run
 
 # ==========================================
 # 1. CONFIGURACIÓN
@@ -73,18 +73,15 @@ if "expiry_time" not in st.session_state:
     st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
 
 if "messages" not in st.session_state:
-    # --- CAMBIO 1: SALUDO EDUCATIVO ---
-    # En lugar de texto plano, usamos Markdown estructurado para enseñar
     saludo_inicial = """
 👋 **¡Hola! Soy Miguel, tu asistente experto.**
 Estoy conectado al stock en tiempo real y tengo el dólar actualizado.
 
-🚀 **¿CÓMO PODEMOS COTIZAR?** (Elegí tu forma favorita):
+🚀 **¿CÓMO PODEMOS COTIZAR?**
 1. ✍️ **Escribime** la lista de materiales aquí abajo.
 2. 📸 **Subí una foto** de tu papel escrito a mano (Tocá el botón **➕ Adjuntar**).
-3. 🎤 **Mandame un audio** dictándome el pedido (Tocá el botón **➕ Adjuntar**).
 
-*¡Probá subir una foto o un audio, soy muy rápido!* 😉
+*¡Probá subir una foto, soy muy rápido!* 😉
     """
     st.session_state.messages = [{"role": "assistant", "content": saludo_inicial}]
 
@@ -131,8 +128,8 @@ def calcular_negocio():
 
     bruto = sum(i['subtotal'] for i in st.session_state.cart)
     desc_base = 0; desc_extra = 0; nivel_texto = "PRECIO LISTA"; color = "#546e7a"; meta = META_BASE
-    tipos_en_carrito = [x['tipo'] for x in st.session_state.cart]
     
+    tipos_en_carrito = [x['tipo'] for x in st.session_state.cart]
     tiene_chapa = any("CHAPA" in t for t in tipos_en_carrito)
     tiene_perfil = any("PERFIL" in t for t in tipos_en_carrito)
     tiene_acero = any(t in ["HIERRO", "MALLA", "CLAVOS", "ALAMBRE", "PERFIL", "CHAPA", "TUBO", "CAÑO"] for t in tipos_en_carrito)
@@ -177,12 +174,15 @@ subtext_badge = f"Ahorro Total: {desc_actual}%" if (oferta_viva and subtotal > 0
 
 header_html = f"""
     <style>
+    /* ESPACIO SUPERIOR PARA NO PISAR */
     .block-container {{ 
         padding-top: 220px !important; 
         padding-bottom: 150px !important; 
     }}
+    
     [data-testid="stSidebar"] {{ display: none; }} 
     
+    /* CHAT ABAJO */
     [data-testid="stBottomBlock"], [data-testid="stChatInput"] {{
         position: fixed; bottom: 0; left: 0; width: 100%;
         background-color: white; padding: 10px;
@@ -267,13 +267,14 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA
+# 6. CEREBRO IA (GOOGLE CLOUD)
 # ==========================================
 try:
     api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
         try: api_key = st.secrets["GOOGLE_API_KEY"]
         except: pass
+    
     if not api_key: st.error("🚨 FALTA API KEY: Configurar en Cloud Run.")
     else: genai.configure(api_key=api_key)
 except Exception as e: st.error(f"Error IA: {e}")
@@ -306,15 +307,12 @@ if "chat_session" not in st.session_state:
     if "api_key" in locals() and api_key:
         st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
 
-def procesar_input(contenido, es_imagen=False, es_audio=False):
+def procesar_input(contenido, es_imagen=False):
     if "chat_session" in st.session_state:
         msg = contenido
         prefix = ""
         if es_imagen: 
             msg = ["Analiza lista. COTIZA SOLO LO QUE VES.", contenido]
-        elif es_audio:
-            # Simulación de respuesta.
-            return "🎤 (Audio recibido) - Dame un momento para escuchar y procesar tu pedido..."
         
         prompt_final = f"{prefix}{msg}. (NOTA INTERNA: Cotiza SOLO lo pedido. Sugiere combos)." if not es_imagen else msg
         return st.session_state.chat_session.send_message(prompt_final).text
@@ -336,23 +334,20 @@ with tab1:
             st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
             st.rerun()
 
-    # --- ZONA DE AYUDA VISUAL (ZERO STATE) ---
-    # CAMBIO 2: Si es el primer mensaje, mostrar "Tutorial"
+    # ZERO STATE
     if len(st.session_state.messages) == 1:
-        st.info("💡 **TIP:** ¿Te da fiaca escribir? Tocá el botón **'➕ Adjuntar'** y subí una foto de tu lista escrita a mano. ¡Miguel la lee!")
+        st.info("💡 **TIP:** Tocá el botón **'➕ Adjuntar'** para subir una foto de tu lista.")
 
     for m in st.session_state.messages:
         if m["role"] != "system":
             clean = re.sub(r'\[ADD:.*?\]', '', m["content"]).strip()
             if clean: st.chat_message(m["role"], avatar="👷‍♂️" if m["role"]=="assistant" else "👤").markdown(clean)
 
-    # --- BARRA MULTIMEDIA FLOTANTE ---
+    # BARRA FLOTANTE (Solo Foto)
     with st.container():
         col_pop, col_spacer = st.columns([1.5, 8.5])
         with col_pop:
             with st.popover("➕ Adjuntar", use_container_width=True):
-                st.caption("Selecciona una opción:")
-                
                 img_val = st.file_uploader("📸 Foto de lista", type=["jpg","png","jpeg"])
                 if img_val is not None:
                     file_id = f"{img_val.name}_{img_val.size}"
@@ -364,20 +359,9 @@ with tab1:
                             st.session_state.last_processed_file = file_id
                             if news: st.balloons()
                             st.rerun()
-                
-                st.divider()
-                
-                audio = audiorecorder("🔴 Grabar Audio", "⏹️ Enviar")
-                if len(audio) > 0:
-                    st.info("🎤 Audio enviado.")
-                    time.sleep(1)
-                    st.session_state.messages.append({"role": "user", "content": "🎤 (Mensaje de voz enviado)"})
-                    res = procesar_input(None, es_audio=True)
-                    st.session_state.messages.append({"role": "assistant", "content": res})
-                    st.rerun()
 
-    # --- CAMBIO 3: TEXTO DE ENTRADA EXPLICATIVO ---
-    if prompt := st.chat_input("Escribí, subí foto o grabá audio..."):
+    # INPUT CHAT
+    if prompt := st.chat_input("Escribí, subí foto..."):
         if prompt == "#admin-miguel": st.session_state.admin_mode = not st.session_state.admin_mode; st.rerun()
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.chat_message("user").markdown(prompt)
