@@ -56,7 +56,7 @@ SHEET_ID = "2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvn
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/e/{SHEET_ID}/pub?gid=2029869540&single=true&output=csv"
 URL_FORM_GOOGLE = "" 
 
-# ⏱️ TIEMPO CORTO (3 MINUTOS)
+# ⏱️ TIEMPO CORTO (3 MINUTOS) -> PRESIÓN TEMU
 MINUTOS_OFERTA = 3
 
 CIUDADES_GRATIS = [
@@ -83,6 +83,7 @@ if "expiry_time" not in st.session_state:
     st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
 
 if "messages" not in st.session_state:
+    # SALUDO INICIAL
     saludo = """
 🦁 **Soy Miguel.** Dólar actualizado. Stock disponible.
 
@@ -127,7 +128,9 @@ def calcular_negocio():
     if activa:
         m, s = divmod(segundos_restantes, 60)
         reloj_init = f"{m:02d}:{s:02d}"
-        color_reloj = "#2e7d32" if m > 1 else "#d32f2f" 
+        color_reloj = "#2e7d32" 
+        if m < 2: color_reloj = "#ff9800"
+        if m < 1: color_reloj = "#ff0000"
     else:
         reloj_init = "00:00"
         color_reloj = "#b0bec5"
@@ -168,7 +171,7 @@ def generar_link_wa(total):
     return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
-# 5. UI: HEADER Y ESTILOS APP NATIVA
+# 5. UI: HEADER AGRESIVO Y ESTILOS
 # ==========================================
 subtotal, total_final, desc_actual, color_barra, nombre_nivel, prox_meta, seg_restantes, oferta_viva, color_timer, reloj_python, dinero_ahorrado = calcular_negocio()
 porcentaje_barra = 100
@@ -176,40 +179,33 @@ if prox_meta > 0: porcentaje_barra = min((subtotal / prox_meta) * 100, 100)
 
 display_precio = f"${total_final:,.0f}" if subtotal > 0 else "COTIZAR"
 display_iva = "+IVA" if subtotal > 0 else ""
-display_badge = nombre_nivel[:20] + "..." if len(nombre_nivel) > 20 and subtotal > 0 else (nombre_nivel if subtotal > 0 else "⚡ 3% OFF")
-subtext_badge = f"🔥 AHORRAS: ${dinero_ahorrado:,.0f}" if dinero_ahorrado > 0 else "TIEMPO LIMITADO"
+display_badge = nombre_nivel[:25] + "..." if len(nombre_nivel) > 25 and subtotal > 0 else (nombre_nivel if subtotal > 0 else "⚡ 3% OFF")
+
+if dinero_ahorrado > 0:
+    subtext_badge = f"🔥 AHORRAS: ${dinero_ahorrado:,.0f}"
+else:
+    subtext_badge = "TIEMPO LIMITADO"
 
 header_html = f"""
     <style>
-    /* LIMPIEZA DE INTERFAZ */
+    /* LIMPIEZA */
     #MainMenu, footer, header {{ visibility: hidden !important; }}
     [data-testid="stToolbar"] {{ display: none !important; }}
     
-    /* LAYOUT MÓVIL ESTABILIZADO */
-    .block-container {{ 
-        padding-top: 130px !important; 
-        padding-bottom: 120px !important; 
-    }}
+    /* LAYOUT OPTIMIZADO PARA MÓVIL */
+    .block-container {{ padding-top: 130px !important; padding-bottom: 120px !important; }}
     [data-testid="stSidebar"] {{ display: none; }} 
     
-    /* CHAT INPUT FIJO Y SEGURO */
+    /* INPUT CHAT SLIM */
     [data-testid="stBottomBlock"], [data-testid="stChatInput"] {{ 
         position: fixed; bottom: 0; left: 0; width: 100%; 
         background: white; padding: 5px 10px !important; 
         z-index: 99999; border-top: 1px solid #eee; 
     }}
-    .stChatInputContainer textarea {{ min-height: 40px !important; height: 40px !important; }}
+    .stChatInputContainer textarea {{ min-height: 38px !important; height: 38px !important; padding: 8px !important; }}
 
-    /* HEADER FIJO "A PRUEBA DE TECLADO" */
-    .fixed-header {{ 
-        position: fixed; top: 0; left: 0; width: 100%; 
-        background: #fff; z-index: 100000; /* Z-Index máximo */
-        border-bottom: 4px solid {color_barra}; 
-        height: 95px; overflow: hidden; 
-        box-shadow: 0 5px 20px rgba(0,0,0,0.15); 
-        transform: translateZ(0); /* Aceleración de hardware para móviles */
-        -webkit-transform: translateZ(0);
-    }}
+    /* HEADER */
+    .fixed-header {{ position: fixed; top: 0; left: 0; width: 100%; background: #fff; z-index: 99990; border-bottom: 4px solid {color_barra}; height: 95px; overflow: hidden; box-shadow: 0 5px 20px rgba(0,0,0,0.15); }}
     
     /* ANIMACIONES */
     @keyframes heartbeat {{ 0% {{ transform: scale(1); }} 15% {{ transform: scale(1.05); }} 30% {{ transform: scale(1); }} 45% {{ transform: scale(1.05); }} 60% {{ transform: scale(1); }} }}
@@ -233,17 +229,15 @@ header_html = f"""
     .cart-summary {{ padding: 5px 15px; display: flex; justify-content: space-between; align-items: center; height: 60px; }}
     .timer-box {{ color: {color_timer}; background: #fff; padding: 1px 6px; border-radius: 3px; font-weight: 900; border: 1px solid {color_timer}; }}
     
-    /* TABS FIJOS */
-    .stTabs [data-baseweb="tab-list"] {{ 
-        position: fixed; top: 95px; left: 0; width: 100%; 
-        background: #ffffff; z-index: 99980; padding-top: 2px; 
-        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); 
-        transform: translateZ(0); /* Estabilidad móvil */
-    }}
+    /* TABS */
+    .stTabs [data-baseweb="tab-list"] {{ position: fixed; top: 95px; left: 0; width: 100%; background: #ffffff; z-index: 99980; padding-top: 2px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }}
     .stTabs [data-baseweb="tab"] {{ flex: 1; text-align: center; padding: 6px; font-weight: bold; font-size: 0.75rem; }}
     
     /* BOTÓN FLOTANTE ESTILO WHATSAPP (EL +) */
-    div[data-testid="stPopover"] {{ position: fixed; bottom: 65px; left: 10px; z-index: 200000; width: auto; }}
+    div[data-testid="stPopover"] {{
+        position: fixed; bottom: 65px; left: 10px; z-index: 200000;
+        width: auto;
+    }}
     div[data-testid="stPopover"] button {{
         border-radius: 50%; width: 45px; height: 45px;
         background-color: #25D366; color: white; border: 2px solid white;
@@ -264,7 +258,7 @@ header_html = f"""
                 <span class="badge">{display_badge}</span>
                 <div style="font-size:0.7rem; color:{color_barra}; font-weight:900; margin-top:3px; animation: heartbeat 1s infinite;">{subtext_badge}</div>
             </div>
-            <div class="price-tag">{display_precio}<span style="font-size:0.7rem; font-weight:400; color:#666; margin-left:2px;">{display_iva}</span></div>
+            <div class="price-tag">{display_precio}<span style="font-size:0.8rem; font-weight:400; color:#666; margin-left:2px;">{display_iva}</span></div>
         </div>
         <div class="progress-container"><div class="progress-bar"></div></div>
     </div>
@@ -302,7 +296,7 @@ DOLAR: {DOLAR_BNA}
 📏 **CATÁLOGO TÉCNICO (ESTRICTO):**
 - **12m:** Perfil C, IPN, UPN, ADN.
 - **6.40m:** Caños (Mecánico, Epoxi, Galvanizado, Schedule).
-- **6m:** Tubos Estructurales, Hierros, Ángulos.
+- **6m:** Tubos Estructurales, Hierros, Ángulos, Planchuelas.
 - **CHAPA T90:** Única medida 13m.
 - **CHAPA COLOR:** Por metro.
 - **CINCALUM:** Por metro (Ref Cod 4/6).
@@ -314,7 +308,7 @@ DOLAR: {DOLAR_BNA}
 
 ⛔ **PROTOCOLO SNIPER:**
 1. **BREVEDAD:** Max 15 palabras. Directo.
-2. **CONFIRMACIÓN:** SOLO agrega `[ADD:...]` si el cliente dice "SÍ/CARGALO".
+2. **CONFIRMACIÓN:** SOLO agrega `[ADD:...]` si el cliente dice "SÍ" o "CARGALO".
    - *Ejemplo:* Si piden precio, dalo y pregunta: "**¿Te separo el stock?**".
 3. **UPSELL:** "Te faltan $X para el descuento. ¿Agrego pintura?".
 4. **ANTI-AMBIGÜEDAD:** Si falta medida, PREGUNTA.
@@ -340,19 +334,19 @@ def procesar_input(contenido, es_imagen=False):
 tab1, tab2 = st.tabs(["💬 COTIZAR", f"🛒 MI PEDIDO ({len(st.session_state.cart)})"])
 spacer = '<div style="height: 20px;"></div>'
 
-# --- 💡 BOTÓN FLOTANTE "FINALIZAR" (SI HAY CARRITO) ---
+# --- 💡 BOTÓN FLOTANTE "PAGAR AHORA" (STICKY FOOTER) ---
 if len(st.session_state.cart) > 0 and oferta_viva:
     st.markdown(f"""
     <div style="position:fixed; bottom:75px; right:10px; left:10px; z-index:200000; display:flex; justify-content:center;">
         <a href="{generar_link_wa(total_final)}" target="_blank" style="
-            background: linear-gradient(90deg, #ff0000, #ff4d4d); color: white; 
-            padding: 12px 30px; border-radius: 50px; width: 100%; text-align:center;
-            font-weight: 900; text-decoration: none; box-shadow: 0 5px 20px rgba(255,0,0,0.6);
-            border: 2px solid #fff; font-size: 1rem; animation: pulse-red 1.5s infinite;">
+            background: linear-gradient(90deg, #ff0000, #d50000); color: white; 
+            padding: 15px 30px; border-radius: 50px; width: 100%; text-align:center;
+            font-weight: 900; text-decoration: none; box-shadow: 0 5px 25px rgba(255,0,0,0.6);
+            border: 3px solid #fff; font-size: 1.2rem; animation: shake 4s infinite; text-transform: uppercase;">
             🔥 PAGAR AHORA: ${total_final:,.0f} ➔
         </a>
     </div>
-    <style>@keyframes pulse-red {{ 0% {{ transform: scale(1); }} 50% {{ transform: scale(1.05); }} 100% {{ transform: scale(1); }} }}</style>
+    <style>@keyframes shake {{ 0%, 100% {{transform: translateX(0);}} 10%, 30%, 50%, 70%, 90% {{transform: translateX(-2px);}} 20%, 40%, 60%, 80% {{transform: translateX(2px);}} }}</style>
     """, unsafe_allow_html=True)
 
 with tab1:
@@ -363,9 +357,9 @@ with tab1:
             st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
             st.rerun()
 
-    # POP-UP AGRESIVO DE OPORTUNIDAD
-    if 0 < prox_meta - subtotal < 150000 and oferta_viva:
-        st.toast(f"🚨 ¡FALTAN ${prox_meta - subtotal:,.0f} PARA DESCUENTO! SUMÁ ALGO CHICO.", icon="🔥")
+    # POP-UP DE OPORTUNIDAD
+    if 0 < prox_meta - subtotal < 200000 and oferta_viva:
+        st.toast(f"🚨 ¡FALTAN ${prox_meta - subtotal:,.0f} PARA DESCUENTO! SUMÁ PINTURA O DISCOS.", icon="🔥")
 
     for m in st.session_state.messages:
         if m["role"] != "system":
@@ -419,33 +413,45 @@ with tab2:
             with st.container():
                 c1, c2, c3 = st.columns([3, 1.5, 0.5])
                 c1.markdown(f"**{item['producto']}**\n<span style='color:grey;font-size:0.8em'>${item['precio_unit']:,.0f} unit</span>", unsafe_allow_html=True)
-                item['cantidad'] = c2.number_input("Cant", 0.0, value=float(item['cantidad']), key=f"q_{i}", label_visibility="collapsed")
-                item['subtotal'] = item['cantidad'] * item['precio_unit']
-                if c3.button("🗑️", key=f"d_{i}"): st.session_state.cart.pop(i); st.rerun()
-                if item['cantidad'] == 0: st.session_state.cart.pop(i); st.rerun()
+                
+                # ARREGLADO: Input numérico para editar cantidad
+                nueva_cant = c2.number_input("Cant", 0.0, value=float(item['cantidad']), key=f"q_{i}", label_visibility="collapsed")
+                
+                # Actualizar lógica si cambia el número
+                if nueva_cant != item['cantidad']:
+                    if nueva_cant == 0:
+                        st.session_state.cart.pop(i)
+                    else:
+                        st.session_state.cart[i]['cantidad'] = nueva_cant
+                        st.session_state.cart[i]['subtotal'] = nueva_cant * item['precio_unit']
+                    st.rerun()
+
+                if c3.button("🗑️", key=f"d_{i}"): 
+                    st.session_state.cart.pop(i)
+                    st.rerun()
+                
                 st.markdown("---")
         
-        # BOTÓN DE PAGO GIGANTE EN PESTAÑA CARRITO (Backup)
+        # BOTÓN DE PAGO BACKUP (Por si el flotante falla)
         st.markdown(f"""
         <a href="{generar_link_wa(total_final)}" target="_blank" style="
-            display:block; width:100%; background: linear-gradient(45deg, #25D366, #128C7E); 
-            color:white; margin-top:20px; text-align:center; padding:20px; border-radius:12px; 
-            text-decoration:none; font-weight:900; font-size:1.5rem; text-transform:uppercase;
-            box-shadow: 0 10px 25px rgba(37, 211, 102, 0.4); border: 2px solid #fff;
-            animation: pulse-green 1.5s infinite;">
-            🚀 CONFIRMAR PEDIDO <br><span style="font-size:0.8rem; opacity:0.8">CONGELAR PRECIO AHORA</span>
+            display:block; width:100%; background: #333; 
+            color:white; margin-top:20px; text-align:center; padding:15px; border-radius:12px; 
+            text-decoration:none; font-weight:bold; opacity:0.8;">
+            Link Alternativo de Pago
         </a>
-        <style>@keyframes pulse-green {{ 0% {{ transform: scale(1); box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.7); }} 70% {{ transform: scale(1.02); box-shadow: 0 0 0 15px rgba(37, 211, 102, 0); }} 100% {{ transform: scale(1); box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }} }}</style>
         """, unsafe_allow_html=True)
         
         if st.button("Vaciar Carrito", use_container_width=True): st.session_state.cart = []; st.rerun()
 
-# --- SCRIPT AUTO-SCROLL (ARREGLADO PARA CLOUD RUN) ---
+# SCRIPT AUTO-SCROLL MEJORADO
 components.html("""
     <script>
         function scrollDown() {
-            const main = window.parent.document.querySelector('.main') || window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
-            if (main) main.scrollTop = main.scrollHeight;
+            var body = window.parent.document.querySelector(".main");
+            if (body) {
+                body.scrollTop = body.scrollHeight;
+            }
         }
         setInterval(scrollDown, 800);
     </script>
