@@ -23,13 +23,13 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 🎯 METAS DE VENTA (BASE POR VOLUMEN)
-META_MAXIMA = 2500000   # 15% Base
-META_MEDIA  = 1500000   # 12% Base
-META_BASE   = 800000    # 10% Base
+# 🎯 METAS DE VENTA
+META_MAXIMA = 2500000
+META_MEDIA  = 1500000
+META_BASE   = 800000
 
 # ==========================================
-# 2. MOTOR INVISIBLE (DATOS + LÓGICA)
+# 2. MOTOR INVISIBLE
 # ==========================================
 @st.cache_data(ttl=3600)
 def obtener_dolar_bna():
@@ -57,16 +57,7 @@ SHEET_URL = f"https://docs.google.com/spreadsheets/d/e/{SHEET_ID}/pub?gid=202986
 URL_FORM_GOOGLE = "" 
 
 MINUTOS_OFERTA = 10 
-
-CIUDADES_GRATIS = [
-    "EL TREBOL", "LOS CARDOS", "LAS ROSAS", "SAN GENARO", "CENTENO", "CASAS", 
-    "CAÑADA ROSQUIN", "SAN VICENTE", "SAN MARTIN DE LAS ESCOBAS", "ANGELICA", 
-    "SUSANA", "RAFAELA", "SUNCHALES", "PRESIDENTE ROCA", "SA PEREIRA", 
-    "CLUCELLAS", "MARIA JUANA", "SASTRE", "SAN JORGE", "LAS PETACAS", 
-    "ZENON PEREYRA", "CARLOS PELLEGRINI", "LANDETA", "MARIA SUSANA", 
-    "PIAMONTE", "VILA", "SAN FRANCISCO"
-]
-
+CIUDADES_GRATIS = ["EL TREBOL", "LOS CARDOS", "LAS ROSAS", "SAN GENARO", "CENTENO", "CASAS", "CAÑADA ROSQUIN", "SAN VICENTE", "SAN MARTIN DE LAS ESCOBAS", "ANGELICA", "SUSANA", "RAFAELA", "SUNCHALES", "PRESIDENTE ROCA", "SA PEREIRA", "CLUCELLAS", "MARIA JUANA", "SASTRE", "SAN JORGE", "LAS PETACAS", "ZENON PEREYRA", "CARLOS PELLEGRINI", "LANDETA", "MARIA SUSANA", "PIAMONTE", "VILA", "SAN FRANCISCO"]
 TOASTS_EXITO = ["✨ ¡Excelente elección!", "🔥 ¡Te congelé este precio!", "💎 ¡Producto reservado!", "🚀 ¡Sumamos puntos!"]
 
 # ==========================================
@@ -82,7 +73,20 @@ if "expiry_time" not in st.session_state:
     st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
 
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "👋 **¡Hola!** Soy Miguel. Tengo la lista de precios abierta y el dólar actualizado. \n\nPasame tu pedido (escribime o mandame foto/audio 📷🎤) y **vemos qué atención especial te puedo hacer**. 😉"}]
+    # --- CAMBIO 1: SALUDO EDUCATIVO ---
+    # En lugar de texto plano, usamos Markdown estructurado para enseñar
+    saludo_inicial = """
+👋 **¡Hola! Soy Miguel, tu asistente experto.**
+Estoy conectado al stock en tiempo real y tengo el dólar actualizado.
+
+🚀 **¿CÓMO PODEMOS COTIZAR?** (Elegí tu forma favorita):
+1. ✍️ **Escribime** la lista de materiales aquí abajo.
+2. 📸 **Subí una foto** de tu papel escrito a mano (Tocá el botón **➕ Adjuntar**).
+3. 🎤 **Mandame un audio** dictándome el pedido (Tocá el botón **➕ Adjuntar**).
+
+*¡Probá subir una foto o un audio, soy muy rápido!* 😉
+    """
+    st.session_state.messages = [{"role": "assistant", "content": saludo_inicial}]
 
 # ==========================================
 # 4. FUNCIONES BACKEND
@@ -96,35 +100,21 @@ csv_context = load_data()
 
 def enviar_a_google_form_background(cliente, monto, oportunidad):
     if URL_FORM_GOOGLE:
-        try: 
-            requests.post(URL_FORM_GOOGLE, data={
-                ID_CAMPO_CLIENTE: str(cliente), 
-                ID_CAMPO_MONTO: str(monto), 
-                ID_CAMPO_OPORTUNIDAD: str(oportunidad)
-            }, timeout=1)
+        try: requests.post(URL_FORM_GOOGLE, data={'entry.xxxxxx': str(cliente), 'entry.xxxxxx': str(monto), 'entry.xxxxxx': str(oportunidad)}, timeout=1)
         except: pass
 
 def log_interaction(user_text, monto):
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    op = "ALTA" if monto > META_MEDIA else "MEDIA" if monto > META_BASE else "BAJA"
     st.session_state.log_data.append({"Fecha": ts, "Usuario": user_text[:50], "Monto": monto})
-    threading.Thread(target=enviar_a_google_form_background, args=(user_text, monto, op)).start()
 
 def parsear_ordenes_bot(texto):
     items_nuevos = []
     for cant, prod, precio, tipo in re.findall(r'\[ADD:([\d\.]+):([^:]+):([\d\.]+):([^\]]+)\]', texto):
-        item = {
-            "cantidad": float(cant), 
-            "producto": prod.strip(), 
-            "precio_unit": float(precio), 
-            "subtotal": float(cant)*float(precio), 
-            "tipo": tipo.strip().upper()
-        }
+        item = {"cantidad": float(cant), "producto": prod.strip(), "precio_unit": float(precio), "subtotal": float(cant)*float(precio), "tipo": tipo.strip().upper()}
         st.session_state.cart.append(item)
         items_nuevos.append(item)
     return items_nuevos
 
-# --- LÓGICA DE NEGOCIO (BASE + BOOSTERS) ---
 def calcular_negocio():
     now = datetime.datetime.now()
     tiempo_restante = st.session_state.expiry_time - now
@@ -141,31 +131,26 @@ def calcular_negocio():
 
     bruto = sum(i['subtotal'] for i in st.session_state.cart)
     desc_base = 0; desc_extra = 0; nivel_texto = "PRECIO LISTA"; color = "#546e7a"; meta = META_BASE
-    
-    # Detección de tipos para combos
     tipos_en_carrito = [x['tipo'] for x in st.session_state.cart]
+    
     tiene_chapa = any("CHAPA" in t for t in tipos_en_carrito)
     tiene_perfil = any("PERFIL" in t for t in tipos_en_carrito)
     tiene_acero = any(t in ["HIERRO", "MALLA", "CLAVOS", "ALAMBRE", "PERFIL", "CHAPA", "TUBO", "CAÑO"] for t in tipos_en_carrito)
     tiene_pintura = any("PINTURA" in t or "ACCESORIO" in t or "ELECTRODO" in t for t in tipos_en_carrito)
 
     if activa:
-        # A. CALCULO BASE
         if bruto > META_MAXIMA: desc_base = 15; nivel_texto = "PARTNER (15%)"; color = "#6200ea"; meta = 0
         elif bruto > META_MEDIA: desc_base = 12; nivel_texto = "CONSTRUCTOR (12%)"; color = "#d32f2f"; meta = META_MAXIMA
         elif bruto > META_BASE: desc_base = 10; nivel_texto = "OBRA (10%)"; color = "#f57c00"; meta = META_MEDIA
         else: desc_base = 3; nivel_texto = "CONTADO (3%)"; color = "#2e7d32"; meta = META_BASE
 
-        # B. BOOSTERS
         boosters_activos = []
         if tiene_chapa and tiene_perfil: desc_extra += 3; boosters_activos.append("🏠 KIT TECHO")
         elif tiene_acero and tiene_pintura: desc_extra += 2; boosters_activos.append("🎨 PACK TERM.")
             
         desc_total = min(desc_base + desc_extra, 18)
-        
-        if desc_extra > 0:
-            nivel_texto = f"{nivel_texto} + {' '.join(boosters_activos)}"
-            if desc_total >= 15: color = "#6200ea" 
+        if desc_extra > 0: nivel_texto = f"{nivel_texto} + {' '.join(boosters_activos)}"; 
+        if desc_total >= 15: color = "#6200ea"
     else:
         if bruto > META_MAXIMA: desc_total = 12; nivel_texto = "OFERTA EXPIRADA"; color = "#455a64"
         else: desc_total = 0; nivel_texto = "PRECIO LISTA"; color = "#455a64"
@@ -192,15 +177,12 @@ subtext_badge = f"Ahorro Total: {desc_actual}%" if (oferta_viva and subtotal > 0
 
 header_html = f"""
     <style>
-    /* 1. ESPACIO SUPERIOR (Padding) PARA EVITAR QUE SE PISE */
     .block-container {{ 
         padding-top: 220px !important; 
         padding-bottom: 150px !important; 
     }}
-    
     [data-testid="stSidebar"] {{ display: none; }} 
     
-    /* 2. BARRA DE CHAT FIJA ABAJO */
     [data-testid="stBottomBlock"], [data-testid="stChatInput"] {{
         position: fixed; bottom: 0; left: 0; width: 100%;
         background-color: white; padding: 10px;
@@ -208,7 +190,6 @@ header_html = f"""
         box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
     }}
 
-    /* 3. HEADER FIJO */
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; 
         background: #ffffff; z-index: 100000;
@@ -216,7 +197,6 @@ header_html = f"""
         height: 110px; overflow: hidden;
     }}
     
-    /* 4. TABS FLOTANTES */
     .stTabs [data-baseweb="tab-list"] {{
         position: fixed; top: 110px; left: 0; width: 100%; 
         background: #ffffff; z-index: 99990;
@@ -235,6 +215,10 @@ header_html = f"""
         .price-tag {{ font-size: 1.2rem; }}
         .badge {{ font-size: 0.65rem; padding: 3px 6px; }}
         .cart-summary {{ padding: 5px 10px; }}
+    }}
+    @media only screen and (min-width: 601px) {{
+        .price-tag {{ font-size: 1.5rem; }}
+        .badge {{ font-size: 0.75rem; padding: 4px 12px; }}
     }}
     
     .timer-container {{ display: flex; align-items: center; gap: 5px; }}
@@ -283,20 +267,16 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA (API KEY GOOGLE CLOUD)
+# 6. CEREBRO IA
 # ==========================================
 try:
     api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
         try: api_key = st.secrets["GOOGLE_API_KEY"]
         except: pass
-    
-    if not api_key: 
-        st.error("🚨 FALTA API KEY: Configurar en Cloud Run.")
-    else: 
-        genai.configure(api_key=api_key)
-except Exception as e: 
-    st.error(f"Error IA: {e}")
+    if not api_key: st.error("🚨 FALTA API KEY: Configurar en Cloud Run.")
+    else: genai.configure(api_key=api_key)
+except Exception as e: st.error(f"Error IA: {e}")
 
 sys_prompt = f"""
 ROL: Miguel, ejecutivo comercial de Pedro Bravin S.A.
@@ -304,31 +284,20 @@ DB: {csv_context}
 ZONA GRATIS: {CIUDADES_GRATIS}
 # DATO INTERNO: DOLAR = {DOLAR_BNA}
 
-📏 **CATÁLOGO TÉCNICO Y LARGOS DE VENTA (REGLAS DE ORO):**
+📏 **CATÁLOGO TÉCNICO:**
 1. **PERFILES/HIERROS/TUBO/IPN/UPN:** Barras enteras (12m o 6m según tipo).
 2. **CAÑOS:** Barras de 6.40m.
-3. **CHAPA T90:** Hoja cerrada de 13m (ÚNICA MEDIDA).
+3. **CHAPA T90:** Hoja cerrada de 13m.
 4. **CHAPA COLOR:** Por Metro Lineal.
-5. **CHAPA CINCALUM:** Códigos de cortes específicos o base 1 Metro (Código 4/6).
-6. **PINTURERIA/ACCESORIOS:** Por Unidad.
+5. **CHAPA CINCALUM:** Códigos de cortes o base 1 Metro.
+6. **PINTURERIA/ACCESORIOS:** Unidad.
 
-⛔ **PROTOCOLO DE SEGURIDAD (ANTI-AMBIGÜEDAD):**
-1. **NO AGREGAR SIN PERMISO:**
-   - **SOLO** agrega al carrito `[ADD:...]` productos pedidos EXPLÍCITAMENTE.
-   - **CROSS-SELLING:** Sugiere verbalmente ("¿Te agrego perfiles?"), espera el "Sí" y luego agrega.
-   
-2. **MEDIDAS CLARAS:**
-   - Si piden "Planchuela" o "Ángulo" SIN MEDIDAS -> ❌ NO COTIZAR. ✅ PREGUNTAR: "¿Qué ancho y espesor buscás?".
+⛔ **REGLAS DE ORO:**
+1. **NO AGREGAR SIN PERMISO:** Cotiza -> Sugiere combo -> Espera "Sí" -> Agrega.
+2. **ANTI-AMBIGÜEDAD:** Si no hay medidas, PREGUNTA.
+3. **CLASIFICACIÓN TIPO:** Chapa->CHAPA, Perfil->PERFIL, Pintura->PINTURA, Hierro->HIERRO.
 
-3. **CLASIFICACIÓN PARA DESCUENTOS:**
-   - Chapa -> TIPO: **CHAPA**
-   - Perfil -> TIPO: **PERFIL**
-   - Pintura/Accesorios -> TIPO: **PINTURA**
-   - Hierro/Caño -> TIPO: **HIERRO**
-
-💞 **PERSONALIDAD:**
-- Seductor comercial, amable pero técnico.
-- Usa el reloj y los descuentos como palanca de cierre.
+💞 **PERSONALIDAD:** Sé concreto pero amable. Induce al cierre.
 
 SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
 """
@@ -344,8 +313,7 @@ def procesar_input(contenido, es_imagen=False, es_audio=False):
         if es_imagen: 
             msg = ["Analiza lista. COTIZA SOLO LO QUE VES.", contenido]
         elif es_audio:
-            # Simulación: En un futuro aquí integraríamos Whisper para STT.
-            # Por ahora, usamos el modelo para recibir el evento.
+            # Simulación de respuesta.
             return "🎤 (Audio recibido) - Dame un momento para escuchar y procesar tu pedido..."
         
         prompt_final = f"{prefix}{msg}. (NOTA INTERNA: Cotiza SOLO lo pedido. Sugiere combos)." if not es_imagen else msg
@@ -357,7 +325,6 @@ def procesar_input(contenido, es_imagen=False, es_audio=False):
 # ==========================================
 tab1, tab2 = st.tabs(["💬 COTIZAR", f"🛒 MI PEDIDO ({len(st.session_state.cart)})"])
 
-# ESPACIADOR INVISIBLE (SOLUCIÓN DEFINITIVA AL PISADO)
 spacer_html = '<div style="height: 30px;"></div>'
 
 with tab1:
@@ -369,20 +336,23 @@ with tab1:
             st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
             st.rerun()
 
+    # --- ZONA DE AYUDA VISUAL (ZERO STATE) ---
+    # CAMBIO 2: Si es el primer mensaje, mostrar "Tutorial"
+    if len(st.session_state.messages) == 1:
+        st.info("💡 **TIP:** ¿Te da fiaca escribir? Tocá el botón **'➕ Adjuntar'** y subí una foto de tu lista escrita a mano. ¡Miguel la lee!")
+
     for m in st.session_state.messages:
         if m["role"] != "system":
             clean = re.sub(r'\[ADD:.*?\]', '', m["content"]).strip()
             if clean: st.chat_message(m["role"], avatar="👷‍♂️" if m["role"]=="assistant" else "👤").markdown(clean)
 
-    # --- BARRA MULTIMEDIA FLOTANTE (ESTILO WHATSAPP/GEMINI) ---
+    # --- BARRA MULTIMEDIA FLOTANTE ---
     with st.container():
         col_pop, col_spacer = st.columns([1.5, 8.5])
         with col_pop:
-            # Botón "➕" con menú desplegable
             with st.popover("➕ Adjuntar", use_container_width=True):
                 st.caption("Selecciona una opción:")
                 
-                # FOTO
                 img_val = st.file_uploader("📸 Foto de lista", type=["jpg","png","jpeg"])
                 if img_val is not None:
                     file_id = f"{img_val.name}_{img_val.size}"
@@ -397,7 +367,6 @@ with tab1:
                 
                 st.divider()
                 
-                # AUDIO
                 audio = audiorecorder("🔴 Grabar Audio", "⏹️ Enviar")
                 if len(audio) > 0:
                     st.info("🎤 Audio enviado.")
@@ -407,8 +376,8 @@ with tab1:
                     st.session_state.messages.append({"role": "assistant", "content": res})
                     st.rerun()
 
-    # INPUT DE CHAT
-    if prompt := st.chat_input("Escribí tu pedido acá..."):
+    # --- CAMBIO 3: TEXTO DE ENTRADA EXPLICATIVO ---
+    if prompt := st.chat_input("Escribí, subí foto o grabá audio..."):
         if prompt == "#admin-miguel": st.session_state.admin_mode = not st.session_state.admin_mode; st.rerun()
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.chat_message("user").markdown(prompt)
