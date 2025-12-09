@@ -18,7 +18,7 @@ import streamlit.components.v1 as components
 # ==========================================
 st.set_page_config(
     page_title="🔥 OFERTAS PEDRO BRAVIN",
-    page_icon="🏗️", # CAMBIO: Icono de construcción
+    page_icon="🦁", 
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -83,9 +83,9 @@ if "expiry_time" not in st.session_state:
     st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
 
 if "messages" not in st.session_state:
-    # SALUDO INICIAL (CAMBIO A OBRERO)
+    # SALUDO INICIAL
     saludo = """
-👷‍♂️ **Soy Miguel.** Dólar actualizado. Stock disponible.
+🦁 **Soy Miguel.** Dólar actualizado. Stock disponible.
 
 👇 **PASAME TU PEDIDO YA** (Escribí o usá el botón **➕** para subir foto).
 *¡El precio se congela por 3 minutos!* ⏳
@@ -113,78 +113,62 @@ def log_interaction(user_text, monto):
 
 def parsear_ordenes_bot(texto):
     items_nuevos = []
-    # FIX: Try-except agregado para evitar error al cerrar pedido si el bot alucina formato
     for cant, prod, precio, tipo in re.findall(r'\[ADD:([\d\.]+):([^:]+):([\d\.]+):([^\]]+)\]', texto):
-        try:
-            item = {
-                "cantidad": float(cant), 
-                "producto": prod.strip(), 
-                "precio_unit": float(precio), 
-                "subtotal": float(cant)*float(precio), 
-                "tipo": tipo.strip().upper()
-            }
-            st.session_state.cart.append(item)
-            items_nuevos.append(item)
-        except: pass
+        item = {"cantidad": float(cant), "producto": prod.strip(), "precio_unit": float(precio), "subtotal": float(cant)*float(precio), "tipo": tipo.strip().upper()}
+        st.session_state.cart.append(item)
+        items_nuevos.append(item)
     return items_nuevos
 
 def calcular_negocio():
-    # FIX: Try-except agregado para evitar pantalla roja si hay error matemático
-    try:
-        now = datetime.datetime.now()
-        tiempo_restante = st.session_state.expiry_time - now
-        segundos_restantes = int(tiempo_restante.total_seconds())
-        activa = segundos_restantes > 0
-        
-        if activa:
-            m, s = divmod(segundos_restantes, 60)
-            reloj_init = f"{m:02d}:{s:02d}"
-            color_reloj = "#2e7d32" 
-            if m < 2: color_reloj = "#ff9800"
-            if m < 1: color_reloj = "#ff0000"
-        else:
-            reloj_init = "00:00"
-            color_reloj = "#b0bec5"
+    now = datetime.datetime.now()
+    tiempo_restante = st.session_state.expiry_time - now
+    segundos_restantes = int(tiempo_restante.total_seconds())
+    activa = segundos_restantes > 0
+    
+    if activa:
+        m, s = divmod(segundos_restantes, 60)
+        reloj_init = f"{m:02d}:{s:02d}"
+        color_reloj = "#2e7d32" 
+        if m < 2: color_reloj = "#ff9800"
+        if m < 1: color_reloj = "#ff0000"
+    else:
+        reloj_init = "00:00"
+        color_reloj = "#b0bec5"
 
-        bruto = sum(i['subtotal'] for i in st.session_state.cart)
-        desc_base = 0; desc_extra = 0; nivel_texto = "LISTA"; color = "#546e7a"; meta = META_BASE
-        
-        tipos = [x['tipo'] for x in st.session_state.cart]
-        tiene_chapa = any("CHAPA" in t for t in tipos)
-        tiene_perfil = any("PERFIL" in t for t in tipos)
-        tiene_acero = any(t in ["HIERRO", "MALLA", "CLAVOS", "ALAMBRE", "PERFIL", "CHAPA", "TUBO", "CAÑO"] for t in tipos)
-        tiene_pintura = any("PINTURA" in t or "ACCESORIO" in t or "ELECTRODO" in t for t in tipos)
+    bruto = sum(i['subtotal'] for i in st.session_state.cart)
+    desc_base = 0; desc_extra = 0; nivel_texto = "LISTA"; color = "#546e7a"; meta = META_BASE
+    
+    tipos = [x['tipo'] for x in st.session_state.cart]
+    tiene_chapa = any("CHAPA" in t for t in tipos)
+    tiene_perfil = any("PERFIL" in t for t in tipos)
+    tiene_acero = any(t in ["HIERRO", "MALLA", "CLAVOS", "ALAMBRE", "PERFIL", "CHAPA", "TUBO", "CAÑO"] for t in tipos)
+    tiene_pintura = any("PINTURA" in t or "ACCESORIO" in t or "ELECTRODO" in t for t in tipos)
 
-        if activa:
-            if bruto > META_MAXIMA: desc_base = 15; nivel_texto = "PARTNER MAX"; color = "#6200ea"; meta = 0
-            elif bruto > META_MEDIA: desc_base = 12; nivel_texto = "CONSTRUCTOR"; color = "#d32f2f"; meta = META_MAXIMA
-            elif bruto > META_BASE: desc_base = 10; nivel_texto = "OBRA"; color = "#f57c00"; meta = META_MEDIA
-            else: desc_base = 3; nivel_texto = "CONTADO"; color = "#2e7d32"; meta = META_BASE
+    if activa:
+        if bruto > META_MAXIMA: desc_base = 15; nivel_texto = "PARTNER MAX"; color = "#6200ea"; meta = 0
+        elif bruto > META_MEDIA: desc_base = 12; nivel_texto = "CONSTRUCTOR"; color = "#d32f2f"; meta = META_MAXIMA
+        elif bruto > META_BASE: desc_base = 10; nivel_texto = "OBRA"; color = "#f57c00"; meta = META_MEDIA
+        else: desc_base = 3; nivel_texto = "CONTADO"; color = "#2e7d32"; meta = META_BASE
 
-            boosters = []
-            if tiene_chapa and tiene_perfil: desc_extra += 3; boosters.append("KIT TECHO")
-            elif tiene_acero and tiene_pintura: desc_extra += 2; boosters.append("PACK TERM.")
-                
-            desc_total = min(desc_base + desc_extra, 18)
-            if desc_extra > 0: 
-                nivel_texto = f"{nivel_texto} + {' '.join(boosters)}"
-                if desc_total >= 15: color = "#6200ea" 
-        else:
-            desc_total = 0; nivel_texto = "EXPIRADO"; color = "#455a64"
+        boosters = []
+        if tiene_chapa and tiene_perfil: desc_extra += 3; boosters.append("KIT TECHO")
+        elif tiene_acero and tiene_pintura: desc_extra += 2; boosters.append("PACK TERM.")
+            
+        desc_total = min(desc_base + desc_extra, 18)
+        if desc_extra > 0: 
+            nivel_texto = f"{nivel_texto} + {' '.join(boosters)}"
+            if desc_total >= 15: color = "#6200ea" 
+    else:
+        desc_total = 0; nivel_texto = "EXPIRADO"; color = "#455a64"
 
-        neto = bruto * (1 - (desc_total/100))
-        ahorro_total = bruto - neto
-        return bruto, neto, desc_total, color, nivel_texto, meta, segundos_restantes, activa, color_reloj, reloj_init, ahorro_total
-    except:
-        return 0, 0, 0, "#000", "ERROR", 0, 0, False, "#000", "00:00", 0
+    neto = bruto * (1 - (desc_total/100))
+    ahorro_total = bruto - neto
+    return bruto, neto, desc_total, color, nivel_texto, meta, segundos_restantes, activa, color_reloj, reloj_init, ahorro_total
 
 def generar_link_wa(total):
-    try:
-        txt = "HOLA, QUIERO CONGELAR PRECIO YA (Oferta Flash):\n" + "\n".join([f"▪ {i['cantidad']}x {i['producto']}" for i in st.session_state.cart])
-        txt += f"\n💰 TOTAL FINAL: ${total:,.0f} + IVA"
-        return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
-    except:
-        return "https://wa.me/5493401527780"
+    txt = "HOLA, QUIERO CONGELAR PRECIO YA (Oferta Flash):\n" + "\n".join([f"▪ {i['cantidad']}x {i['producto']}" for i in st.session_state.cart])
+    txt += f"\n💰 TOTAL FINAL: ${total:,.0f} + IVA"
+    return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
 
 # ==========================================
 # 5. UI: HEADER AGRESIVO Y ESTILOS
@@ -267,7 +251,7 @@ header_html = f"""
     <div class="fixed-header">
         <div class="top-strip">
             <div style="display:flex; align-items:center; gap:5px;">⏳ EXPIRA: <span id="countdown_display" class="timer-box">{reloj_python}</span></div>
-            <div style="color:#FFD700; font-style:italic;">🏗️ PEDRO BRAVIN S.A.</div>
+            <div style="color:#FFD700; font-style:italic;">🦁 PEDRO BRAVIN S.A.</div>
         </div>
         <div class="cart-summary">
             <div>
@@ -293,7 +277,7 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA (ACTUALIZADO CON TUS REGLAS)
+# 6. CEREBRO IA (REGLAS + LOGÍSTICA COMPLETA)
 # ==========================================
 try:
     api_key = os.environ.get("GOOGLE_API_KEY")
@@ -303,39 +287,35 @@ try:
     if api_key: genai.configure(api_key=api_key)
 except: pass
 
-# PROMPT MEJORADO: Lógica de flete, unidades y kits
 sys_prompt = f"""
-ROL: Miguel, Ingeniero Comercial y Vendedor Técnico de Pedro Bravin S.A.
-DB (CATÁLOGO): {csv_context}
-ZONA GRATIS (PUNTOS LOGÍSTICOS): {CIUDADES_GRATIS}
-DOLAR BNA VENTA: {DOLAR_BNA}
+ROL: Miguel, vendedor experto de Pedro Bravin S.A.
+DB: {csv_context}
+ZONA GRATIS: {CIUDADES_GRATIS}
+DOLAR: {DOLAR_BNA}
 
-🏗️ **LÓGICA DE PROYECTOS (ESTA ES TU PRIORIDAD):**
-Cuando el cliente pide un proyecto (ej: "cerrar terreno", "techada", "galpón"), NO busques solo el producto principal. **ARMA EL KIT COMPLETO.**
-1. **¿Faltan datos?** -> PREGUNTA (Medidas, metros, etc).
-2. **Armado de Kits:**
-   - **CERCOS:** Postes (c/2.5m) + Malla + Alambre + Tensores.
-   - **TECHOS:** Chapas + Perfil C + Tornillos + Aislante.
-
-3. **CROSS-SELLING:** Si llevan perfiles -> Ofrece electrodos/discos. Si llevan pintura -> Pinceles.
-
-📏 **DETALLES TÉCNICOS:**
-- **6.40m:** Caños (Venta por **METRO**, NO KG).
-- **Contexto:** "60m de alambre" no son 60 rollos. Calcula el equivalente.
+📏 **CATÁLOGO TÉCNICO (ESTRICTO):**
+- **12m:** Perfil C, IPN, UPN, ADN.
+- **6.40m:** Caños (Mecánico, Epoxi, Galvanizado, Schedule).
+- **6m:** Tubos Estructurales, Hierros, Ángulos, Planchuelas.
+- **CHAPA T90:** Única medida 13m.
+- **CHAPA COLOR:** Por metro.
+- **CINCALUM:** Por metro (Ref Cod 4/6).
 
 🚚 **LOGÍSTICA:**
-- **ZONA GRATIS:** {CIUDADES_GRATIS}.
-- **RESTO:** Costo = `KM_TOTAL (IDA+VUELTA) * 0.85 USD * {DOLAR_BNA} * 1.21`.
+1. **ZONA GRATIS:** Si la ciudad está en {CIUDADES_GRATIS} -> ENVÍO $0.
+2. **OTRAS ZONAS:** Costo = `KM_TOTAL (IDA+VUELTA) * 0.85 USD * {DOLAR_BNA} * 1.21 (IVA)`.
+3. **ACOPIO:** "Comprá hoy, retirá en **6 MESES** sin cargo".
 
-⛔ **PROTOCOLO:**
-- Sé breve y técnico.
-- Si confirmas pedido: `[ADD:CANT:PROD:PRECIO:TIPO]`.
-- Si saluda: Invita a cotizar.
+⛔ **PROTOCOLO SNIPER:**
+1. **BREVEDAD:** Max 15 palabras. Directo.
+2. **CONFIRMACIÓN:** SOLO agrega `[ADD:...]` si el cliente dice "SÍ" o "CARGALO".
+   - *Ejemplo:* Si piden precio, dalo y pregunta: "**¿Te separo el stock?**".
+3. **UPSELL:** "Te faltan $X para el descuento. ¿Agrego pintura?".
+4. **ANTI-AMBIGÜEDAD:** Si falta medida, PREGUNTA.
 
-SALIDA: [TEXTO VISIBLE] [ADD:...]
+SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
 """
 
-# MOTOR ORIGINAL (NO TOCADO COMO PEDISTE, SOLO SYS_PROMPT ACTUALIZADO)
 if "chat_session" not in st.session_state and "api_key" in locals() and api_key:
     st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
 
@@ -343,12 +323,9 @@ def procesar_input(contenido, es_imagen=False):
     if "chat_session" in st.session_state:
         msg = contenido
         prefix = ""
-        if es_imagen: msg = ["COTIZA PROYECTO VISUAL. DETECTA KIT.", contenido]
-        prompt = f"{prefix}{msg}. (NOTA: ARMA EL KIT COMPLETO SI APLICA)." if not es_imagen else msg
-        try:
-            return st.session_state.chat_session.send_message(prompt).text
-        except:
-            return "Hubo un error de conexión, intenta de nuevo."
+        if es_imagen: msg = ["COTIZA ESTO RÁPIDO. DETECTA OPORTUNIDADES DE COMBO.", contenido]
+        prompt = f"{prefix}{msg}. (NOTA: Sé breve. Cotiza precios. NO AGREGUES sin confirmación)." if not es_imagen else msg
+        return st.session_state.chat_session.send_message(prompt).text
     return "Error: Chat off."
 
 # ==========================================
@@ -398,7 +375,7 @@ with tab1:
                 if img:
                     fid = f"{img.name}_{img.size}"
                     if st.session_state.last_processed_file != fid:
-                        with st.spinner("⚡ Analizando proyecto..."):
+                        with st.spinner("⚡ Procesando..."):
                             txt = procesar_input(Image.open(img), True)
                             news = parsear_ordenes_bot(txt)
                             st.session_state.messages.append({"role": "assistant", "content": txt})
