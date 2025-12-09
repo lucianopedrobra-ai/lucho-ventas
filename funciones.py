@@ -136,7 +136,7 @@ def get_sys_prompt(csv_context, DOLAR_BNA):
     - **6m:** Tubos Estructurales, Hierros, Ángulos, Planchuelas.
     - **CHAPA T90:** Única medida 13m.
     - **CHAPA COLOR / CINCALUM:** Por metro.
-    - **AISLANTES:** El precio en la base de datos es por m². **TU TAREA:** Lee en la descripción cuántos m² trae el rollo (ej: 10m², 20m²), multiplica (Precio m² * Cantidad m²) y **COTIZA SIEMPRE EL PRECIO FINAL POR ROLLO CERRADO**. Nunca pases precio por m2 suelto.
+    - **AISLANTES ISOVER ISOLANT:** El precio en la base de datos es por m². **TU TAREA:** Lee en la descripción cuántos m² trae el rollo (ej: 10m², 20m²), multiplica (Precio m² * Cantidad m²) y **COTIZA SIEMPRE EL PRECIO FINAL POR ROLLO CERRADO**. Nunca pases precio por m2 suelto.
 
     🧠 **SENTIDO COMÚN Y CONTEXTO (GOOGLE):**
     - Interpreta las descripciones del usuario usando información disponible en Google si es ambigua.
