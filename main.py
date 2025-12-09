@@ -34,7 +34,8 @@ META_BASE   = 800000
 @st.cache_data(ttl=3600)
 def obtener_dolar_bna():
     url = "https://www.bna.com.ar/Personas"
-    backup = 1060.00
+    # Dólar billete Venta (Este es el que usaremos para la fórmula de flete)
+    backup = 1060.00 
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
         r = requests.get(url, headers=headers, timeout=5)
@@ -43,6 +44,7 @@ def obtener_dolar_bna():
             target = soup.find(string=re.compile("Dolar U.S.A"))
             if target:
                 row = target.find_parent('tr')
+                # La columna 3 (índice 2) suele ser el valor de Venta
                 cols = row.find_all('td')
                 if len(cols) >= 3:
                     return float(cols[2].get_text().replace(',', '.'))
@@ -304,6 +306,11 @@ try:
     if api_key: genai.configure(api_key=api_key)
 except: pass
 
+# --- DEFINICIÓN DEL FALLBACK DE MODELOS ---
+MODELOS_ORDENADOS = ['gemini-2.5-flash', 'gemini-2.5-pro'] 
+if "model_name" not in st.session_state: st.session_state.model_name = None
+if "chat_session" not in st.session_state: st.session_state.chat_session = None
+
 sys_prompt = f"""
 ROL: Miguel, vendedor experto de Pedro Bravin S.A.
 DB: {csv_context}
@@ -327,49 +334,64 @@ DOLAR BNA VENTA: {DOLAR_BNA}
 - **CASO "TECHO/GALPÓN":** Si pide material para techo, ofrece: Perfil C, Chapas y Aislantes.
 - **INTERPRETACIÓN:** Si el usuario no especifica medidas exactas, sugiere las estándar disponibles en el CSV y PREGUNTA para confirmar.
 
-🚚 **LÓGICA DE FLETE (CRÍTICO):**
+🚚 **LÓGICA DE FLETE (CRÍTICO - CÁLCULO AUTOMÁTICO):**
 1. **Analiza la ubicación del cliente.**
 2. **CASO 1: ZONA GRATIS.** Si la ciudad está en {CIUDADES_GRATIS} -> ENVÍO $0.
-3. **CASO 2: FUERA DE ZONA.** - Identifica la ciudad de {CIUDADES_GRATIS} más cercana al cliente (Punto Logístico).
-   - Estima la distancia en KM (IDA Y VUELTA) desde ese punto logístico hasta el cliente usando tus conocimientos geográficos/mapas.
-   - **Cálculo:** `KM_TOTAL (IDA+VUELTA) * 0.85 USD * {DOLAR_BNA} * 1.21 (IVA)`.
-   - Agrega este costo como un item "[ADD:1:FLETE A [CIUDAD]:PRECIO_CALCULADO:SERVICIO]".
+3. **CASO 2: FUERA DE ZONA.** - **Herramienta de Búsqueda (IMPRESCINDIBLE):** Utiliza tu herramienta de búsqueda/geografía para:
+     a. Identificar la ciudad de {CIUDADES_GRATIS} más cercana al cliente (Punto Logístico).
+     b. **Estimar/Buscar la distancia REAL en KM (solo IDA) entre el Punto Logístico y el cliente.**
+   - **Cálculo de Flete (Total):** `(KM_IDA * 2) * {COSTO_FLETE_USD} USD * {DOLAR_BNA} * 1.21 (IVA)`.
+   - **RESPUESTA:** Agrega este costo de flete al carrito inmediatamente como un item obligatorio. NUNCA preguntes los KM al cliente.
+   - **Formato:** Agrega el costo como un item "[ADD:1:FLETE A [CIUDAD DEL CLIENTE]:PRECIO_CALCULADO:SERVICIO]".
 
 ⛔ **PROTOCOLO SNIPER:**
 1. **BREVEDAD:** Max 15 palabras. Directo.
-2. **CONFIRMACIÓN:** SOLO agrega `[ADD:...]` si el cliente dice "SÍ", "CARGALO", o si has inferido una necesidad obvia (ej. flete obligatorio).
+2. **CONFIRMACIÓN:** SOLO agrega `[ADD:...]` si el cliente dice "SÍ" o "CARGALO" o si has inferido una necesidad obvia (ej. flete obligatorio y productos cotizados).
 3. **UPSELL:** "Te faltan $X para el descuento. ¿Agrego pintura?".
 
 SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
 """
 
-# Configuración del modelo con herramientas (si está disponible en la versión de librería)
-if "chat_session" not in st.session_state and "api_key" in locals() and api_key:
-    try:
-        # Intentamos habilitar tools para búsqueda si es compatible
-        st.session_state.chat_session = genai.GenerativeModel(
-            'gemini-2.5-flash', 
-            system_instruction=sys_prompt,
-            tools='google_search_retrieval' # Permite buscar distancias reales
-        ).start_chat(history=[])
-    except:
-        # Fallback a versión simple si falla la config de tools
-        st.session_state.chat_session = genai.GenerativeModel(
-            'gemini-2.5-flash', 
-            system_instruction=sys_prompt
-        ).start_chat(history=[])
+# Inicializa la sesión de chat con el primer modelo disponible que no arroje error.
+if "api_key" in locals() and api_key and not st.session_state.chat_session:
+    for model_name in MODELOS_ORDENADOS:
+        try:
+            # Intentamos habilitar tools para búsqueda
+            st.session_state.chat_session = genai.GenerativeModel(
+                model_name, 
+                system_instruction=sys_prompt,
+                tools='google_search_retrieval' # Permite buscar distancias reales
+            ).start_chat(history=[])
+            st.session_state.model_name = model_name
+            # Si tiene éxito, salimos del bucle
+            break 
+        except Exception as e:
+            # Si falla un modelo (ej. gemini-2.5-flash), intenta con el siguiente (ej. gemini-2.5-pro)
+            st.session_state.model_name = None 
+            continue
+
+if not st.session_state.chat_session and "api_key" in locals() and api_key:
+    st.warning("⚠️ Error al inicializar todos los modelos de IA. Revisa la API Key o los permisos.")
 
 def procesar_input(contenido, es_imagen=False):
-    if "chat_session" in st.session_state:
+    if st.session_state.chat_session:
         msg = contenido
         prefix = ""
+        
         if es_imagen: msg = ["COTIZA ESTO RÁPIDO. DETECTA OPORTUNIDADES Y CONTEXTO DEL PRODUCTO (No confundir unidades).", contenido]
-        prompt = f"{prefix}{msg}. (NOTA: Sé breve. Cotiza precios. NO AGREGUES sin confirmación)." if not es_imagen else msg
+        
+        prompt_final = f"{prefix}{msg}. (NOTA: Sé breve. Cotiza precios. NO AGREGUES sin confirmación)." if not es_imagen else msg
+
         try:
-            return st.session_state.chat_session.send_message(prompt).text
+            # Utilizamos la sesión ya inicializada con el modelo que funcionó
+            return st.session_state.chat_session.send_message(prompt_final).text
         except Exception as e:
-            return "Hubo un error de conexión, intenta de nuevo."
-    return "Error: Chat off."
+            # Si falla la comunicación una vez iniciado (time-out, etc.)
+            st.session_state.chat_session = None # Obligamos a reintentar la inicialización en el próximo rerun
+            return f"Hubo un error de conexión con el modelo **{st.session_state.model_name}**, intenta de nuevo. Error: {e}"
+            
+    return "Error: Chat off. No se pudo inicializar ningún modelo de IA. Revisar logs."
+
 
 # ==========================================
 # 7. INTERFAZ TABS
@@ -433,18 +455,19 @@ with tab1:
         with st.chat_message("assistant", avatar="👷‍♂️"):
             with st.spinner("Calculando logística y stock..."):
                 try:
-                    if "chat_session" in st.session_state:
-                        res = st.session_state.chat_session.send_message(f"{p}. (CORTITO Y AL PIE).").text
-                        news = parsear_ordenes_bot(res)
-                        display = re.sub(r'\[ADD:.*?\]', '', res)
-                        st.markdown(display)
-                        
-                        if news: 
-                            st.toast(random.choice(TOASTS_EXITO), icon='🔥')
-                            if desc_actual >= 12: st.balloons()
-                        
-                        st.session_state.messages.append({"role": "assistant", "content": res})
-                        if news: time.sleep(1); st.rerun()
+                    # Usamos la nueva función procesar_input, que maneja el fallback
+                    res = procesar_input(f"{p}. (CORTITO Y AL PIE).")
+                    
+                    news = parsear_ordenes_bot(res)
+                    display = re.sub(r'\[ADD:.*?\]', '', res)
+                    st.markdown(display)
+                    
+                    if news: 
+                        st.toast(random.choice(TOASTS_EXITO), icon='🔥')
+                        if desc_actual >= 12: st.balloons()
+                    
+                    st.session_state.messages.append({"role": "assistant", "content": res})
+                    if news: time.sleep(1); st.rerun()
                 except: st.error("Error al procesar.")
 
 with tab2:
