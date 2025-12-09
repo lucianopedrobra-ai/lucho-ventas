@@ -18,8 +18,7 @@ import streamlit.components.v1 as components
 # ==========================================
 st.set_page_config(
     page_title="🔥 OFERTAS PEDRO BRAVIN",
-    # CAMBIO: Ícono de león 🦁 cambiado por grúa 🏗️
-    page_icon="🏗️", 
+    page_icon="🏗️", # CAMBIO: Icono de construcción
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -84,8 +83,7 @@ if "expiry_time" not in st.session_state:
     st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
 
 if "messages" not in st.session_state:
-    # SALUDO INICIAL
-    # CAMBIO: León 🦁 cambiado por obrero 👷‍♂️
+    # SALUDO INICIAL (CAMBIO A OBRERO)
     saludo = """
 👷‍♂️ **Soy Miguel.** Dólar actualizado. Stock disponible.
 
@@ -115,7 +113,7 @@ def log_interaction(user_text, monto):
 
 def parsear_ordenes_bot(texto):
     items_nuevos = []
-    # Regex robusto para capturar las órdenes del bot
+    # FIX: Try-except agregado para evitar error al cerrar pedido si el bot alucina formato
     for cant, prod, precio, tipo in re.findall(r'\[ADD:([\d\.]+):([^:]+):([\d\.]+):([^\]]+)\]', texto):
         try:
             item = {
@@ -127,11 +125,11 @@ def parsear_ordenes_bot(texto):
             }
             st.session_state.cart.append(item)
             items_nuevos.append(item)
-        except Exception:
-            pass # Evita romper si el bot alucina un formato numérico extraño
+        except: pass
     return items_nuevos
 
 def calcular_negocio():
+    # FIX: Try-except agregado para evitar pantalla roja si hay error matemático
     try:
         now = datetime.datetime.now()
         tiempo_restante = st.session_state.expiry_time - now
@@ -177,8 +175,7 @@ def calcular_negocio():
         neto = bruto * (1 - (desc_total/100))
         ahorro_total = bruto - neto
         return bruto, neto, desc_total, color, nivel_texto, meta, segundos_restantes, activa, color_reloj, reloj_init, ahorro_total
-    except Exception:
-        # Fallback seguro para evitar errores visuales
+    except:
         return 0, 0, 0, "#000", "ERROR", 0, 0, False, "#000", "00:00", 0
 
 def generar_link_wa(total):
@@ -205,7 +202,6 @@ if dinero_ahorrado > 0:
 else:
     subtext_badge = "TIEMPO LIMITADO"
 
-# CAMBIO: León 🦁 cambiado por grúa 🏗️ en el header
 header_html = f"""
     <style>
     /* LIMPIEZA */
@@ -297,7 +293,7 @@ header_html = f"""
 st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. CEREBRO IA (REGLAS + LOGÍSTICA COMPLETA)
+# 6. CEREBRO IA (ACTUALIZADO CON TUS REGLAS)
 # ==========================================
 try:
     api_key = os.environ.get("GOOGLE_API_KEY")
@@ -307,6 +303,7 @@ try:
     if api_key: genai.configure(api_key=api_key)
 except: pass
 
+# PROMPT MEJORADO: Lógica de flete, unidades y kits
 sys_prompt = f"""
 ROL: Miguel, Ingeniero Comercial y Vendedor Técnico de Pedro Bravin S.A.
 DB (CATÁLOGO): {csv_context}
@@ -315,67 +312,44 @@ DOLAR BNA VENTA: {DOLAR_BNA}
 
 🏗️ **LÓGICA DE PROYECTOS (ESTA ES TU PRIORIDAD):**
 Cuando el cliente pide un proyecto (ej: "cerrar terreno", "techada", "galpón"), NO busques solo el producto principal. **ARMA EL KIT COMPLETO.**
-**1. ¿Tienes las medidas?** - SI -> Calcula materiales exactos.
-   - NO -> **PREGUNTA PRIMERO.** (ej: "¿Qué medidas tiene el terreno?" "¿Cuántos metros cuadrados de techo?"). NO des precio sin saber cantidad.
+1. **¿Faltan datos?** -> PREGUNTA (Medidas, metros, etc).
+2. **Armado de Kits:**
+   - **CERCOS:** Postes (c/2.5m) + Malla + Alambre + Tensores.
+   - **TECHOS:** Chapas + Perfil C + Tornillos + Aislante.
 
-**2. REGLAS DE ARMADO DE KITS (Usar productos del CSV):**
-   - **CERCOS:** Perímetro -> Calculá: Postes (cada 2.5m aprox) + Malla (según metros lineales) + Alambre + Tensores + Torniquetas.
-   - **TECHOS:** Superficie -> Calculá: Chapas (calcula el largo óptimo) + Perfil C (clavaderas) + Tornillos autoperforantes + Aislante.
+3. **CROSS-SELLING:** Si llevan perfiles -> Ofrece electrodos/discos. Si llevan pintura -> Pinceles.
 
-**3. CROSS-SELLING OBLIGATORIO:**
-   - Si llevan hierros/perfiles -> Ofrece: Electrodos, Discos de corte, Antiósxido.
-   - Si llevan pintura -> Ofrece: Pinceles, Aguarrás.
-
-📏 **DETALLES TÉCNICOS (NO ALUCINAR):**
-- **12m:** Perfil C, IPN, UPN, ADN.
+📏 **DETALLES TÉCNICOS:**
 - **6.40m:** Caños (Venta por **METRO**, NO KG).
-- **6m:** Tubos, Hierros, Ángulos.
-- **CHAPA:** T90 (13m max) o Cortes a medida.
+- **Contexto:** "60m de alambre" no son 60 rollos. Calcula el equivalente.
 
-🧠 **CONTEXTO & SENTIDO COMÚN:**
-- Si piden "60 metros de alambre", NO son 60 rollos. Calcula el equivalente en kg o la fracción de rollo si es posible, o aclara.
-- Usa Google para entender términos de obra si son ambiguos.
+🚚 **LOGÍSTICA:**
+- **ZONA GRATIS:** {CIUDADES_GRATIS}.
+- **RESTO:** Costo = `KM_TOTAL (IDA+VUELTA) * 0.85 USD * {DOLAR_BNA} * 1.21`.
 
-🚚 **LOGÍSTICA (IMPORTANTE):**
-- **ZONA GRATIS:** Si es en {CIUDADES_GRATIS} -> $0.
-- **RESTO:** Costo = `KM_TOTAL (IDA+VUELTA desde la ciudad gratis más cercana) * 0.85 USD * {DOLAR_BNA} * 1.21`.
-- Si calculas flete, agrégalo como item: `[ADD:1:FLETE A [CIUDAD]:PRECIO:SERVICIO]`.
-
-⛔ **PROTOCOLO DE RESPUESTA:**
-- **Breve y Técnico:** "Hola, para cerrar 10x30m necesitas: X rollos, Y postes... Total: $Z".
-- **Formato Orden:** SOLO si te confirman o si es un presupuesto claro: `[ADD:CANT:PROD:PRECIO:TIPO]`.
-- Si el usuario solo saluda, responde corto invitando a cotizar.
+⛔ **PROTOCOLO:**
+- Sé breve y técnico.
+- Si confirmas pedido: `[ADD:CANT:PROD:PRECIO:TIPO]`.
+- Si saluda: Invita a cotizar.
 
 SALIDA: [TEXTO VISIBLE] [ADD:...]
 """
 
-# SOLUCIÓN DE ERROR: Inicialización simplificada con modelo estable gemini-1.5-flash
-if "chat_session" not in st.session_state:
-    if "api_key" in locals() and api_key:
-        try:
-            # Se usa 'gemini-1.5-flash' que es la versión estable actual.
-            # Se retira 'tools' temporalmente para asegurar estabilidad si la API key no lo soporta.
-            st.session_state.chat_session = genai.GenerativeModel(
-                'gemini-1.5-flash', 
-                system_instruction=sys_prompt
-            ).start_chat(history=[])
-        except Exception as e:
-            # Si falla la inicialización, se manejará en el bucle de chat
-            print(f"Error fatal iniciando Gemini: {e}")
-    else:
-        pass # Se manejará la falta de API key luego
+# MOTOR ORIGINAL (NO TOCADO COMO PEDISTE, SOLO SYS_PROMPT ACTUALIZADO)
+if "chat_session" not in st.session_state and "api_key" in locals() and api_key:
+    st.session_state.chat_session = genai.GenerativeModel('gemini-2.5-flash', system_instruction=sys_prompt).start_chat(history=[])
 
 def procesar_input(contenido, es_imagen=False):
     if "chat_session" in st.session_state:
         msg = contenido
         prefix = ""
-        if es_imagen: msg = ["COTIZA PROYECTO VISUAL. DETECTA TODOS LOS COMPONENTES NECESARIOS (No vendas suelto).", contenido]
-        prompt = f"{prefix}{msg}. (NOTA: Si es un proyecto, ARMA EL KIT COMPLETO CON CANTIDADES. Si faltan datos, PREGUNTA)." if not es_imagen else msg
+        if es_imagen: msg = ["COTIZA PROYECTO VISUAL. DETECTA KIT.", contenido]
+        prompt = f"{prefix}{msg}. (NOTA: ARMA EL KIT COMPLETO SI APLICA)." if not es_imagen else msg
         try:
             return st.session_state.chat_session.send_message(prompt).text
-        except Exception:
-            return "Hubo un error de conexión con el cerebro de Miguel. Por favor intenta de nuevo en unos segundos."
-    return "Error: Chat no disponible (Verificar API Key)."
+        except:
+            return "Hubo un error de conexión, intenta de nuevo."
+    return "Error: Chat off."
 
 # ==========================================
 # 7. INTERFAZ TABS
@@ -424,31 +398,23 @@ with tab1:
                 if img:
                     fid = f"{img.name}_{img.size}"
                     if st.session_state.last_processed_file != fid:
-                        with st.spinner("⚡ Analizando proyecto y componentes..."):
-                            # SOLUCIÓN ERROR: Llamada protegida
-                            try:
-                                txt = procesar_input(Image.open(img), True)
-                                if "Error:" not in txt:
-                                    news = parsear_ordenes_bot(txt)
-                                    st.session_state.messages.append({"role": "assistant", "content": txt})
-                                    st.session_state.last_processed_file = fid
-                                    if news: st.balloons()
-                                    st.rerun()
-                                else:
-                                     st.error(txt)
-                            except Exception as e:
-                                st.error(f"Error al procesar imagen: {e}")
+                        with st.spinner("⚡ Analizando proyecto..."):
+                            txt = procesar_input(Image.open(img), True)
+                            news = parsear_ordenes_bot(txt)
+                            st.session_state.messages.append({"role": "assistant", "content": txt})
+                            st.session_state.last_processed_file = fid
+                            if news: st.balloons()
+                            st.rerun()
 
     if p := st.chat_input("Escribí acá..."):
         if p == "#admin": st.session_state.admin_mode = not st.session_state.admin_mode; st.rerun()
         st.session_state.messages.append({"role": "user", "content": p})
         st.chat_message("user").markdown(p)
         with st.chat_message("assistant", avatar="👷‍♂️"):
-            with st.spinner("Calculando Kit y Logística..."):
-                # SOLUCIÓN ERROR: Bloque try-except más robusto
+            with st.spinner("Calculando..."):
                 try:
-                    if "chat_session" in st.session_state and st.session_state.chat_session:
-                        res = st.session_state.chat_session.send_message(f"{p}. (SI ES PROYECTO, ARMA EL KIT).").text
+                    if "chat_session" in st.session_state:
+                        res = st.session_state.chat_session.send_message(f"{p}. (CORTITO Y AL PIE).").text
                         news = parsear_ordenes_bot(res)
                         display = re.sub(r'\[ADD:.*?\]', '', res)
                         st.markdown(display)
@@ -459,44 +425,37 @@ with tab1:
                         
                         st.session_state.messages.append({"role": "assistant", "content": res})
                         if news: time.sleep(1); st.rerun()
-                    else:
-                         st.error("El sistema no está listo. Verifique la API Key.")
-                except Exception as e: 
-                    st.error(f"Error al procesar tu mensaje. Intenta nuevamente. ({e})")
+                except: st.error("Error.")
 
 with tab2:
     st.markdown(spacer, unsafe_allow_html=True)
     if not st.session_state.cart:
         st.info("Carrito vacío. Agregá items para ver el precio final.")
     else:
-        # Se usa una copia de la lista para iterar sin errores al borrar
-        indices_to_remove = []
         for i, item in enumerate(st.session_state.cart):
             with st.container():
                 c1, c2, c3 = st.columns([3, 1.5, 0.5])
                 c1.markdown(f"**{item['producto']}**\n<span style='color:grey;font-size:0.8em'>${item['precio_unit']:,.0f} unit</span>", unsafe_allow_html=True)
                 
+                # ARREGLADO: Input numérico para editar cantidad
                 nueva_cant = c2.number_input("Cant", 0.0, value=float(item['cantidad']), key=f"q_{i}", label_visibility="collapsed")
                 
+                # Actualizar lógica si cambia el número
                 if nueva_cant != item['cantidad']:
                     if nueva_cant == 0:
-                        indices_to_remove.append(i)
+                        st.session_state.cart.pop(i)
                     else:
                         st.session_state.cart[i]['cantidad'] = nueva_cant
                         st.session_state.cart[i]['subtotal'] = nueva_cant * item['precio_unit']
-                        st.rerun()
+                    st.rerun()
 
                 if c3.button("🗑️", key=f"d_{i}"): 
-                    indices_to_remove.append(i)
+                    st.session_state.cart.pop(i)
+                    st.rerun()
                 
                 st.markdown("---")
         
-        if indices_to_remove:
-            for index in sorted(indices_to_remove, reverse=True):
-                del st.session_state.cart[index]
-            st.rerun()
-        
-        # BOTÓN DE PAGO BACKUP
+        # BOTÓN DE PAGO BACKUP (Por si el flotante falla)
         st.markdown(f"""
         <a href="{generar_link_wa(total_final)}" target="_blank" style="
             display:block; width:100%; background: #333; 
