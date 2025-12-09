@@ -7,11 +7,19 @@ ENV PYTHONUNBUFFERED=1
 # Crear directorio de trabajo
 WORKDIR /app
 
+# Instalar dependencias del sistema necesarias
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    software-properties-common \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copiar los requisitos e instalarlos
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar EL RESTO de los archivos
+# Copiar EL RESTO de los archivos (app.py, config.py, etc)
 COPY . .
 
 # Exponer el puerto
