@@ -125,7 +125,7 @@ def parsear_ordenes_bot(texto):
             }
             st.session_state.cart.append(item)
             items_nuevos.append(item)
-        except Exception as e:
+        except Exception:
             pass # Evita romper si el bot alucina un formato numérico extraño
     return items_nuevos
 
@@ -175,8 +175,8 @@ def calcular_negocio():
         neto = bruto * (1 - (desc_total/100))
         ahorro_total = bruto - neto
         return bruto, neto, desc_total, color, nivel_texto, meta, segundos_restantes, activa, color_reloj, reloj_init, ahorro_total
-    except:
-        # Fallback seguro para evitar errores en cierre
+    except Exception:
+        # Fallback seguro para evitar errores visuales
         return 0, 0, 0, "#000", "ERROR", 0, 0, False, "#000", "00:00", 0
 
 def generar_link_wa(total):
@@ -305,36 +305,45 @@ try:
 except: pass
 
 sys_prompt = f"""
-ROL: Miguel, vendedor experto de Pedro Bravin S.A.
-DB: {csv_context}
+ROL: Miguel, Ingeniero Comercial y Vendedor Técnico de Pedro Bravin S.A.
+DB (CATÁLOGO): {csv_context}
 ZONA GRATIS (PUNTOS LOGÍSTICOS): {CIUDADES_GRATIS}
 DOLAR BNA VENTA: {DOLAR_BNA}
 
-📏 **CATÁLOGO TÉCNICO (ESTRICTO):**
+🏗️ **LÓGICA DE PROYECTOS (ESTA ES TU PRIORIDAD):**
+Cuando el cliente pide un proyecto (ej: "cerrar terreno", "techada", "galpón"), NO busques solo el producto principal. **ARMA EL KIT COMPLETO.**
+**1. ¿Tienes las medidas?** - SI -> Calcula materiales exactos.
+   - NO -> **PREGUNTA PRIMERO.** (ej: "¿Qué medidas tiene el terreno?" "¿Cuántos metros cuadrados de techo?"). NO des precio sin saber cantidad.
+
+**2. REGLAS DE ARMADO DE KITS (Usar productos del CSV):**
+   - **CERCOS:** Perímetro -> Calculá: Postes (cada 2.5m aprox) + Malla (según metros lineales) + Alambre + Tensores + Torniquetas.
+   - **TECHOS:** Superficie -> Calculá: Chapas (calcula el largo óptimo) + Perfil C (clavaderas) + Tornillos autoperforantes + Aislante.
+
+**3. CROSS-SELLING OBLIGATORIO:**
+   - Si llevan hierros/perfiles -> Ofrece: Electrodos, Discos de corte, Antiósxido.
+   - Si llevan pintura -> Ofrece: Pinceles, Aguarrás.
+
+📏 **DETALLES TÉCNICOS (NO ALUCINAR):**
 - **12m:** Perfil C, IPN, UPN, ADN.
-- **6.40m:** Caños (Mecánico, Epoxi, Galvanizado, Schedule). **¡ATENCIÓN! La unidad de venta de estas barras es "METRO", NO "KG".**
-- **6m:** Tubos Estructurales, Hierros, Ángulos, Planchuelas.
-- **CHAPA T90:** Única medida 13m.
-- **CHAPA COLOR / CINCALUM:** Por metro.
+- **6.40m:** Caños (Venta por **METRO**, NO KG).
+- **6m:** Tubos, Hierros, Ángulos.
+- **CHAPA:** T90 (13m max) o Cortes a medida.
 
-🧠 **SENTIDO COMÚN Y CONTEXTO (GOOGLE):**
-- Interpreta las descripciones del usuario usando información disponible en Google si es ambigua.
-- **Ejemplo Alambre:** Si envían foto o piden "60 metros de alambre", NO son 60 rollos. Calcula el peso aproximado de 60 metros lineales o el equivalente fraccionado. Contextualiza que es un elemento continuo.
+🧠 **CONTEXTO & SENTIDO COMÚN:**
+- Si piden "60 metros de alambre", NO son 60 rollos. Calcula el equivalente en kg o la fracción de rollo si es posible, o aclara.
+- Usa Google para entender términos de obra si son ambiguos.
 
-🚚 **LÓGICA DE FLETE (CRÍTICO):**
-1. **Analiza la ubicación del cliente.**
-2. **CASO 1: ZONA GRATIS.** Si la ciudad está en {CIUDADES_GRATIS} -> ENVÍO $0.
-3. **CASO 2: FUERA DE ZONA.** - Identifica la ciudad de {CIUDADES_GRATIS} más cercana al cliente (Punto Logístico).
-   - Estima la distancia en KM (IDA Y VUELTA) desde ese punto logístico hasta el cliente usando tus conocimientos geográficos/mapas.
-   - **Cálculo:** `KM_TOTAL (IDA+VUELTA) * 0.85 USD * {DOLAR_BNA} * 1.21 (IVA)`.
-   - Agrega este costo como un item "[ADD:1:FLETE A [CIUDAD]:PRECIO_CALCULADO:SERVICIO]".
+🚚 **LOGÍSTICA (IMPORTANTE):**
+- **ZONA GRATIS:** Si es en {CIUDADES_GRATIS} -> $0.
+- **RESTO:** Costo = `KM_TOTAL (IDA+VUELTA desde la ciudad gratis más cercana) * 0.85 USD * {DOLAR_BNA} * 1.21`.
+- Si calculas flete, agrégalo como item: `[ADD:1:FLETE A [CIUDAD]:PRECIO:SERVICIO]`.
 
-⛔ **PROTOCOLO SNIPER:**
-1. **BREVEDAD:** Max 15 palabras. Directo.
-2. **CONFIRMACIÓN:** SOLO agrega `[ADD:...]` si el cliente dice "SÍ" o "CARGALO" o envía una lista definida de pedido.
-3. **UPSELL:** "Te faltan $X para el descuento. ¿Agrego pintura?".
+⛔ **PROTOCOLO DE RESPUESTA:**
+- **Breve y Técnico:** "Hola, para cerrar 10x30m necesitas: X rollos, Y postes... Total: $Z".
+- **Formato Orden:** SOLO si te confirman o si es un presupuesto claro: `[ADD:CANT:PROD:PRECIO:TIPO]`.
+- Si el usuario solo saluda, responde corto invitando a cotizar.
 
-SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
+SALIDA: [TEXTO VISIBLE] [ADD:...]
 """
 
 # Configuración del modelo con herramientas (si está disponible en la versión de librería)
@@ -344,7 +353,7 @@ if "chat_session" not in st.session_state and "api_key" in locals() and api_key:
         st.session_state.chat_session = genai.GenerativeModel(
             'gemini-2.5-flash', 
             system_instruction=sys_prompt,
-            tools='google_search_retrieval' # Permite buscar distancias reales
+            tools='google_search_retrieval' # Permite buscar distancias reales y contextos de obra
         ).start_chat(history=[])
     except:
         # Fallback a versión simple si falla la config de tools
@@ -357,11 +366,11 @@ def procesar_input(contenido, es_imagen=False):
     if "chat_session" in st.session_state:
         msg = contenido
         prefix = ""
-        if es_imagen: msg = ["COTIZA ESTO RÁPIDO. DETECTA OPORTUNIDADES Y CONTEXTO DEL PRODUCTO (No confundir unidades).", contenido]
-        prompt = f"{prefix}{msg}. (NOTA: Sé breve. Cotiza precios. NO AGREGUES sin confirmación)." if not es_imagen else msg
+        if es_imagen: msg = ["COTIZA PROYECTO VISUAL. DETECTA TODOS LOS COMPONENTES NECESARIOS (No vendas suelto).", contenido]
+        prompt = f"{prefix}{msg}. (NOTA: Si es un proyecto, ARMA EL KIT COMPLETO CON CANTIDADES. Si faltan datos, PREGUNTA)." if not es_imagen else msg
         try:
             return st.session_state.chat_session.send_message(prompt).text
-        except Exception as e:
+        except Exception:
             return "Hubo un error de conexión, intenta de nuevo."
     return "Error: Chat off."
 
@@ -412,7 +421,7 @@ with tab1:
                 if img:
                     fid = f"{img.name}_{img.size}"
                     if st.session_state.last_processed_file != fid:
-                        with st.spinner("⚡ Procesando con visión contextual..."):
+                        with st.spinner("⚡ Analizando proyecto y componentes..."):
                             txt = procesar_input(Image.open(img), True)
                             news = parsear_ordenes_bot(txt)
                             st.session_state.messages.append({"role": "assistant", "content": txt})
@@ -425,10 +434,10 @@ with tab1:
         st.session_state.messages.append({"role": "user", "content": p})
         st.chat_message("user").markdown(p)
         with st.chat_message("assistant", avatar="👷‍♂️"):
-            with st.spinner("Calculando logística y stock..."):
+            with st.spinner("Calculando Kit y Logística..."):
                 try:
                     if "chat_session" in st.session_state:
-                        res = st.session_state.chat_session.send_message(f"{p}. (CORTITO Y AL PIE).").text
+                        res = st.session_state.chat_session.send_message(f"{p}. (SI ES PROYECTO, ARMA EL KIT).").text
                         news = parsear_ordenes_bot(res)
                         display = re.sub(r'\[ADD:.*?\]', '', res)
                         st.markdown(display)
