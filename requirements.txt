@@ -3,3 +3,5 @@ google-generativeai
 pandas
 Pillow
 watchdog
+beautifulsoup4
+requests
