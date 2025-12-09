@@ -6,84 +6,68 @@ def cargar_estilos(color_barra, porcentaje_barra, color_timer, reloj_python, dis
     
     header_html = f"""
     <style>
-    /* MODO OSCURO FORZADO */
-    .stApp {{ background-color: #121212 !important; }}
-    p, h1, h2, h3, div, span {{ color: #e0e0e0; }}
-    
     /* LIMPIEZA */
     #MainMenu, footer, header {{ visibility: hidden !important; }}
     [data-testid="stToolbar"] {{ display: none !important; }}
-    .block-container {{ padding-top: 100px !important; padding-bottom: 130px !important; }}
+    .block-container {{ padding-top: 120px !important; padding-bottom: 120px !important; }}
     [data-testid="stSidebar"] {{ display: none; }} 
 
-    /* CHAT INDUSTRIAL */
-    [data-testid="stChatInput"] {{ background: #1e1e1e !important; border-top: 1px solid #333; }}
-    .stChatInputContainer {{ border: 1px solid #444 !important; background: #2c2c2c !important; border-radius: 4px !important; }}
-    .stChatInputContainer textarea {{ color: white !important; }}
+    /* CHAT MINIMAL */
+    [data-testid="stBottomBlock"] {{ background: rgba(255,255,255,0.8) !important; backdrop-filter: blur(5px); }}
+    .stChatInputContainer {{ border: 1px solid #000 !important; border-radius: 0px !important; box-shadow: none !important; }}
 
-    /* HEADER INDUSTRIAL */
+    /* HEADER */
     .fixed-header {{ 
         position: fixed; top: 0; left: 0; width: 100%; 
-        background: #1e1e1e; 
-        z-index: 99990; 
-        height: 90px; 
-        border-bottom: 2px solid #FFD700; /* Amarillo Pedro Bravin */
-        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        background: #fff; z-index: 99990; 
+        height: 100px; 
+        display: flex; flex-direction: column; justify-content: center;
+        border-bottom: 1px solid #000;
     }}
     
-    .data-row {{ display: flex; justify-content: space-between; padding: 10px 15px; align-items: center; }}
+    .container-min {{ padding: 0 20px; display: flex; justify-content: space-between; align-items: baseline; }}
     
-    .price-industrial {{ font-family: 'Courier New', monospace; font-size: 1.6rem; color: #FFD700; font-weight: bold; text-shadow: 0 0 10px rgba(255, 215, 0, 0.3); }}
+    .big-price {{ font-size: 2.2rem; font-weight: 900; color: #000; line-height: 1; letter-spacing: -1.5px; }}
+    .meta-info {{ text-align: right; }}
     
-    .timer-digital {{ 
-        font-family: 'Courier New', monospace; 
-        background: #000; color: {color_timer}; 
-        padding: 5px 10px; border: 1px solid #333; 
-        font-size: 1.2rem; letter-spacing: 2px;
-    }}
+    .timer-min {{ font-weight: 900; font-size: 1.2rem; color: #000; }}
+    .status-dot {{ height: 10px; width: 10px; background-color: {color_timer}; border-radius: 50%; display: inline-block; margin-right: 5px; }}
 
-    /* BARRA PROGRESO */
-    .progress-bar-ind {{ height: 4px; background: #333; width: 100%; position: absolute; bottom: 0; }}
-    .fill-ind {{ height: 100%; background: repeating-linear-gradient(45deg, #FFD700, #FFD700 10px, #b8860b 10px, #b8860b 20px); width: {porcentaje_barra}%; }}
+    /* BARRA DE VIDA (Estilo videojuego minimalista) */
+    .life-bar {{ height: 5px; background: #eee; width: 100%; position: absolute; bottom: 0; }}
+    .life-fill {{ height: 100%; background: #000; width: {porcentaje_barra}%; transition: width 0.2s; }}
 
-    /* BOTÓN (+) */
-    div[data-testid="stPopover"] button {{
-        background-color: #FFD700; color: black; border-radius: 0px; font-weight: bold;
-    }}
     </style>
     
     <div class="fixed-header">
-        <div class="data-row">
+        <div class="container-min">
             <div>
-                <div style="font-size:0.6rem; color:#888; text-transform:uppercase;">COTIZADOR V3.0</div>
-                <div class="price-industrial">{display_precio}</div>
+                <span style="font-size:0.8rem; font-weight:700;">TOTAL ESTIMADO</span><br>
+                <div class="big-price">{display_precio}</div>
             </div>
-            <div style="text-align:right;">
-                <div class="timer-digital">{reloj_python}</div>
-                <div style="font-size:0.7rem; color:#aaa; margin-top:2px;">{subtext_badge}</div>
+            <div class="meta-info">
+                <div class="timer-min"><span class="status-dot"></span>{reloj_python}</div>
+                <div style="font-size:0.7rem; font-weight:bold; text-decoration: underline;">{subtext_badge}</div>
             </div>
         </div>
-        <div class="progress-bar-ind"><div class="fill-ind"></div></div>
+        <div class="life-bar"><div class="life-fill"></div></div>
     </div>
     """
     st.markdown(header_html, unsafe_allow_html=True)
     
-    # BOTON PAGAR (Amarillo y Negro, alto contraste)
+    # BOTON PAGAR (Negro solido, muy Apple)
     if len(st.session_state.cart) > 0 and oferta_viva:
         st.markdown(f"""
-        <div style="position:fixed; bottom:70px; right:10px; left:10px; z-index:200000;">
+        <div style="position:fixed; bottom:80px; right:20px; left:20px; z-index:200000;">
             <a href="{generar_link_wa(total_final)}" target="_blank" style="
-                display: block; background: #FFD700; color: #000; 
-                padding: 15px; width: 100%; text-align:center;
-                font-weight: 900; text-decoration: none; 
-                border: 2px solid #fff; text-transform: uppercase;
-                box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);">
-                ⚡ CONFIRMAR: ${total_final:,.0f}
+                display:block; background: #000; color: #fff; 
+                padding: 18px; width: 100%; text-align:center;
+                font-weight: 600; text-decoration: none; font-size: 1rem;
+                border-radius: 8px; transition: transform 0.1s;">
+                Pagar Ahora ➔
             </a>
         </div>
         """, unsafe_allow_html=True)
 
 def auto_scroll():
     components.html("""<script>setInterval(function(){var b=window.parent.document.querySelector(".main");if(b)b.scrollTop=b.scrollHeight;},800);</script>""", height=0)
-            return "Hubo un error de conexión, intenta de nuevo."
-    return "Error: Chat off."
