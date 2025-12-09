@@ -8,6 +8,7 @@ from PIL import Image
 import google.generativeai as genai
 import os
 import re
+import pandas as pd
 
 # IMPORTAR MÓDULOS PROPIOS
 from config import *
