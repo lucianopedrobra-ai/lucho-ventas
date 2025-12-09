@@ -2,3 +2,5 @@
 enableCORS = false
 enableXsrfProtection = false
 headless = true
+port = 8080
+address = "0.0.0.0"
