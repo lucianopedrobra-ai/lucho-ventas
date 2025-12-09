@@ -1,28 +1,21 @@
-# --- AQUÍ ESTÁ LA CLAVE: TIENE QUE DECIR 3.11 ---
-FROM python:3.11-slim
+FROM python:3.9-slim
 
-# Evita archivos basura
+# Evitar que Python genere archivos .pyc y buffer de salida
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Directorio de trabajo
+# Crear directorio de trabajo
 WORKDIR /app
 
-# ACTUALIZAMOS PIP (Vital)
-RUN pip install --upgrade pip
-
-# Instalamos librerías
+# Copiar los requisitos e instalarlos
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiamos TODOS los archivos (app.py, estilos.py, config.py, funciones.py)
+# Copiar EL RESTO de los archivos (app.py, config.py, etc)
 COPY . .
 
-# Puerto
+# Exponer el puerto que usa Cloud Run (8080)
 EXPOSE 8080
 
-# Salud
-HEALTHCHECK CMD curl --fail http://localhost:8080/_stcore/health
-
-# --- CONFIRMACIÓN FINAL: Apuntamos a app.py ---
-ENTRYPOINT ["streamlit", "run", "app.py", "--server.port=8080", "--server.address=0.0.0.0"]
+# Comando para iniciar la app
+CMD streamlit run app.py --server.port=8080 --server.address=0.0.0.0
