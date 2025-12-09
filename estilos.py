@@ -1,123 +1,171 @@
-# estilos.py
+# funciones.py
 import streamlit as st
-import streamlit.components.v1 as components 
+import pandas as pd
+import google.generativeai as genai
+import requests
+import re
+import datetime
+import urllib.parse
+from bs4 import BeautifulSoup
+import os
+from config import *
 
-def cargar_estilos(color_barra, porcentaje_barra, color_timer, reloj_python, display_badge, subtext_badge, display_precio, display_iva, seg_restantes, generar_link_wa, total_final, oferta_viva):
-    
-    header_html = f"""
-    <style>
-    /* LIMPIEZA */
-    #MainMenu, footer, header {{ visibility: hidden !important; }}
-    [data-testid="stToolbar"] {{ display: none !important; }}
-    
-    /* LAYOUT OPTIMIZADO PARA MÓVIL */
-    .block-container {{ padding-top: 130px !important; padding-bottom: 120px !important; }}
-    [data-testid="stSidebar"] {{ display: none; }} 
-    
-    /* INPUT CHAT SLIM */
-    [data-testid="stBottomBlock"], [data-testid="stChatInput"] {{ 
-        position: fixed; bottom: 0; left: 0; width: 100%; 
-        background: white; padding: 5px 10px !important; 
-        z-index: 99999; border-top: 1px solid #eee; 
-    }}
-    .stChatInputContainer textarea {{ min-height: 38px !important; height: 38px !important; padding: 8px !important; }}
+# ==========================================
+# MOTOR INVISIBLE
+# ==========================================
+@st.cache_data(ttl=3600)
+def obtener_dolar_bna():
+    url = "https://www.bna.com.ar/Personas"
+    backup = 1060.00
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        r = requests.get(url, headers=headers, timeout=5)
+        if r.status_code == 200:
+            soup = BeautifulSoup(r.content, 'html.parser')
+            target = soup.find(string=re.compile("Dolar U.S.A"))
+            if target:
+                row = target.find_parent('tr')
+                cols = row.find_all('td')
+                if len(cols) >= 3:
+                    return float(cols[2].get_text().replace(',', '.'))
+        return backup
+    except: return backup
 
-    /* HEADER */
-    .fixed-header {{ position: fixed; top: 0; left: 0; width: 100%; background: #fff; z-index: 99990; border-bottom: 4px solid {color_barra}; height: 95px; overflow: hidden; box-shadow: 0 5px 20px rgba(0,0,0,0.15); }}
-    
-    /* ANIMACIONES */
-    @keyframes heartbeat {{ 0% {{ transform: scale(1); }} 15% {{ transform: scale(1.05); }} 30% {{ transform: scale(1); }} 45% {{ transform: scale(1.05); }} 60% {{ transform: scale(1); }} }}
-    @keyframes blink {{ 50% {{ opacity: 0.5; }} }}
-    @keyframes slideBg {{ 0% {{ background-position: 0% 50%; }} 100% {{ background-position: 100% 50%; }} }}
+@st.cache_data(ttl=600)
+def load_data():
+    try: return pd.read_csv(SHEET_URL, dtype=str).fillna("").to_csv(index=False)
+    except: return ""
 
-    .price-tag {{ font-weight: 900; color: #111; font-size: 1.5rem; animation: heartbeat 2s infinite; }}
-    .badge {{ background: linear-gradient(90deg, {color_barra}, #111); color: white; padding: 3px 10px; border-radius: 4px; font-weight: 900; font-size: 0.75rem; text-transform: uppercase; }}
-    
-    /* BARRA PROGRESO */
-    .progress-container {{ width: 100%; height: 8px; background: #eee; position: absolute; bottom: 0; }}
-    .progress-bar {{ 
-        height: 100%; width: {porcentaje_barra}%; 
-        background: linear-gradient(90deg, {color_barra}, #ffeb3b); 
-        transition: width 0.5s ease-out; 
-        background-size: 200% 200%;
-        animation: slideBg 2s linear infinite;
-    }}
+def enviar_a_google_form_background(cliente, monto, oportunidad):
+    if URL_FORM_GOOGLE:
+        try: requests.post(URL_FORM_GOOGLE, data={'entry.xxxxxx': str(cliente), 'entry.xxxxxx': str(monto), 'entry.xxxxxx': str(oportunidad)}, timeout=1)
+        except: pass
 
-    .top-strip {{ background: #000; color: #fff; padding: 4px 10px; display: flex; justify-content: space-between; font-size: 0.7rem; align-items: center; font-weight: bold; letter-spacing: 0.5px; }}
-    .cart-summary {{ padding: 5px 15px; display: flex; justify-content: space-between; align-items: center; height: 60px; }}
-    .timer-box {{ color: {color_timer}; background: #fff; padding: 1px 6px; border-radius: 3px; font-weight: 900; border: 1px solid {color_timer}; }}
-    
-    /* TABS */
-    .stTabs [data-baseweb="tab-list"] {{ position: fixed; top: 95px; left: 0; width: 100%; background: #ffffff; z-index: 99980; padding-top: 2px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }}
-    .stTabs [data-baseweb="tab"] {{ flex: 1; text-align: center; padding: 6px; font-weight: bold; font-size: 0.75rem; }}
-    
-    /* BOTÓN FLOTANTE ESTILO WHATSAPP (EL +) */
-    div[data-testid="stPopover"] {{
-        position: fixed; bottom: 65px; left: 10px; z-index: 200000;
-        width: auto;
-    }}
-    div[data-testid="stPopover"] button {{
-        border-radius: 50%; width: 45px; height: 45px;
-        background-color: #25D366; color: white; border: 2px solid white;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        display: flex; align-items: center; justify-content: center; font-size: 20px;
-        animation: pulse-green-btn 2s infinite;
-    }}
-    @keyframes pulse-green-btn {{ 0% {{ box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.7); }} 70% {{ box-shadow: 0 0 0 10px rgba(37, 211, 102, 0); }} 100% {{ box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }} }}
-    </style>
-    
-    <div class="fixed-header">
-        <div class="top-strip">
-            <div style="display:flex; align-items:center; gap:5px;">⏳ EXPIRA: <span id="countdown_display" class="timer-box">{reloj_python}</span></div>
-            <div style="color:#FFD700; font-style:italic;"> PEDRO BRAVIN S.A.</div>
-        </div>
-        <div class="cart-summary">
-            <div>
-                <span class="badge">{display_badge}</span>
-                <div style="font-size:0.7rem; color:{color_barra}; font-weight:900; margin-top:3px; animation: heartbeat 1s infinite;">{subtext_badge}</div>
-            </div>
-            <div class="price-tag">{display_precio}<span style="font-size:0.8rem; font-weight:400; color:#666; margin-left:2px;">{display_iva}</span></div>
-        </div>
-        <div class="progress-container"><div class="progress-bar"></div></div>
-    </div>
-    <script>
-    (function() {{
-        if (window.miIntervalo) clearInterval(window.miIntervalo); var duration = {seg_restantes}; var display = document.getElementById("countdown_display");
-        function updateTimer() {{
-            var m = parseInt(duration / 60, 10); var s = parseInt(duration % 60, 10); m = m < 10 ? "0" + m : m; s = s < 10 ? "0" + s : s;
-            if (display) display.textContent = m + ":" + s;
-            if (--duration < 0) {{ duration = 0; if (window.miIntervalo) clearInterval(window.miIntervalo); }}
-        }}
-        if (duration > 0) {{ updateTimer(); window.miIntervalo = setInterval(updateTimer, 1000); }}
-    }})();
-    </script>
-    """
-    st.markdown(header_html, unsafe_allow_html=True)
-    
-    # BOTON PAGAR AHORA
-    if len(st.session_state.cart) > 0 and oferta_viva:
-        st.markdown(f"""
-        <div style="position:fixed; bottom:75px; right:10px; left:10px; z-index:200000; display:flex; justify-content:center;">
-            <a href="{generar_link_wa(total_final)}" target="_blank" style="
-                background: linear-gradient(90deg, #ff0000, #d50000); color: white; 
-                padding: 15px 30px; border-radius: 50px; width: 100%; text-align:center;
-                font-weight: 900; text-decoration: none; box-shadow: 0 5px 25px rgba(255,0,0,0.6);
-                border: 3px solid #fff; font-size: 1.2rem; animation: shake 4s infinite; text-transform: uppercase;">
-                🔥 PAGAR AHORA: ${total_final:,.0f} ➔
-            </a>
-        </div>
-        <style>@keyframes shake {{ 0%, 100% {{transform: translateX(0);}} 10%, 30%, 50%, 70%, 90% {{transform: translateX(-2px);}} 20%, 40%, 60%, 80% {{transform: translateX(2px);}} }}</style>
-        """, unsafe_allow_html=True)
+def log_interaction(user_text, monto):
+    ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    st.session_state.log_data.append({"Fecha": ts, "Usuario": user_text[:50], "Monto": monto})
 
-def auto_scroll():
-    components.html("""
-        <script>
-            function scrollDown() {
-                var body = window.parent.document.querySelector(".main");
-                if (body) {
-                    body.scrollTop = body.scrollHeight;
-                }
+def parsear_ordenes_bot(texto):
+    items_nuevos = []
+    # Regex robusto para capturar las órdenes del bot
+    for cant, prod, precio, tipo in re.findall(r'\[ADD:([\d\.]+):([^:]+):([\d\.]+):([^\]]+)\]', texto):
+        try:
+            item = {
+                "cantidad": float(cant), 
+                "producto": prod.strip(), 
+                "precio_unit": float(precio), 
+                "subtotal": float(cant)*float(precio), 
+                "tipo": tipo.strip().upper()
             }
-            setInterval(scrollDown, 800);
-        </script>
-    """, height=0)
+            st.session_state.cart.append(item)
+            items_nuevos.append(item)
+        except Exception as e:
+            pass 
+    return items_nuevos
+
+def calcular_negocio():
+    try:
+        now = datetime.datetime.now()
+        tiempo_restante = st.session_state.expiry_time - now
+        segundos_restantes = int(tiempo_restante.total_seconds())
+        activa = segundos_restantes > 0
+        
+        if activa:
+            m, s = divmod(segundos_restantes, 60)
+            reloj_init = f"{m:02d}:{s:02d}"
+            color_reloj = "#2e7d32" 
+            if m < 2: color_reloj = "#ff9800"
+            if m < 1: color_reloj = "#ff0000"
+        else:
+            reloj_init = "00:00"
+            color_reloj = "#b0bec5"
+
+        bruto = sum(i['subtotal'] for i in st.session_state.cart)
+        desc_base = 0; desc_extra = 0; nivel_texto = "LISTA"; color = "#546e7a"; meta = META_BASE
+        
+        tipos = [x['tipo'] for x in st.session_state.cart]
+        tiene_chapa = any("CHAPA" in t for t in tipos)
+        tiene_perfil = any("PERFIL" in t for t in tipos)
+        tiene_acero = any(t in ["HIERRO", "MALLA", "CLAVOS", "ALAMBRE", "PERFIL", "CHAPA", "TUBO", "CAÑO"] for t in tipos)
+        tiene_pintura = any("PINTURA" in t or "ACCESORIO" in t or "ELECTRODO" in t for t in tipos)
+
+        if activa:
+            if bruto > META_MAXIMA: desc_base = 15; nivel_texto = "PARTNER MAX"; color = "#6200ea"; meta = 0
+            elif bruto > META_MEDIA: desc_base = 12; nivel_texto = "CONSTRUCTOR"; color = "#d32f2f"; meta = META_MAXIMA
+            elif bruto > META_BASE: desc_base = 10; nivel_texto = "OBRA"; color = "#f57c00"; meta = META_MEDIA
+            else: desc_base = 3; nivel_texto = "CONTADO"; color = "#2e7d32"; meta = META_BASE
+
+            boosters = []
+            if tiene_chapa and tiene_perfil: desc_extra += 3; boosters.append("KIT TECHO")
+            elif tiene_acero and tiene_pintura: desc_extra += 2; boosters.append("PACK TERM.")
+                
+            desc_total = min(desc_base + desc_extra, 18)
+            if desc_extra > 0: 
+                nivel_texto = f"{nivel_texto} + {' '.join(boosters)}"
+                if desc_total >= 15: color = "#6200ea" 
+        else:
+            desc_total = 0; nivel_texto = "EXPIRADO"; color = "#455a64"
+
+        neto = bruto * (1 - (desc_total/100))
+        ahorro_total = bruto - neto
+        return bruto, neto, desc_total, color, nivel_texto, meta, segundos_restantes, activa, color_reloj, reloj_init, ahorro_total
+    except:
+        return 0, 0, 0, "#000", "ERROR", 0, 0, False, "#000", "00:00", 0
+
+def generar_link_wa(total):
+    try:
+        txt = "HOLA, QUIERO CONGELAR PRECIO YA (Oferta Flash):\n" + "\n".join([f"▪ {i['cantidad']}x {i['producto']}" for i in st.session_state.cart])
+        txt += f"\n💰 TOTAL FINAL: ${total:,.0f} + IVA"
+        return f"https://wa.me/5493401527780?text={urllib.parse.quote(txt)}"
+    except:
+        return "https://wa.me/5493401527780"
+
+# ==========================================
+# IA LOGIC (AQUÍ ESTÁ EL CAMBIO)
+# ==========================================
+def get_sys_prompt(csv_context, DOLAR_BNA):
+    return f"""
+    ROL: Miguel, vendedor experto de Pedro Bravin S.A.
+    DB: {csv_context}
+    ZONA GRATIS (PUNTOS LOGÍSTICOS): {CIUDADES_GRATIS}
+    DOLAR BNA VENTA: {DOLAR_BNA}
+
+    📏 **CATÁLOGO TÉCNICO (ESTRICTO):**
+    - **12m:** Perfil C, IPN, UPN, ADN.
+    - **6.40m:** Caños (Mecánico, Epoxi, Galvanizado, Schedule). **¡ATENCIÓN! La unidad de venta de estas barras es "METRO", NO "KG".**
+    - **6m:** Tubos Estructurales, Hierros, Ángulos, Planchuelas.
+    - **CHAPA T90:** Única medida 13m.
+    - **CHAPA COLOR / CINCALUM:** Por metro.
+    - **AISLANTES ISOVER ISOLANT:** El precio en la base de datos es por m². **TU TAREA:** Lee en la descripción cuántos m² trae el rollo (ej: 10m², 20m²), multiplica (Precio m² * Cantidad m²) y **COTIZA SIEMPRE EL PRECIO FINAL POR ROLLO CERRADO**. Nunca pases precio por m2 suelto.
+
+    🧠 **SENTIDO COMÚN Y CONTEXTO (GOOGLE):**
+    - Interpreta las descripciones del usuario usando información disponible en Google si es ambigua.
+    - **Ejemplo Alambre:** Si envían foto o piden "60 metros de alambre", NO son 60 rollos. Calcula el peso aproximado de 60 metros lineales o el equivalente fraccionado. Contextualiza que es un elemento continuo.
+
+    🚚 **LÓGICA DE FLETE (CRÍTICO):**
+    1. **Analiza la ubicación del cliente.**
+    2. **CASO 1: ZONA GRATIS.** Si la ciudad está en {CIUDADES_GRATIS} -> ENVÍO $0.
+    3. **CASO 2: FUERA DE ZONA.** - Identifica la ciudad de {CIUDADES_GRATIS} más cercana al cliente (Punto Logístico).
+       - Estima la distancia en KM (IDA Y VUELTA) desde ese punto logístico hasta el cliente usando tus conocimientos geográficos/mapas.
+       - **Cálculo:** `KM_TOTAL (IDA+VUELTA) * 0.85 USD * {DOLAR_BNA} * 1.21 (IVA)`.
+       - Agrega este costo como un item "[ADD:1:FLETE A [CIUDAD]:PRECIO_CALCULADO:SERVICIO]".
+
+    ⛔ **PROTOCOLO SNIPER:**
+    1. **BREVEDAD:** Max 15 palabras. Directo.
+    2. **CONFIRMACIÓN:** SOLO agrega `[ADD:...]` si el cliente dice "SÍ" o "CARGALO" o envía una lista definida de pedido.
+    3. **UPSELL:** "Te faltan $X para el descuento. ¿Agrego pintura?".
+
+    SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
+    """
+
+def procesar_input(contenido, es_imagen=False):
+    if "chat_session" in st.session_state:
+        msg = contenido
+        prefix = ""
+        if es_imagen: msg = ["COTIZA ESTO RÁPIDO. DETECTA OPORTUNIDADES Y CONTEXTO DEL PRODUCTO (No confundir unidades).", contenido]
+        prompt = f"{prefix}{msg}. (NOTA: Sé breve. Cotiza precios. NO AGREGUES sin confirmación)." if not es_imagen else msg
+        try:
+            return st.session_state.chat_session.send_message(prompt).text
+        except Exception as e:
+            return "Hubo un error de conexión, intenta de nuevo."
+    return "Error: Chat off."
