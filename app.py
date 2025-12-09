@@ -1,5 +1,4 @@
 #app.py
-# Actualización para forzar despliegue
 import streamlit as st
 import datetime
 import random
@@ -8,7 +7,7 @@ from PIL import Image
 import google.generativeai as genai
 import os
 import re
-import pandas as pd
+import pandas as pd 
 
 # IMPORTAR MÓDULOS PROPIOS
 from config import *
