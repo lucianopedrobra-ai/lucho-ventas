@@ -1,4 +1,4 @@
-FROM python:3.9-slim
+FROM python:3.11-slim
 
 # Evitar que Python genere archivos .pyc y buffer de salida
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -11,10 +11,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar EL RESTO de los archivos (app.py, config.py, etc)
+# Copiar EL RESTO de los archivos
 COPY . .
 
-# Exponer el puerto que usa Cloud Run (8080)
+# Exponer el puerto
 EXPOSE 8080
 
 # Comando para iniciar la app
