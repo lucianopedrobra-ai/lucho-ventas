@@ -1,6 +1,6 @@
 streamlit
 pandas
-google-generativeai>=0.10.0 
+google-generativeai>=0.10.0
 requests
 beautifulsoup4
 Pillow
