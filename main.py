@@ -18,7 +18,8 @@ import streamlit.components.v1 as components
 # ==========================================
 st.set_page_config(
     page_title="🔥 OFERTAS PEDRO BRAVIN",
-    page_icon="🦁", 
+    # CAMBIO: Ícono de león 🦁 cambiado por grúa 🏗️
+    page_icon="🏗️", 
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -84,8 +85,9 @@ if "expiry_time" not in st.session_state:
 
 if "messages" not in st.session_state:
     # SALUDO INICIAL
+    # CAMBIO: León 🦁 cambiado por obrero 👷‍♂️
     saludo = """
-🦁 **Soy Miguel.** Dólar actualizado. Stock disponible.
+👷‍♂️ **Soy Miguel.** Dólar actualizado. Stock disponible.
 
 👇 **PASAME TU PEDIDO YA** (Escribí o usá el botón **➕** para subir foto).
 *¡El precio se congela por 3 minutos!* ⏳
@@ -203,6 +205,7 @@ if dinero_ahorrado > 0:
 else:
     subtext_badge = "TIEMPO LIMITADO"
 
+# CAMBIO: León 🦁 cambiado por grúa 🏗️ en el header
 header_html = f"""
     <style>
     /* LIMPIEZA */
@@ -268,7 +271,7 @@ header_html = f"""
     <div class="fixed-header">
         <div class="top-strip">
             <div style="display:flex; align-items:center; gap:5px;">⏳ EXPIRA: <span id="countdown_display" class="timer-box">{reloj_python}</span></div>
-            <div style="color:#FFD700; font-style:italic;">🦁 PEDRO BRAVIN S.A.</div>
+            <div style="color:#FFD700; font-style:italic;">🏗️ PEDRO BRAVIN S.A.</div>
         </div>
         <div class="cart-summary">
             <div>
@@ -346,21 +349,21 @@ Cuando el cliente pide un proyecto (ej: "cerrar terreno", "techada", "galpón"),
 SALIDA: [TEXTO VISIBLE] [ADD:...]
 """
 
-# Configuración del modelo con herramientas (si está disponible en la versión de librería)
-if "chat_session" not in st.session_state and "api_key" in locals() and api_key:
-    try:
-        # Intentamos habilitar tools para búsqueda si es compatible
-        st.session_state.chat_session = genai.GenerativeModel(
-            'gemini-2.5-flash', 
-            system_instruction=sys_prompt,
-            tools='google_search_retrieval' # Permite buscar distancias reales y contextos de obra
-        ).start_chat(history=[])
-    except:
-        # Fallback a versión simple si falla la config de tools
-        st.session_state.chat_session = genai.GenerativeModel(
-            'gemini-2.5-flash', 
-            system_instruction=sys_prompt
-        ).start_chat(history=[])
+# SOLUCIÓN DE ERROR: Inicialización simplificada con modelo estable gemini-1.5-flash
+if "chat_session" not in st.session_state:
+    if "api_key" in locals() and api_key:
+        try:
+            # Se usa 'gemini-1.5-flash' que es la versión estable actual.
+            # Se retira 'tools' temporalmente para asegurar estabilidad si la API key no lo soporta.
+            st.session_state.chat_session = genai.GenerativeModel(
+                'gemini-1.5-flash', 
+                system_instruction=sys_prompt
+            ).start_chat(history=[])
+        except Exception as e:
+            # Si falla la inicialización, se manejará en el bucle de chat
+            print(f"Error fatal iniciando Gemini: {e}")
+    else:
+        pass # Se manejará la falta de API key luego
 
 def procesar_input(contenido, es_imagen=False):
     if "chat_session" in st.session_state:
@@ -371,8 +374,8 @@ def procesar_input(contenido, es_imagen=False):
         try:
             return st.session_state.chat_session.send_message(prompt).text
         except Exception:
-            return "Hubo un error de conexión, intenta de nuevo."
-    return "Error: Chat off."
+            return "Hubo un error de conexión con el cerebro de Miguel. Por favor intenta de nuevo en unos segundos."
+    return "Error: Chat no disponible (Verificar API Key)."
 
 # ==========================================
 # 7. INTERFAZ TABS
@@ -422,12 +425,19 @@ with tab1:
                     fid = f"{img.name}_{img.size}"
                     if st.session_state.last_processed_file != fid:
                         with st.spinner("⚡ Analizando proyecto y componentes..."):
-                            txt = procesar_input(Image.open(img), True)
-                            news = parsear_ordenes_bot(txt)
-                            st.session_state.messages.append({"role": "assistant", "content": txt})
-                            st.session_state.last_processed_file = fid
-                            if news: st.balloons()
-                            st.rerun()
+                            # SOLUCIÓN ERROR: Llamada protegida
+                            try:
+                                txt = procesar_input(Image.open(img), True)
+                                if "Error:" not in txt:
+                                    news = parsear_ordenes_bot(txt)
+                                    st.session_state.messages.append({"role": "assistant", "content": txt})
+                                    st.session_state.last_processed_file = fid
+                                    if news: st.balloons()
+                                    st.rerun()
+                                else:
+                                     st.error(txt)
+                            except Exception as e:
+                                st.error(f"Error al procesar imagen: {e}")
 
     if p := st.chat_input("Escribí acá..."):
         if p == "#admin": st.session_state.admin_mode = not st.session_state.admin_mode; st.rerun()
@@ -435,8 +445,9 @@ with tab1:
         st.chat_message("user").markdown(p)
         with st.chat_message("assistant", avatar="👷‍♂️"):
             with st.spinner("Calculando Kit y Logística..."):
+                # SOLUCIÓN ERROR: Bloque try-except más robusto
                 try:
-                    if "chat_session" in st.session_state:
+                    if "chat_session" in st.session_state and st.session_state.chat_session:
                         res = st.session_state.chat_session.send_message(f"{p}. (SI ES PROYECTO, ARMA EL KIT).").text
                         news = parsear_ordenes_bot(res)
                         display = re.sub(r'\[ADD:.*?\]', '', res)
@@ -448,7 +459,10 @@ with tab1:
                         
                         st.session_state.messages.append({"role": "assistant", "content": res})
                         if news: time.sleep(1); st.rerun()
-                except: st.error("Error al procesar.")
+                    else:
+                         st.error("El sistema no está listo. Verifique la API Key.")
+                except Exception as e: 
+                    st.error(f"Error al procesar tu mensaje. Intenta nuevamente. ({e})")
 
 with tab2:
     st.markdown(spacer, unsafe_allow_html=True)
