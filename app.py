@@ -49,7 +49,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": saludo}]
 
 # ==========================================
-# 3. CEREBRO IA (SOLUCIÓN ERROR 400)
+# 3. CEREBRO IA (LISTA DE COMPATIBILIDAD TOTAL)
 # ==========================================
 api_key = None
 try:
@@ -69,12 +69,14 @@ if "chat_session" not in st.session_state:
     else:
         sys_prompt = get_sys_prompt(csv_context, DOLAR_BNA)
         
-        # ⚠️ CAMBIO CRÍTICO: Eliminamos 'google_search_retrieval' que daba Error 400.
-        # Ahora usamos 'None' en tools para que el bot sea PURA VENTA con tu CSV.
+        # ⚠️ LISTA DE FUERZA BRUTA:
+        # Probamos TODAS las versiones posibles. Si una falla, salta a la siguiente.
         intentos = [
-            ("gemini-1.5-flash", None),       # Rápido y obediente al CSV
-            ("gemini-1.5-pro", None),         # Respaldo inteligente
-            ("gemini-2.0-flash-exp", None)    # Respaldo experimental
+            ("gemini-1.5-flash", None),          # Estándar actual
+            ("gemini-1.5-flash-latest", None),   # Alias alternativo
+            ("gemini-1.5-pro", None),            # Pro
+            ("gemini-pro", None),                # ⚠️ LA VIEJA CONFIABLE (Versión 1.0)
+            ("gemini-1.0-pro", None)             # Alias 1.0
         ]
         
         connected = False
@@ -82,19 +84,20 @@ if "chat_session" not in st.session_state:
         
         for modelo, tools in intentos:
             try:
-                # Inicialización simple sin herramientas externas (Evita errores)
+                # Inicialización simple
                 st.session_state.chat_session = genai.GenerativeModel(
                     modelo, system_instruction=sys_prompt
                 ).start_chat(history=[])
                 
                 connected = True
+                # print(f"✅ Conectado con {modelo}") # Debug
                 break 
             except Exception as e:
                 error_debug.append(f"{modelo}: {str(e)}")
                 continue 
 
         if not connected:
-            st.error(f"⚠️ Error de conexión con Google: {error_debug}")
+            st.error(f"⚠️ Error total de conexión. Detalles: {error_debug}")
 
 
 # ==========================================
