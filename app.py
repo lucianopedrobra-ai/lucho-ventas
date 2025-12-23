@@ -49,7 +49,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": saludo}]
 
 # ==========================================
-# 3. CEREBRO IA (MODO NEXT-GEN 2.0)
+# 3. CEREBRO IA (MODELO 2.5 ACTIVADO)
 # ==========================================
 api_key = None
 try:
@@ -69,11 +69,16 @@ if "chat_session" not in st.session_state:
     else:
         sys_prompt = get_sys_prompt(csv_context, DOLAR_BNA)
         
-        # ⚠️ ESTRATEGIA DE CONEXIÓN:
+        # ⚠️ ESTRATEGIA DE CONEXIÓN ACTUALIZADA:
+        # 1. Gemini 2.5 Flash Image (El que Google sugirió en el error).
+        # 2. Gemini 2.0 Flash Exp (Tu favorito).
+        # 3. Gemini 1.5 Flash (Respaldo final).
+        
         intentos = [
-            "gemini-2.0-flash-exp", # Tu prioridad (Tecnología nueva)
-            "gemini-1.5-flash",     # Intermedio
-            "gemini-pro"            # Respaldo total (Legacy)
+            "gemini-2.5-flash-image", # NUEVO: Sugerido por el error 429
+            "gemini-2.0-flash-exp",   
+            "gemini-1.5-flash",
+            "gemini-pro"
         ]
         
         connected_model = None
@@ -91,7 +96,7 @@ if "chat_session" not in st.session_state:
                 continue 
 
         if not connected_model:
-            st.error(f"⚠️ Todos los modelos fallaron. Log: {error_log}")
+            st.error(f"⚠️ Error de conexión IA. Detalles: {error_log}")
 
 # ==========================================
 # 4. UI: HEADER Y ESTILOS
@@ -126,7 +131,7 @@ with tab1:
 
     for m in st.session_state.messages:
         if m["role"] != "system":
-            # LIMPIEZA VISUAL POTENTE
+            # LIMPIEZA VISUAL
             clean = re.sub(r'\[ADD:.*?\]', '', m["content"])
             clean = clean.replace("[TEXTO VISIBLE]", "").replace("SALIDA:", "").strip()
             
@@ -171,7 +176,8 @@ with tab1:
             with st.spinner("Calculando logística y stock..."):
                 try:
                     res = procesar_input(p)
-                    if res.startswith("⚠️ ERROR"):
+                    # VERIFICAR SI HAY ERROR EXPLÍCITO
+                    if res.startswith("⚠️ ERROR TÉCNICO") or res.startswith("⚠️ SERVIDORES"):
                         st.error(res)
                     else:
                         news = parsear_ordenes_bot(res)
