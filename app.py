@@ -49,7 +49,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": saludo}]
 
 # ==========================================
-# 3. CEREBRO IA (LISTA DE COMPATIBILIDAD TOTAL)
+# 3. CEREBRO IA (MODO NEXT-GEN 2.0)
 # ==========================================
 api_key = None
 try:
@@ -69,35 +69,36 @@ if "chat_session" not in st.session_state:
     else:
         sys_prompt = get_sys_prompt(csv_context, DOLAR_BNA)
         
-        # ⚠️ LISTA DE FUERZA BRUTA:
-        # Probamos TODAS las versiones posibles. Si una falla, salta a la siguiente.
+        # ⚠️ ESTRATEGIA DE CONEXIÓN:
+        # 1. Gemini 2.0 Flash Experimental (Lo más nuevo que existe hoy).
+        # 2. Gemini Pro (Versión 1.0 estable - Esta NO FALLA).
+        # Eliminamos 'tools' para evitar el error 400.
+        
         intentos = [
-            ("gemini-1.5-flash", None),          # Estándar actual
-            ("gemini-1.5-flash-latest", None),   # Alias alternativo
-            ("gemini-1.5-pro", None),            # Pro
-            ("gemini-pro", None),                # ⚠️ LA VIEJA CONFIABLE (Versión 1.0)
-            ("gemini-1.0-pro", None)             # Alias 1.0
+            "gemini-2.0-flash-exp", # Tu prioridad (Tecnología nueva)
+            "gemini-1.5-flash",     # Intermedio
+            "gemini-pro"            # Respaldo total (Legacy)
         ]
         
-        connected = False
-        error_debug = []
+        connected_model = None
+        error_log = []
         
-        for modelo, tools in intentos:
+        for modelo in intentos:
             try:
-                # Inicialización simple
                 st.session_state.chat_session = genai.GenerativeModel(
                     modelo, system_instruction=sys_prompt
                 ).start_chat(history=[])
-                
-                connected = True
-                # print(f"✅ Conectado con {modelo}") # Debug
+                connected_model = modelo
                 break 
             except Exception as e:
-                error_debug.append(f"{modelo}: {str(e)}")
+                error_log.append(f"{modelo}: {e}")
                 continue 
 
-        if not connected:
-            st.error(f"⚠️ Error total de conexión. Detalles: {error_debug}")
+        if not connected_model:
+            st.error(f"⚠️ Todos los modelos fallaron. Log: {error_log}")
+        # Opcional: Descomentar para ver qué modelo conectó
+        # else:
+        #    st.toast(f"✅ Conectado a motor: {connected_model}", icon="🤖")
 
 
 # ==========================================
@@ -175,7 +176,6 @@ with tab1:
             with st.spinner("Calculando logística y stock..."):
                 try:
                     res = procesar_input(p)
-                    # VERIFICAR SI HAY ERROR EXPLÍCITO
                     if res.startswith("⚠️ ERROR"):
                         st.error(res)
                     else:
