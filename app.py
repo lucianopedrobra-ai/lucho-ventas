@@ -49,48 +49,38 @@ if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": saludo}]
 
 # ==========================================
-# 3. CEREBRO IA (SEGURO - VÍA SECRETS)
+# 3. CEREBRO IA (MODO ESTABLE)
 # ==========================================
 api_key = None
-
-# Intentamos cargar la clave de forma segura
 try:
-    # 1. Primero busca en secrets (Nube)
     if "GOOGLE_API_KEY" in st.secrets:
         api_key = st.secrets["GOOGLE_API_KEY"]
-    # 2. Si no, busca en entorno (Local/Docker)
     elif "GOOGLE_API_KEY" in os.environ:
         api_key = os.environ.get("GOOGLE_API_KEY")
-except FileNotFoundError:
-    pass # Manejo normal si no hay archivo secrets local
+except: pass
 
-# Configurar GenAI solo si tenemos llave
 if api_key:
-    try:
-        genai.configure(api_key=api_key)
-    except Exception as e:
-        st.error(f"Error de autenticación con Google: {e}")
-        api_key = None # Invalidamos si falló la config
+    try: genai.configure(api_key=api_key)
+    except: pass
 
-# Lógica de conexión con Fallback (Respaldo)
 if "chat_session" not in st.session_state:
     if not api_key:
-        # 🛑 AQUÍ ES DONDE SE GENERA EL CARTEL ROJO DE TU FOTO
-        st.error("🚨 ERROR CRÍTICO: No se detectó la API KEY en los Secrets de Streamlit.")
-        st.info("Ve a Settings > Secrets y agrega: GOOGLE_API_KEY = 'tu_clave'")
+        st.error("🚨 ERROR CRÍTICO: Falta la API KEY en Secrets.")
     else:
         sys_prompt = get_sys_prompt(csv_context, DOLAR_BNA)
         
-        # Intentamos conectar en orden de prioridad
-        # Si la 2.5 falla, bajamos a la 2.0, luego a la 1.5
+        # ⚠️ CAMBIO CLAVE: Usamos la versión ESTABLE primero para asegurar que funcione.
+        # Las versiones experimentales (2.0/2.5) pueden fallar en cuentas nuevas.
         intentos = [
-            ("gemini-2.5-flash", 'google_search_retrieval'),       # Tu prioridad
-            ("gemini-2.0-flash-exp", 'google_search_retrieval'),   # Nueva experimental
-            ("gemini-1.5-pro", 'google_search_retrieval'),         # Potente estable
-            ("gemini-1.5-flash", None)                             # Rápida emergencia
+            ("gemini-1.5-flash", 'google_search_retrieval'),       # LA MÁS RÁPIDA Y SEGURA
+            ("gemini-1.5-pro", 'google_search_retrieval'),         # LA MÁS INTELIGENTE
+            ("gemini-2.0-flash-exp", 'google_search_retrieval'),   # EXPERIMENTAL
+            ("gemini-1.5-flash", None)                             # RESPALDO SIN BÚSQUEDA
         ]
         
         connected = False
+        error_debug = []
+        
         for modelo, tools in intentos:
             try:
                 if tools:
@@ -103,11 +93,12 @@ if "chat_session" not in st.session_state:
                     ).start_chat(history=[])
                 connected = True
                 break 
-            except:
-                continue # Si falla, prueba el siguiente modelo silenciosamente
+            except Exception as e:
+                error_debug.append(str(e))
+                continue 
 
         if not connected:
-            st.error("⚠️ Error: La API Key es válida pero Google rechazó la conexión con todos los modelos.")
+            st.error(f"⚠️ Error al conectar con Google AI: {error_debug}")
 
 
 # ==========================================
@@ -185,17 +176,21 @@ with tab1:
             with st.spinner("Calculando logística y stock..."):
                 try:
                     res = procesar_input(p)
-                    news = parsear_ordenes_bot(res)
-                    display = re.sub(r'\[ADD:.*?\]', '', res)
-                    st.markdown(display)
-                    
-                    if news: 
-                        st.toast(random.choice(TOASTS_EXITO), icon='🔥')
-                        if desc_actual >= 12: st.balloons()
-                    
-                    st.session_state.messages.append({"role": "assistant", "content": res})
-                    if news: time.sleep(1); st.rerun()
-                except: st.error("Error al procesar.")
+                    # VERIFICAR SI HAY ERROR EXPLÍCITO
+                    if res.startswith("⚠️ ERROR"):
+                        st.error(res)
+                    else:
+                        news = parsear_ordenes_bot(res)
+                        display = re.sub(r'\[ADD:.*?\]', '', res)
+                        st.markdown(display)
+                        
+                        if news: 
+                            st.toast(random.choice(TOASTS_EXITO), icon='🔥')
+                            if desc_actual >= 12: st.balloons()
+                        
+                        st.session_state.messages.append({"role": "assistant", "content": res})
+                        if news: time.sleep(1); st.rerun()
+                except Exception as e: st.error(f"Error crítico en UI: {e}")
 
 with tab2:
     st.markdown(spacer, unsafe_allow_html=True)
