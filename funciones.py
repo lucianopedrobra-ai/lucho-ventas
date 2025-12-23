@@ -11,48 +11,26 @@ import os
 from config import *
 
 # ==========================================
-# MOTOR INVISIBLE (OPTIMIZADO)
+# MOTOR INVISIBLE
 # ==========================================
 @st.cache_data(ttl=3600)
 def obtener_dolar_bna():
-    # 1. INTENTO VÍA API (Más rápido y estable)
     try:
         r = requests.get("https://dolarapi.com/v1/dolares/oficial", timeout=3)
         if r.status_code == 200:
             data = r.json()
-            # La API devuelve venta, lo usamos
             return float(data['venta'])
-    except:
-        pass
-
-    # 2. INTENTO VÍA SCRAPING (Respaldo original)
-    url = "https://www.bna.com.ar/Personas"
-    backup = 1060.00
-    try:
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        r = requests.get(url, headers=headers, timeout=5)
-        if r.status_code == 200:
-            soup = BeautifulSoup(r.content, 'html.parser')
-            target = soup.find(string=re.compile("Dolar U.S.A"))
-            if target:
-                row = target.find_parent('tr')
-                cols = row.find_all('td')
-                if len(cols) >= 3:
-                    return float(cols[2].get_text().replace(',', '.'))
-        return backup
-    except: return backup
+    except: pass
+    return 1060.00 # Backup fijo
 
 @st.cache_data(ttl=600)
 def load_data():
     try: 
-        # Carga optimizada: Leemos todo como texto para evitar errores de formato
-        return pd.read_csv(SHEET_URL, dtype=str).fillna("").to_csv(index=False)
-    except: return ""
-
-def enviar_a_google_form_background(cliente, monto, oportunidad):
-    if URL_FORM_GOOGLE:
-        try: requests.post(URL_FORM_GOOGLE, data={'entry.xxxxxx': str(cliente), 'entry.xxxxxx': str(monto), 'entry.xxxxxx': str(oportunidad)}, timeout=1)
-        except: pass
+        # Carga robusta del CSV
+        df = pd.read_csv(SHEET_URL, dtype=str).fillna("")
+        return df.to_csv(index=False)
+    except Exception as e: 
+        return ""
 
 def log_interaction(user_text, monto):
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -60,7 +38,7 @@ def log_interaction(user_text, monto):
 
 def parsear_ordenes_bot(texto):
     items_nuevos = []
-    # Regex robusto para capturar las órdenes del bot
+    # Regex para detectar órdenes del bot: [ADD:CANT:PROD:PRECIO:TIPO]
     for cant, prod, precio, tipo in re.findall(r'\[ADD:([\d\.]+):([^:]+):([\d\.]+):([^\]]+)\]', texto):
         try:
             item = {
@@ -72,8 +50,7 @@ def parsear_ordenes_bot(texto):
             }
             st.session_state.cart.append(item)
             items_nuevos.append(item)
-        except Exception as e:
-            pass 
+        except: pass 
     return items_nuevos
 
 def calcular_negocio():
@@ -134,7 +111,7 @@ def generar_link_wa(total):
         return "https://wa.me/5493401527780"
 
 # ==========================================
-# IA LOGIC (CEREBRO OPTIMIZADO)
+# IA LOGIC (CEREBRO)
 # ==========================================
 def get_sys_prompt(csv_context, DOLAR_BNA):
     return f"""
@@ -148,36 +125,28 @@ def get_sys_prompt(csv_context, DOLAR_BNA):
     2. Si un producto NO está en la DB, di: "No tengo stock de eso" o sugiere un sustituto que SÍ esté.
     3. JAMÁS INVENTES UN PRECIO.
 
-    📏 **CATÁLOGO TÉCNICO (ESTRICTO):**
-    - **12m:** Perfil C, IPN, UPN, ADN.
-    - **6.40m:** Caños (Mecánico, Epoxi, Galvanizado, Schedule). **¡ATENCIÓN! La unidad de venta de estas barras es "METRO", NO "KG".**
-    - **6m:** Tubos Estructurales, Hierros, Ángulos, Planchuelas.
-    - **CHAPA T90:** Única medida 13m.
-    - **CHAPA COLOR / CINCALUM:** Por metro.
-    - **AISLANTES ISOVER ISOLANT:** Cotiza SIEMPRE por ROLLO CERRADO (Precio m² * m² del rollo).
+    📏 **CATÁLOGO TÉCNICO:**
+    - Perfiles C y ADN: 12m.
+    - Caños: 6.40m (Venta por METRO).
+    - Tubos, Hierros: 6m.
 
-    🚚 **LÓGICA DE FLETE:**
-    1. **CASO 1: ZONA GRATIS.** Si la ciudad está en {CIUDADES_GRATIS} -> ENVÍO $0.
-    2. **CASO 2: FUERA DE ZONA.** - Calcula KM ida y vuelta desde punto logístico más cercano.
-       - Costo: `KM_TOTAL * 0.85 USD * {DOLAR_BNA} * 1.21`.
-       - Agrega item: "[ADD:1:FLETE A [CIUDAD]:PRECIO:SERVICIO]".
-
-    ⛔ **PROTOCOLO SNIPER:**
-    1. **BREVEDAD:** Max 15 palabras. Directo.
-    2. **CONFIRMACIÓN:** SOLO agrega `[ADD:...]` si el cliente confirma o pide explícitamente.
-    3. **UPSELL:** "Te faltan $X para el descuento. ¿Agrego pintura?".
-
-    SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
+    🚚 **FLETE:**
+    1. ZONA GRATIS: {CIUDADES_GRATIS} -> ENVÍO $0.
+    2. FUERA DE ZONA: `KM * 0.85 USD * {DOLAR_BNA} * 1.21`.
+    
+    PROTOCOLO SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
     """
 
 def procesar_input(contenido, es_imagen=False):
     if "chat_session" in st.session_state:
         msg = contenido
         prefix = ""
-        if es_imagen: msg = ["COTIZA ESTO RÁPIDO. DETECTA OPORTUNIDADES Y CONTEXTO DEL PRODUCTO (No confundir unidades).", contenido]
-        prompt = f"{prefix}{msg}. (NOTA: Sé breve. Cotiza precios exactos de la DB)." if not es_imagen else msg
+        if es_imagen: msg = ["COTIZA ESTO. DETECTA PRODUCTOS Y CANTIDADES.", contenido]
+        prompt = f"{prefix}{msg}. (Responde breve. Usa precios DB)." if not es_imagen else msg
         try:
             return st.session_state.chat_session.send_message(prompt).text
         except Exception as e:
-            return "Hubo un error de conexión, intenta de nuevo."
-    return "Error: Chat off."
+            # AQUI ESTA LA CLAVE: Devolvemos el error real para saber qué pasa
+            return f"⚠️ ERROR DE GOOGLE: {str(e)}"
+            
+    return "Error: Chat off (Reinicia la página)."
