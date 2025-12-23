@@ -49,60 +49,66 @@ if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": saludo}]
 
 # ==========================================
-# 3. CEREBRO IA (SISTEMA DE ARRANQUE SEGURO)
+# 3. CEREBRO IA (SEGURO - VÍA SECRETS)
 # ==========================================
 api_key = None
+
+# Intentamos cargar la clave de forma segura
 try:
-    # 1. Intentamos leer de variables de entorno (Local/Docker)
-    api_key = os.environ.get("GOOGLE_API_KEY")
-    # 2. Si falla, intentamos leer de Secrets (Streamlit Cloud)
-    if not api_key:
-        try: api_key = st.secrets["GOOGLE_API_KEY"]
-        except: pass
-    
-    # 3. Configurar solo si hay llave
-    if api_key: 
+    # 1. Primero busca en secrets (Nube)
+    if "GOOGLE_API_KEY" in st.secrets:
+        api_key = st.secrets["GOOGLE_API_KEY"]
+    # 2. Si no, busca en entorno (Local/Docker)
+    elif "GOOGLE_API_KEY" in os.environ:
+        api_key = os.environ.get("GOOGLE_API_KEY")
+except FileNotFoundError:
+    pass # Manejo normal si no hay archivo secrets local
+
+# Configurar GenAI solo si tenemos llave
+if api_key:
+    try:
         genai.configure(api_key=api_key)
+    except Exception as e:
+        st.error(f"Error de autenticación con Google: {e}")
+        api_key = None # Invalidamos si falló la config
+
+# Lógica de conexión con Fallback (Respaldo)
+if "chat_session" not in st.session_state:
+    if not api_key:
+        # 🛑 AQUÍ ES DONDE SE GENERA EL CARTEL ROJO DE TU FOTO
+        st.error("🚨 ERROR CRÍTICO: No se detectó la API KEY en los Secrets de Streamlit.")
+        st.info("Ve a Settings > Secrets y agrega: GOOGLE_API_KEY = 'tu_clave'")
     else:
-        st.error("🚨 ERROR CRÍTICO: No se encontró la API KEY. Configura los Secrets en Streamlit.")
-except Exception as e:
-    st.error(f"Error configurando API: {e}")
+        sys_prompt = get_sys_prompt(csv_context, DOLAR_BNA)
+        
+        # Intentamos conectar en orden de prioridad
+        # Si la 2.5 falla, bajamos a la 2.0, luego a la 1.5
+        intentos = [
+            ("gemini-2.5-flash", 'google_search_retrieval'),       # Tu prioridad
+            ("gemini-2.0-flash-exp", 'google_search_retrieval'),   # Nueva experimental
+            ("gemini-1.5-pro", 'google_search_retrieval'),         # Potente estable
+            ("gemini-1.5-flash", None)                             # Rápida emergencia
+        ]
+        
+        connected = False
+        for modelo, tools in intentos:
+            try:
+                if tools:
+                    st.session_state.chat_session = genai.GenerativeModel(
+                        modelo, system_instruction=sys_prompt, tools=tools
+                    ).start_chat(history=[])
+                else:
+                    st.session_state.chat_session = genai.GenerativeModel(
+                        modelo, system_instruction=sys_prompt
+                    ).start_chat(history=[])
+                connected = True
+                break 
+            except:
+                continue # Si falla, prueba el siguiente modelo silenciosamente
 
-# Solo intentamos conectar si no existe sesión y tenemos llave
-if "chat_session" not in st.session_state and api_key:
-    sys_prompt = get_sys_prompt(csv_context, DOLAR_BNA)
-    
-    # LISTA DE PRIORIDAD: Intenta conectar en orden.
-    intentos = [
-        ("gemini-2.5-flash", 'google_search_retrieval'),       # Tu preferencia
-        ("gemini-2.0-flash-exp", 'google_search_retrieval'),   # Experimental Nuevo
-        ("gemini-1.5-flash", 'google_search_retrieval'),       # Estable Rápido
-        ("gemini-1.5-flash", None)                             # Modo Seguro (Sin tools)
-    ]
-    
-    model_connected = False
-    error_log = []
+        if not connected:
+            st.error("⚠️ Error: La API Key es válida pero Google rechazó la conexión con todos los modelos.")
 
-    for modelo, tools in intentos:
-        try:
-            # Configuración del modelo
-            if tools:
-                st.session_state.chat_session = genai.GenerativeModel(
-                    modelo, system_instruction=sys_prompt, tools=tools
-                ).start_chat(history=[])
-            else:
-                st.session_state.chat_session = genai.GenerativeModel(
-                    modelo, system_instruction=sys_prompt
-                ).start_chat(history=[])
-            
-            model_connected = True
-            break # Si conectó, salimos del bucle
-        except Exception as e:
-            error_log.append(f"{modelo}: {str(e)}")
-            continue # Si falló, probamos el siguiente
-
-    if not model_connected:
-        st.error(f"⚠️ NO SE PUDO INICIAR EL CHAT. Detalles: {error_log}")
 
 # ==========================================
 # 4. UI: HEADER Y ESTILOS
@@ -116,7 +122,6 @@ display_iva = "+IVA" if subtotal > 0 else ""
 display_badge = nombre_nivel[:25] + "..." if len(nombre_nivel) > 25 and subtotal > 0 else (nombre_nivel if subtotal > 0 else "⚡ 3% OFF")
 subtext_badge = f"🔥 AHORRAS: ${dinero_ahorrado:,.0f}" if dinero_ahorrado > 0 else "TIEMPO LIMITADO"
 
-# Cargar estilos desde módulo
 cargar_estilos(color_barra, porcentaje_barra, color_timer, reloj_python, display_badge, subtext_badge, display_precio, display_iva, seg_restantes, generar_link_wa, total_final, oferta_viva)
 
 # ==========================================
@@ -133,7 +138,6 @@ with tab1:
             st.session_state.expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=MINUTOS_OFERTA)
             st.rerun()
 
-    # POP-UP DE OPORTUNIDAD
     if 0 < prox_meta - subtotal < 200000 and oferta_viva:
         st.toast(f"🚨 ¡FALTAN ${prox_meta - subtotal:,.0f} PARA DESCUENTO! SUMÁ PINTURA O DISCOS.", icon="🔥")
 
@@ -172,7 +176,6 @@ with tab1:
         if cb3.button("💰 Ofertas", use_container_width=True):
             st.session_state.messages.append({"role": "user", "content": "¿Qué tenés en oferta hoy para llegar al descuento mayorista?"})
             st.rerun()
-    # -----------------------
 
     if p := st.chat_input("Escribí acá..."):
         if p == "#admin": st.session_state.admin_mode = not st.session_state.admin_mode; st.rerun()
@@ -217,7 +220,6 @@ with tab2:
 
                 if c3.button("🗑️", key=f"d_{i}"): 
                     indices_to_remove.append(i)
-                
                 st.markdown("---")
         
         if indices_to_remove:
@@ -225,19 +227,8 @@ with tab2:
                 del st.session_state.cart[index]
             st.rerun()
         
-        # BOTÓN DE PAGO BACKUP
-        st.markdown(f"""
-        <a href="{generar_link_wa(total_final)}" target="_blank" style="
-            display:block; width:100%; background: #333; 
-            color:white; margin-top:20px; text-align:center; padding:15px; border-radius:12px; 
-            text-decoration:none; font-weight:bold; opacity:0.8;">
-            Link Alternativo de Pago
-        </a>
-        """, unsafe_allow_html=True)
-        
+        st.markdown(f"""<a href="{generar_link_wa(total_final)}" target="_blank" style="display:block; width:100%; background: #333; color:white; margin-top:20px; text-align:center; padding:15px; border-radius:12px; text-decoration:none; font-weight:bold; opacity:0.8;">Link Alternativo de Pago</a>""", unsafe_allow_html=True)
         if st.button("Vaciar Carrito", use_container_width=True): st.session_state.cart = []; st.rerun()
 
-# SCRIPT AUTO-SCROLL
 auto_scroll()
-
 if st.session_state.admin_mode: st.dataframe(pd.DataFrame(st.session_state.log_data))
