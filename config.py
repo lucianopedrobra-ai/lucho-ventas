@@ -9,8 +9,8 @@ META_BASE   = 800000
 MINUTOS_OFERTA = 3
 
 # CONFIGURACIÓN GOOGLE SHEET
-SHEET_ID = "2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvnarDQ"
-SHEET_URL = f"https://docs.google.com/spreadsheets/d/e/{SHEET_ID}/pub?gid=2029869540&single=true&output=csv"
+# ✅ LINK ACTUALIZADO:
+SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTUG5PPo2kN1HkP2FY1TNAU9-ehvXqcvE_S9VBnrtQIxS9eVNmnh6Uin_rkvnarDQ/pub?output=csv"
 URL_FORM_GOOGLE = "" 
 
 # COSTOS FIJOS
