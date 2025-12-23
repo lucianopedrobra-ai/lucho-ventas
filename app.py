@@ -49,7 +49,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": saludo}]
 
 # ==========================================
-# 3. CEREBRO IA
+# 3. CEREBRO IA (SOPORTE MULTI-VERSION)
 # ==========================================
 try:
     api_key = os.environ.get("GOOGLE_API_KEY")
@@ -61,17 +61,46 @@ except: pass
 
 if "chat_session" not in st.session_state and "api_key" in locals() and api_key:
     sys_prompt = get_sys_prompt(csv_context, DOLAR_BNA)
-    try:
-        st.session_state.chat_session = genai.GenerativeModel(
-            'gemini-2.5-flash', 
-            system_instruction=sys_prompt,
-            tools='google_search_retrieval'
-        ).start_chat(history=[])
-    except:
-        st.session_state.chat_session = genai.GenerativeModel(
-            'gemini-2.5-flash', 
-            system_instruction=sys_prompt
-        ).start_chat(history=[])
+    
+    # LISTA DE PRIORIDAD (Tu configuración solicitada)
+    # 1. Gemini 2.5 Flash (Tu prioridad)
+    # 2. Gemini 2.0 Flash Exp (La experimental más nueva pública)
+    # 3. Gemini 1.5 Pro (Respaldo inteligente)
+    # 4. Gemini 1.5 Flash (Respaldo rápido de emergencia)
+    
+    intentos = [
+        ("gemini-2.5-flash", 'google_search_retrieval'),
+        ("gemini-2.0-flash-exp", 'google_search_retrieval'),
+        ("gemini-1.5-pro", 'google_search_retrieval'),
+        ("gemini-1.5-flash", None)
+    ]
+    
+    model_connected = False
+    
+    for modelo, tools in intentos:
+        try:
+            # Intentamos conectar con el modelo actual del bucle
+            if tools:
+                st.session_state.chat_session = genai.GenerativeModel(
+                    modelo, 
+                    system_instruction=sys_prompt,
+                    tools=tools
+                ).start_chat(history=[])
+            else:
+                st.session_state.chat_session = genai.GenerativeModel(
+                    modelo, 
+                    system_instruction=sys_prompt
+                ).start_chat(history=[])
+            
+            model_connected = True
+            # print(f"✅ Conectado a: {modelo}") # Descomentar para debug en consola
+            break 
+        except Exception as e:
+            # Si falla, el bucle continúa con el siguiente modelo de la lista
+            continue 
+
+    if not model_connected:
+        st.error("⚠️ Error de conexión con IA. Verifica tu API Key.")
 
 # ==========================================
 # 4. UI: HEADER Y ESTILOS
@@ -128,7 +157,7 @@ with tab1:
                             if news: st.balloons()
                             st.rerun()
     
-    # --- BOTONES RÁPIDOS (NUEVO) ---
+    # --- BOTONES RÁPIDOS ---
     if not st.session_state.cart and oferta_viva:
         st.caption("Atajos rápidos:")
         cb1, cb2, cb3 = st.columns(3)
@@ -141,7 +170,7 @@ with tab1:
         if cb3.button("💰 Ofertas", use_container_width=True):
             st.session_state.messages.append({"role": "user", "content": "¿Qué tenés en oferta hoy para llegar al descuento mayorista?"})
             st.rerun()
-    # -------------------------------
+    # -----------------------
 
     if p := st.chat_input("Escribí acá..."):
         if p == "#admin": st.session_state.admin_mode = not st.session_state.admin_mode; st.rerun()
@@ -207,9 +236,6 @@ with tab2:
         if st.button("Vaciar Carrito", use_container_width=True): st.session_state.cart = []; st.rerun()
 
 # SCRIPT AUTO-SCROLL
-auto_scroll()
-
-if st.session_state.admin_mode: st.dataframe(pd.DataFrame(st.session_state.log_data))
 auto_scroll()
 
 if st.session_state.admin_mode: st.dataframe(pd.DataFrame(st.session_state.log_data))
