@@ -43,7 +43,7 @@ if "messages" not in st.session_state:
     saludo = """
  **Soy Miguel.** Dólar actualizado. Stock disponible.
 
-👇 **PASAME TU PEDIDO YA** (Escribí o usá el botón **➕** para subir foto).
+👇 **PASAME TU PEDIDO YA** (Escribí o usá los botones rápidos).
 *¡El precio se congela por 3 minutos!* ⏳
     """
     st.session_state.messages = [{"role": "assistant", "content": saludo}]
@@ -127,6 +127,21 @@ with tab1:
                             st.session_state.last_processed_file = fid
                             if news: st.balloons()
                             st.rerun()
+    
+    # --- BOTONES RÁPIDOS (NUEVO) ---
+    if not st.session_state.cart and oferta_viva:
+        st.caption("Atajos rápidos:")
+        cb1, cb2, cb3 = st.columns(3)
+        if cb1.button("🏗️ Hierros", use_container_width=True):
+            st.session_state.messages.append({"role": "user", "content": "Hola, necesito precio de hierros de 6mm, 8mm y 10mm."})
+            st.rerun()
+        if cb2.button("🏠 Techos", use_container_width=True):
+            st.session_state.messages.append({"role": "user", "content": "Cotizame chapa cincalum y perfiles C para un techo de 40m2."})
+            st.rerun()
+        if cb3.button("💰 Ofertas", use_container_width=True):
+            st.session_state.messages.append({"role": "user", "content": "¿Qué tenés en oferta hoy para llegar al descuento mayorista?"})
+            st.rerun()
+    # -------------------------------
 
     if p := st.chat_input("Escribí acá..."):
         if p == "#admin": st.session_state.admin_mode = not st.session_state.admin_mode; st.rerun()
@@ -192,6 +207,9 @@ with tab2:
         if st.button("Vaciar Carrito", use_container_width=True): st.session_state.cart = []; st.rerun()
 
 # SCRIPT AUTO-SCROLL
+auto_scroll()
+
+if st.session_state.admin_mode: st.dataframe(pd.DataFrame(st.session_state.log_data))
 auto_scroll()
 
 if st.session_state.admin_mode: st.dataframe(pd.DataFrame(st.session_state.log_data))
