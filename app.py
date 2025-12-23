@@ -70,10 +70,6 @@ if "chat_session" not in st.session_state:
         sys_prompt = get_sys_prompt(csv_context, DOLAR_BNA)
         
         # ⚠️ ESTRATEGIA DE CONEXIÓN:
-        # 1. Gemini 2.0 Flash Experimental (Lo más nuevo que existe hoy).
-        # 2. Gemini Pro (Versión 1.0 estable - Esta NO FALLA).
-        # Eliminamos 'tools' para evitar el error 400.
-        
         intentos = [
             "gemini-2.0-flash-exp", # Tu prioridad (Tecnología nueva)
             "gemini-1.5-flash",     # Intermedio
@@ -96,10 +92,6 @@ if "chat_session" not in st.session_state:
 
         if not connected_model:
             st.error(f"⚠️ Todos los modelos fallaron. Log: {error_log}")
-        # Opcional: Descomentar para ver qué modelo conectó
-        # else:
-        #    st.toast(f"✅ Conectado a motor: {connected_model}", icon="🤖")
-
 
 # ==========================================
 # 4. UI: HEADER Y ESTILOS
@@ -134,7 +126,10 @@ with tab1:
 
     for m in st.session_state.messages:
         if m["role"] != "system":
-            clean = re.sub(r'\[ADD:.*?\]', '', m["content"]).strip()
+            # LIMPIEZA VISUAL POTENTE
+            clean = re.sub(r'\[ADD:.*?\]', '', m["content"])
+            clean = clean.replace("[TEXTO VISIBLE]", "").replace("SALIDA:", "").strip()
+            
             if clean: st.chat_message(m["role"], avatar="👷‍♂️" if m["role"]=="assistant" else "👤").markdown(clean)
 
     with st.container():
@@ -180,7 +175,11 @@ with tab1:
                         st.error(res)
                     else:
                         news = parsear_ordenes_bot(res)
+                        
+                        # LIMPIEZA VISUAL EN TIEMPO REAL
                         display = re.sub(r'\[ADD:.*?\]', '', res)
+                        display = display.replace("[TEXTO VISIBLE]", "").replace("SALIDA:", "").strip()
+                        
                         st.markdown(display)
                         
                         if news: 
