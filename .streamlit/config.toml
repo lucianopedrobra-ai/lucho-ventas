@@ -2,5 +2,4 @@
 enableCORS = false
 enableXsrfProtection = false
 headless = true
-# port = 8080  <-- BORRA O COMENTA ESTA LÍNEA
 address = "0.0.0.0"
