@@ -3,3 +3,4 @@ enableCORS = false
 enableXsrfProtection = false
 headless = true
 address = "0.0.0.0"
+# El puerto se asignará automáticamente (8501)
