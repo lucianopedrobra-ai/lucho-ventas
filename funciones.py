@@ -11,10 +11,21 @@ import os
 from config import *
 
 # ==========================================
-# MOTOR INVISIBLE
+# MOTOR INVISIBLE (OPTIMIZADO)
 # ==========================================
 @st.cache_data(ttl=3600)
 def obtener_dolar_bna():
+    # 1. INTENTO VÍA API (Más rápido y estable)
+    try:
+        r = requests.get("https://dolarapi.com/v1/dolares/oficial", timeout=3)
+        if r.status_code == 200:
+            data = r.json()
+            # La API devuelve venta, lo usamos
+            return float(data['venta'])
+    except:
+        pass
+
+    # 2. INTENTO VÍA SCRAPING (Respaldo original)
     url = "https://www.bna.com.ar/Personas"
     backup = 1060.00
     try:
@@ -33,7 +44,9 @@ def obtener_dolar_bna():
 
 @st.cache_data(ttl=600)
 def load_data():
-    try: return pd.read_csv(SHEET_URL, dtype=str).fillna("").to_csv(index=False)
+    try: 
+        # Carga optimizada: Leemos todo como texto para evitar errores de formato
+        return pd.read_csv(SHEET_URL, dtype=str).fillna("").to_csv(index=False)
     except: return ""
 
 def enviar_a_google_form_background(cliente, monto, oportunidad):
@@ -121,7 +134,7 @@ def generar_link_wa(total):
         return "https://wa.me/5493401527780"
 
 # ==========================================
-# IA LOGIC (AQUÍ ESTÁ EL CAMBIO)
+# IA LOGIC (CEREBRO OPTIMIZADO)
 # ==========================================
 def get_sys_prompt(csv_context, DOLAR_BNA):
     return f"""
@@ -130,29 +143,28 @@ def get_sys_prompt(csv_context, DOLAR_BNA):
     ZONA GRATIS (PUNTOS LOGÍSTICOS): {CIUDADES_GRATIS}
     DOLAR BNA VENTA: {DOLAR_BNA}
 
+    🛑 **REGLA DE ORO (SEGURIDAD DE PRECIOS):**
+    1. TU ÚNICA FUENTE DE VERDAD ES LA "DB".
+    2. Si un producto NO está en la DB, di: "No tengo stock de eso" o sugiere un sustituto que SÍ esté.
+    3. JAMÁS INVENTES UN PRECIO.
+
     📏 **CATÁLOGO TÉCNICO (ESTRICTO):**
     - **12m:** Perfil C, IPN, UPN, ADN.
     - **6.40m:** Caños (Mecánico, Epoxi, Galvanizado, Schedule). **¡ATENCIÓN! La unidad de venta de estas barras es "METRO", NO "KG".**
     - **6m:** Tubos Estructurales, Hierros, Ángulos, Planchuelas.
     - **CHAPA T90:** Única medida 13m.
     - **CHAPA COLOR / CINCALUM:** Por metro.
-    - **AISLANTES ISOVER ISOLANT:** El precio en la base de datos es por m². **TU TAREA:** Lee en la descripción cuántos m² trae el rollo (ej: 10m², 20m²), multiplica (Precio m² * Cantidad m²) y **COTIZA SIEMPRE EL PRECIO FINAL POR ROLLO CERRADO**. Nunca pases precio por m2 suelto.
+    - **AISLANTES ISOVER ISOLANT:** Cotiza SIEMPRE por ROLLO CERRADO (Precio m² * m² del rollo).
 
-    🧠 **SENTIDO COMÚN Y CONTEXTO (GOOGLE):**
-    - Interpreta las descripciones del usuario usando información disponible en Google si es ambigua.
-    - **Ejemplo Alambre:** Si envían foto o piden "60 metros de alambre", NO son 60 rollos. Calcula el peso aproximado de 60 metros lineales o el equivalente fraccionado. Contextualiza que es un elemento continuo.
-
-    🚚 **LÓGICA DE FLETE (CRÍTICO):**
-    1. **Analiza la ubicación del cliente.**
-    2. **CASO 1: ZONA GRATIS.** Si la ciudad está en {CIUDADES_GRATIS} -> ENVÍO $0.
-    3. **CASO 2: FUERA DE ZONA.** - Identifica la ciudad de {CIUDADES_GRATIS} más cercana al cliente (Punto Logístico).
-       - Estima la distancia en KM (IDA Y VUELTA) desde ese punto logístico hasta el cliente usando tus conocimientos geográficos/mapas.
-       - **Cálculo:** `KM_TOTAL (IDA+VUELTA) * 0.85 USD * {DOLAR_BNA} * 1.21 (IVA)`.
-       - Agrega este costo como un item "[ADD:1:FLETE A [CIUDAD]:PRECIO_CALCULADO:SERVICIO]".
+    🚚 **LÓGICA DE FLETE:**
+    1. **CASO 1: ZONA GRATIS.** Si la ciudad está en {CIUDADES_GRATIS} -> ENVÍO $0.
+    2. **CASO 2: FUERA DE ZONA.** - Calcula KM ida y vuelta desde punto logístico más cercano.
+       - Costo: `KM_TOTAL * 0.85 USD * {DOLAR_BNA} * 1.21`.
+       - Agrega item: "[ADD:1:FLETE A [CIUDAD]:PRECIO:SERVICIO]".
 
     ⛔ **PROTOCOLO SNIPER:**
     1. **BREVEDAD:** Max 15 palabras. Directo.
-    2. **CONFIRMACIÓN:** SOLO agrega `[ADD:...]` si el cliente dice "SÍ" o "CARGALO" o envía una lista definida de pedido.
+    2. **CONFIRMACIÓN:** SOLO agrega `[ADD:...]` si el cliente confirma o pide explícitamente.
     3. **UPSELL:** "Te faltan $X para el descuento. ¿Agrego pintura?".
 
     SALIDA: [TEXTO VISIBLE] [ADD:CANTIDAD:PRODUCTO:PRECIO_UNITARIO_FINAL_PESOS:TIPO]
@@ -163,7 +175,7 @@ def procesar_input(contenido, es_imagen=False):
         msg = contenido
         prefix = ""
         if es_imagen: msg = ["COTIZA ESTO RÁPIDO. DETECTA OPORTUNIDADES Y CONTEXTO DEL PRODUCTO (No confundir unidades).", contenido]
-        prompt = f"{prefix}{msg}. (NOTA: Sé breve. Cotiza precios. NO AGREGUES sin confirmación)." if not es_imagen else msg
+        prompt = f"{prefix}{msg}. (NOTA: Sé breve. Cotiza precios exactos de la DB)." if not es_imagen else msg
         try:
             return st.session_state.chat_session.send_message(prompt).text
         except Exception as e:
