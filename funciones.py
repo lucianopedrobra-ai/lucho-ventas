@@ -145,10 +145,28 @@ def procesar_input(contenido, es_imagen=False):
         prefix = ""
         if es_imagen: msg = ["COTIZA ESTO. DETECTA PRODUCTOS Y CANTIDADES.", contenido]
         prompt = f"{prefix}{msg}. (Responde breve. Usa precios DB)." if not es_imagen else msg
+        
+        # --- BLOQUE ANTI-FALLOS 429 ---
         try:
+            # 1. Intento Principal con el modelo activo (2.5 o 2.0)
             return st.session_state.chat_session.send_message(prompt).text
         except Exception as e:
-            # AQUI ESTA LA CLAVE: Devolvemos el error real para saber qué pasa
-            return f"⚠️ ERROR DE GOOGLE: {str(e)}"
+            error_msg = str(e).lower()
+            # 2. Si detectamos bloqueo por cuota (429) o sobrecarga
+            if "429" in error_msg or "quota" in error_msg:
+                try:
+                    # 🚀 ACTIVAMOS EL MOTOR DE RESPALDO (Gemini 1.5 Flash) SOLO POR ESTA VEZ
+                    # Esto evita que el usuario vea el error.
+                    datos = load_data()
+                    dolar = obtener_dolar_bna()
+                    sys = get_sys_prompt(datos, dolar)
+                    
+                    backup_model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=sys)
+                    return backup_model.generate_content(prompt).text
+                except Exception as e2:
+                    return f"⚠️ SERVIDORES SATURADOS: Intenta en 1 minuto."
+            
+            # Si es otro error, lo mostramos
+            return f"⚠️ ERROR TÉCNICO: {str(e)}"
             
     return "Error: Chat off (Reinicia la página)."
