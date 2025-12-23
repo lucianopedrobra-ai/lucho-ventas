@@ -49,7 +49,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": saludo}]
 
 # ==========================================
-# 3. CEREBRO IA (MODO ESTABLE)
+# 3. CEREBRO IA (SOLUCIÓN ERROR 400)
 # ==========================================
 api_key = None
 try:
@@ -69,13 +69,12 @@ if "chat_session" not in st.session_state:
     else:
         sys_prompt = get_sys_prompt(csv_context, DOLAR_BNA)
         
-        # ⚠️ CAMBIO CLAVE: Usamos la versión ESTABLE primero para asegurar que funcione.
-        # Las versiones experimentales (2.0/2.5) pueden fallar en cuentas nuevas.
+        # ⚠️ CAMBIO CRÍTICO: Eliminamos 'google_search_retrieval' que daba Error 400.
+        # Ahora usamos 'None' en tools para que el bot sea PURA VENTA con tu CSV.
         intentos = [
-            ("gemini-1.5-flash", 'google_search_retrieval'),       # LA MÁS RÁPIDA Y SEGURA
-            ("gemini-1.5-pro", 'google_search_retrieval'),         # LA MÁS INTELIGENTE
-            ("gemini-2.0-flash-exp", 'google_search_retrieval'),   # EXPERIMENTAL
-            ("gemini-1.5-flash", None)                             # RESPALDO SIN BÚSQUEDA
+            ("gemini-1.5-flash", None),       # Rápido y obediente al CSV
+            ("gemini-1.5-pro", None),         # Respaldo inteligente
+            ("gemini-2.0-flash-exp", None)    # Respaldo experimental
         ]
         
         connected = False
@@ -83,22 +82,19 @@ if "chat_session" not in st.session_state:
         
         for modelo, tools in intentos:
             try:
-                if tools:
-                    st.session_state.chat_session = genai.GenerativeModel(
-                        modelo, system_instruction=sys_prompt, tools=tools
-                    ).start_chat(history=[])
-                else:
-                    st.session_state.chat_session = genai.GenerativeModel(
-                        modelo, system_instruction=sys_prompt
-                    ).start_chat(history=[])
+                # Inicialización simple sin herramientas externas (Evita errores)
+                st.session_state.chat_session = genai.GenerativeModel(
+                    modelo, system_instruction=sys_prompt
+                ).start_chat(history=[])
+                
                 connected = True
                 break 
             except Exception as e:
-                error_debug.append(str(e))
+                error_debug.append(f"{modelo}: {str(e)}")
                 continue 
 
         if not connected:
-            st.error(f"⚠️ Error al conectar con Google AI: {error_debug}")
+            st.error(f"⚠️ Error de conexión con Google: {error_debug}")
 
 
 # ==========================================
