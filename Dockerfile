@@ -22,8 +22,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar EL RESTO de los archivos (app.py, config.py, etc)
 COPY . .
 
-# Exponer el puerto
-EXPOSE 8080
+# Exponer el puerto estándar de Streamlit
+EXPOSE 8501
 
-# Comando para iniciar la app
+# Comando para iniciar la app (Sin forzar puerto 8080)
 CMD streamlit run app.py --server.address=0.0.0.0
