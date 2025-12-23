@@ -49,58 +49,60 @@ if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": saludo}]
 
 # ==========================================
-# 3. CEREBRO IA (SOPORTE MULTI-VERSION)
+# 3. CEREBRO IA (SISTEMA DE ARRANQUE SEGURO)
 # ==========================================
+api_key = None
 try:
+    # 1. Intentamos leer de variables de entorno (Local/Docker)
     api_key = os.environ.get("GOOGLE_API_KEY")
+    # 2. Si falla, intentamos leer de Secrets (Streamlit Cloud)
     if not api_key:
         try: api_key = st.secrets["GOOGLE_API_KEY"]
         except: pass
-    if api_key: genai.configure(api_key=api_key)
-except: pass
+    
+    # 3. Configurar solo si hay llave
+    if api_key: 
+        genai.configure(api_key=api_key)
+    else:
+        st.error("🚨 ERROR CRÍTICO: No se encontró la API KEY. Configura los Secrets en Streamlit.")
+except Exception as e:
+    st.error(f"Error configurando API: {e}")
 
-if "chat_session" not in st.session_state and "api_key" in locals() and api_key:
+# Solo intentamos conectar si no existe sesión y tenemos llave
+if "chat_session" not in st.session_state and api_key:
     sys_prompt = get_sys_prompt(csv_context, DOLAR_BNA)
     
-    # LISTA DE PRIORIDAD (Tu configuración solicitada)
-    # 1. Gemini 2.5 Flash (Tu prioridad)
-    # 2. Gemini 2.0 Flash Exp (La experimental más nueva pública)
-    # 3. Gemini 1.5 Pro (Respaldo inteligente)
-    # 4. Gemini 1.5 Flash (Respaldo rápido de emergencia)
-    
+    # LISTA DE PRIORIDAD: Intenta conectar en orden.
     intentos = [
-        ("gemini-2.5-flash", 'google_search_retrieval'),
-        ("gemini-2.0-flash-exp", 'google_search_retrieval'),
-        ("gemini-1.5-pro", 'google_search_retrieval'),
-        ("gemini-1.5-flash", None)
+        ("gemini-2.5-flash", 'google_search_retrieval'),       # Tu preferencia
+        ("gemini-2.0-flash-exp", 'google_search_retrieval'),   # Experimental Nuevo
+        ("gemini-1.5-flash", 'google_search_retrieval'),       # Estable Rápido
+        ("gemini-1.5-flash", None)                             # Modo Seguro (Sin tools)
     ]
     
     model_connected = False
-    
+    error_log = []
+
     for modelo, tools in intentos:
         try:
-            # Intentamos conectar con el modelo actual del bucle
+            # Configuración del modelo
             if tools:
                 st.session_state.chat_session = genai.GenerativeModel(
-                    modelo, 
-                    system_instruction=sys_prompt,
-                    tools=tools
+                    modelo, system_instruction=sys_prompt, tools=tools
                 ).start_chat(history=[])
             else:
                 st.session_state.chat_session = genai.GenerativeModel(
-                    modelo, 
-                    system_instruction=sys_prompt
+                    modelo, system_instruction=sys_prompt
                 ).start_chat(history=[])
             
             model_connected = True
-            # print(f"✅ Conectado a: {modelo}") # Descomentar para debug en consola
-            break 
+            break # Si conectó, salimos del bucle
         except Exception as e:
-            # Si falla, el bucle continúa con el siguiente modelo de la lista
-            continue 
+            error_log.append(f"{modelo}: {str(e)}")
+            continue # Si falló, probamos el siguiente
 
     if not model_connected:
-        st.error("⚠️ Error de conexión con IA. Verifica tu API Key.")
+        st.error(f"⚠️ NO SE PUDO INICIAR EL CHAT. Detalles: {error_log}")
 
 # ==========================================
 # 4. UI: HEADER Y ESTILOS
